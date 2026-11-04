@@ -36,8 +36,12 @@ export default function App() {
       } catch {
         return set({ kind: "landing" });
       }
-      const attrs = await fetchUserAttributes();
-      set({ kind: "drive", email: attrs.email ?? "" });
+      try {
+        const attrs = await fetchUserAttributes();
+        set({ kind: "drive", email: attrs.email ?? "" });
+      } catch (e) {
+        set({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      }
     })();
 
     return () => {
