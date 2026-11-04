@@ -1,1 +1,8 @@
 .superpowers/
+node_modules/
+dist/
+*.tfstate*
+.terraform/
+infra/terraform.tfvars
+web/public/config.json
+*.zip

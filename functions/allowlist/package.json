@@ -1,0 +1,17 @@
+{
+  "name": "allowlist",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cognito trigger Lambdas enforcing the Family Drive email allowlist",
+  "scripts": {
+    "test": "vitest run",
+    "build": "esbuild src/preSignUp.ts src/preTokenGeneration.ts --bundle --platform=node --target=node22 --format=cjs --outdir=dist"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
