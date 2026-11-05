@@ -169,13 +169,50 @@ Note these two:
 
 ## 4. Finish Google sign-in
 
-In the Google OAuth client, under **Authorized redirect URIs**, add:
+Google sends people back to **Cognito**, not to the CloudFront site. Until Google knows
+Cognito's return address, sign-in fails with `Error 400: redirect_uri_mismatch`.
 
-```
-https://<cognito_domain>/oauth2/idpresponse
+### Find the Cognito domain
+Use the `cognito_domain` output at the end of the app pipeline log, e.g.
+`family-drive-ab12cd34.auth.ap-southeast-1.amazoncognito.com`. Or run this, which prints the
+prefix; append `.auth.ap-southeast-1.amazoncognito.com`:
+
+```bash
+aws cognito-idp describe-user-pool --region ap-southeast-1 --user-pool-id $(aws cognito-idp list-user-pools --region ap-southeast-1 --max-results 10 --query "UserPools[?Name=='family-drive'].Id | [0]" --output text) --query UserPool.Domain --output text
 ```
 
-Sign-in works once this is saved. Open `app_url` and sign in with an allowlisted Google account.
+### Configure the OAuth client
+In Google Cloud Console, go to **APIs & Services → Credentials** and open the OAuth 2.0 Client ID
+(Web application). It must be the same client as the one in SSM `/family-drive/google_client_id`.
+
+1. Under **Authorized redirect URIs**, add exactly:
+   ```
+   https://<cognito_domain>/oauth2/idpresponse
+   ```
+   - It must start with `https://`.
+   - Don't add a trailing slash.
+   - It's the Cognito domain, not the CloudFront URL.
+2. You can leave **Authorized JavaScript origins** empty.
+3. Click **Save**. Google says the change can take a few minutes to a few hours. It's usually about 5 minutes.
+
+### Check the OAuth consent screen
+Go to **APIs & Services → OAuth consent screen** (or **Google Auth Platform → Audience**).
+
+- **User type:** External.
+- **Publishing status:**
+  - **Testing:** only accounts listed under **Test users** can sign in. Add yourself and each family member.
+  - **Published:** skips the test-user list. With only the basic scopes, Google doesn't require verification, though users may see an "unverified app" notice.
+- **Scopes:** `openid`, `email`, `profile`. Nothing else.
+
+### Test
+Open `app_url` in a private window and sign in.
+
+- **An allowlisted Google account** reaches the drive.
+- **Any other account** sees "You don't have access to this drive."
+- **If `redirect_uri_mismatch` persists,** click the **error details** link on Google's error page. It shows the exact `redirect_uri` that was sent; add that value to the list.
+
+**Heads-up:** the Cognito domain currently ends in a random suffix. If the app stack is
+destroyed and redeployed, the domain changes, so you'll have to update the redirect URI again.
 
 ## 5. App destroy pipeline (optional, manual only)
 
@@ -237,7 +274,8 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
 | `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | `Node >= 20.19 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
-| Google shows `redirect_uri_mismatch` | Step 4 not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse`. |
+| Google shows `redirect_uri_mismatch` | Step 4 not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse` (step 4). Google's error details page shows the exact URI it received. |
+| Google says the account can't access the app (consent screen in Testing) | The account isn't a test user | Add it under **Test users**, or publish the app (step 4). |
 
 ## Known gaps
 
