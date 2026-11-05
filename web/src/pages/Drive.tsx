@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Amplify } from "aws-amplify";
-import { signOut } from "aws-amplify/auth";
+import { signOutSafely } from "../session";
 import { createAmplifyAuthAdapter, createStorageBrowser } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
 import { driveLocation } from "../config";
@@ -22,7 +22,7 @@ export default function Drive({ email }: { email: string }) {
         <strong>Family Drive</strong>
         <span className="spacer" />
         <span>{email}</span>
-        <button className="link" onClick={() => signOut()}>
+        <button className="link" onClick={signOutSafely}>
           Sign out
         </button>
       </header>

@@ -165,7 +165,7 @@ As with the foundation policy, adjust the `PipelineArtifacts` statement if your 
 Push to `main` or click **Release change**. A successful log ends with the Terraform outputs.
 Note these two:
 - `app_url`: the site, `https://<id>.cloudfront.net`
-- `cognito_domain`: `<prefix>.auth.ap-southeast-1.amazoncognito.com`
+- `cognito_domain`: always `family-drive-084519186805.auth.ap-southeast-1.amazoncognito.com` (fixed: project name + account ID)
 
 ## 4. Finish Google sign-in
 
@@ -173,9 +173,10 @@ Google sends people back to **Cognito**, not to the CloudFront site. Until Googl
 Cognito's return address, sign-in fails with `Error 400: redirect_uri_mismatch`.
 
 ### Find the Cognito domain
-Use the `cognito_domain` output at the end of the app pipeline log, e.g.
-`family-drive-ab12cd34.auth.ap-southeast-1.amazoncognito.com`. Or run this, which prints the
-prefix; append `.auth.ap-southeast-1.amazoncognito.com`:
+It is fixed: `family-drive-084519186805.auth.ap-southeast-1.amazoncognito.com`, so the redirect URI below is
+`https://family-drive-084519186805.auth.ap-southeast-1.amazoncognito.com/oauth2/idpresponse`.
+To double-check, use the `cognito_domain` output at the end of the app pipeline log, or run this, which prints the
+prefix (append `.auth.ap-southeast-1.amazoncognito.com`):
 
 ```bash
 aws cognito-idp describe-user-pool --region ap-southeast-1 --user-pool-id $(aws cognito-idp list-user-pools --region ap-southeast-1 --max-results 10 --query "UserPools[?Name=='family-drive'].Id | [0]" --output text) --query UserPool.Domain --output text
@@ -211,8 +212,8 @@ Open `app_url` in a private window and sign in.
 - **Any other account** sees "You don't have access to this drive."
 - **If `redirect_uri_mismatch` persists,** click the **error details** link on Google's error page. It shows the exact `redirect_uri` that was sent; add that value to the list.
 
-**Heads-up:** the Cognito domain currently ends in a random suffix. If the app stack is
-destroyed and redeployed, the domain changes, so you'll have to update the redirect URI again.
+Because the Cognito domain is fixed, this redirect URI keeps working when the app stack is destroyed and
+redeployed. (Deployments made before the domain was fixed used a random suffix; remove that old URI from Google.)
 
 ## 5. App destroy pipeline (optional, manual only)
 
@@ -236,8 +237,9 @@ Use this to take the app down without touching the files, the settings or the st
 - Click **Release change**, then approve.
 - It takes about 5–15 minutes, mostly waiting for CloudFront to be disabled.
 
-**Bringing the app back:** run the app deploy pipeline again. The CloudFront URL and Cognito domain will change, so
-**redo step 4** and share the new link.
+**Bringing the app back:** run the app deploy pipeline again. The Cognito domain stays the same, so Google sign-in
+keeps working, but the CloudFront URL changes: share the new `app_url`. A custom domain would make the link
+permanent (not set up).
 
 **There is deliberately no foundation destroy pipeline.** Removing the foundation deletes the
 family's files and all Terraform state. It needs manual steps:
@@ -252,7 +254,7 @@ family's files and all Terraform state. It needs manual steps:
 1. Edit `/family-drive/allowed_emails` in SSM.
 2. Re-run the app pipeline (**Release change**).
 
-A removed person loses access within about **2 hours**: their current token can last up to an hour, and the AWS credentials they got from it last up to another hour. To cut them off sooner, also delete their user in the Cognito user pool.
+A removed person loses access within about **2 hours**: ID and access tokens are set to last 60 minutes, and the AWS credentials obtained with them up to another hour. Every token refresh re-checks the allowlist. To cut them off sooner, also delete their user in the Cognito user pool.
 
 **Recover a deleted or overwritten file (within 30 days):**
 ```bash
@@ -277,7 +279,45 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | Google shows `redirect_uri_mismatch` | Step 4 not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse` (step 4). Google's error details page shows the exact URI it received. |
 | Google says the account can't access the app (consent screen in Testing) | The account isn't a test user | Add it under **Test users**, or publish the app (step 4). |
 
+## Using the drive
+
+- The drive shows only what's under the **`drive/`** prefix of `family-drive-files-084519186805`. That is the only place signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `drive/`.
+- The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files and can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
+- Both foundation buckets refuse any request that isn't over HTTPS.
+
+## Local development
+
+Run the web app on your machine against the deployed AWS backend. `http://localhost:5173` is already allowed by the Cognito callback URLs and the files bucket CORS rule.
+
+1. Sign the AWS CLI in to the account (read access to the app state is enough).
+2. Build the config from the deployed outputs:
+   ```bash
+   bash ci/tf-init.sh && bash scripts/write-config.sh
+   ```
+3. Start the dev server:
+   ```bash
+   npm ci --prefix web && npm run dev --prefix web
+   ```
+4. Open `http://localhost:5173` and sign in with an allowlisted Google account.
+
+Tests: `npm test --prefix functions/allowlist` and `npm test --prefix web`.
+
+## End-to-end test checklist
+
+Run after a deploy, ideally in a private window.
+
+- [ ] An allowlisted Google account signs in and lands in the drive, with its email in the top bar.
+- [ ] A Google account not on the list sees "You don't have access to this drive." and can sign out.
+- [ ] A file placed under `drive/` in S3 shows up in the list (name, last modified, size).
+- [ ] Upload a small file and a large one (over 100 MB); both appear when done.
+- [ ] Create folder `Tết 2026`, upload `ảnh gia đình.jpg` into it, then download it and check it opens.
+- [ ] Copy a file, then delete the copy.
+- [ ] Delete a file, then confirm a previous version still exists: `aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix drive/`.
+- [ ] Sign out returns to the landing page.
+- [ ] Remove an email from SSM, re-run the app pipeline, and confirm that account is refused within about 2 hours (or at once after deleting its Cognito user).
+
 ## Known gaps
 
-- **The file browser screen isn't built yet** (plan Task 6). The app deploys sign-in and a placeholder page. Storage Browser comes next.
+- No custom domain: the CloudFront link changes if the app stack is recreated.
+
 - The IAM policies are based on the Terraform resources in this repo and haven't been exercised against every AWS provider read. If a run reports `AccessDenied` for a `Get…` or `List…` action, add that action to the matching policy file.

@@ -54,4 +54,21 @@ describe("loadConfig", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
     await expect(loadConfig()).rejects.toThrow(/config\.json/);
   });
+
+  it("explains a non-JSON body (e.g. the SPA fallback page served instead)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => JSON.parse("<!doctype html>") }),
+    );
+    await expect(loadConfig()).rejects.toThrow(/config\.json is not valid JSON/);
+  });
+
+  it("names a missing or empty key", async () => {
+    const { userPoolId: _omit, ...missing } = c;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => missing }));
+    await expect(loadConfig()).rejects.toThrow("config.json is missing userPoolId");
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...c, filesBucket: "" }) }));
+    await expect(loadConfig()).rejects.toThrow("config.json is missing filesBucket");
+  });
 });

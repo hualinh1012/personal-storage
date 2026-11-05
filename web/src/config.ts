@@ -21,10 +21,33 @@ export function driveLocation(bucket: string) {
   };
 }
 
+const CONFIG_KEYS: (keyof AppConfig)[] = [
+  "region",
+  "userPoolId",
+  "userPoolClientId",
+  "cognitoDomain",
+  "identityPoolId",
+  "filesBucket",
+  "appUrl",
+];
+
 export async function loadConfig(): Promise<AppConfig> {
   const res = await fetch("/config.json");
   if (!res.ok) throw new Error(`Failed to load /config.json (HTTP ${res.status})`);
-  return (await res.json()) as AppConfig;
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = (await res.json()) as Record<string, unknown>;
+  } catch {
+    // CloudFront serves index.html for missing paths, so a missing file can arrive as HTML.
+    throw new Error("config.json is not valid JSON (was it deployed? see scripts/write-config.sh)");
+  }
+  for (const key of CONFIG_KEYS) {
+    if (typeof raw?.[key] !== "string" || raw[key] === "") {
+      throw new Error(`config.json is missing ${key}`);
+    }
+  }
+  return raw as unknown as AppConfig;
 }
 
 /** Gen 2-shaped outputs object, accepted by Amplify.configure (any version starting with "1"). */

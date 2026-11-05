@@ -5,7 +5,8 @@
   "description": "Cognito trigger Lambdas enforcing the Family Drive email allowlist",
   "scripts": {
     "test": "vitest run",
-    "build": "esbuild src/preSignUp.ts src/preTokenGeneration.ts --bundle --platform=node --target=node22 --format=cjs --outdir=dist"
+    "build": "esbuild src/preSignUp.ts src/preTokenGeneration.ts --bundle --platform=node --target=node22 --format=cjs --outdir=dist",
+    "typecheck": "tsc -p ."
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.164",

@@ -1,4 +1,13 @@
-import { fetchAuthSession } from "aws-amplify/auth";
+import { fetchAuthSession, signOut } from "aws-amplify/auth";
+
+/** Sign out via Cognito; if that fails, at least drop back to the landing page. */
+export async function signOutSafely(): Promise<void> {
+  try {
+    await signOut();
+  } catch {
+    location.assign("/");
+  }
+}
 
 /**
  * The signed-in user's email, from the ID token. Deliberately not

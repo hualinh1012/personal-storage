@@ -37,6 +37,14 @@ describe("preSignUp", () => {
   it("denies native sign-up even for an allowlisted email", async () => {
     await expect(preSignUp(signUpEvent("PreSignUp_SignUp", "mom@gmail.com"))).rejects.toThrow("ACCESS_DENIED");
   });
+  it("denies an allowlisted Google user whose email isn't verified", async () => {
+    await expect(preSignUp(signUpEvent("PreSignUp_ExternalProvider", "mom@gmail.com", "false"))).rejects.toThrow("ACCESS_DENIED");
+  });
+  it("denies everyone when ALLOWED_EMAILS is not set at all", async () => {
+    delete process.env.ALLOWED_EMAILS;
+    await expect(preSignUp(signUpEvent("PreSignUp_ExternalProvider", "mom@gmail.com"))).rejects.toThrow("ACCESS_DENIED");
+    await expect(preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "mom@gmail.com"))).rejects.toThrow("ACCESS_DENIED");
+  });
 });
 
 describe("preTokenGeneration", () => {

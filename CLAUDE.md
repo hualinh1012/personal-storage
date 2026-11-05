@@ -20,7 +20,7 @@ pass `--prefix <dir>` to `npm`. Run `npm ci` in a package first; `node_modules` 
 # Cognito trigger Lambdas (functions/allowlist)
 npm test                       # vitest
 npm run build                  # esbuild → dist/preSignUp.js, dist/preTokenGeneration.js
-npx tsc -p .                   # typecheck (no script for it)
+npm run typecheck              # tsc -p .
 
 # Web app (web)
 npm run dev                    # Vite on http://localhost:5173 (needs web/public/config.json)
