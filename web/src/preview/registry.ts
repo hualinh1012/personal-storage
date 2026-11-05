@@ -1,4 +1,5 @@
 import MarkdownPreview from "./MarkdownPreview";
+import PdfPreviewLazy from "./PdfPreviewLazy";
 import type { PreviewTypeEntry } from "./types";
 
 /*
@@ -9,8 +10,8 @@ import type { PreviewTypeEntry } from "./types";
  * (image 200 MB, video 2 GB, text 10 MB). Anything else shows "no preview"
  * with a download button.
  *
- * To support a new type (e.g. PDF): add a viewer component in this folder
- * and one entry below.
+ * To support a new type: add a viewer component in this folder and one entry
+ * below. Load heavy viewer libraries lazily (see PdfPreviewLazy).
  */
 export const PREVIEW_TYPES: PreviewTypeEntry[] = [
   {
@@ -19,6 +20,13 @@ export const PREVIEW_TYPES: PreviewTypeEntry[] = [
     contentTypes: ["text/markdown", "text/x-markdown"],
     renderer: MarkdownPreview,
     maxBytes: 10 * 1024 * 1024,
+  },
+  {
+    type: "pdf",
+    extensions: ["pdf"],
+    contentTypes: ["application/pdf"],
+    renderer: PdfPreviewLazy,
+    maxBytes: 50 * 1024 * 1024,
   },
 ];
 

@@ -21,6 +21,10 @@ ENTRY=(--exclude index.html --exclude config.json)
 # 1. Content-hashed assets: cache forever (their names change on every build).
 aws s3 sync "$DIST" "s3://${WEB_BUCKET}" "${ENTRY[@]}" \
   --cache-control "public,max-age=31536000,immutable"
+# Module scripts (e.g. the PDF.js worker) must be served as JavaScript or the
+# browser refuses them; don't rely on the CLI's guess for .mjs.
+aws s3 cp "$DIST" "s3://${WEB_BUCKET}" --recursive --exclude "*" --include "*.mjs" \
+  --content-type "text/javascript" --cache-control "public,max-age=31536000,immutable"
 # 2. Entry points: always revalidate, so browsers pick up new asset names and
 #    config (e.g. a changed Cognito domain) on the next load.
 for f in index.html config.json; do

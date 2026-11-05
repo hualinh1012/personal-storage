@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Records whether anything imported react-pdf (it should only load on demand).
+let pdfLibraryLoaded = false;
+vi.mock("react-pdf", () => {
+  pdfLibraryLoaded = true;
+  return { Document: () => null, Page: () => null, pdfjs: { GlobalWorkerOptions: {} } };
+});
+
 import { filePreviewConfig, resolvePreviewType } from "../src/preview/registry";
 import MarkdownPreview from "../src/preview/MarkdownPreview";
+import PdfPreviewLazy from "../src/preview/PdfPreviewLazy";
 
 const file = (key: string, contentType?: string) => ({ key, contentType });
 
@@ -20,8 +29,14 @@ describe("resolvePreviewType", () => {
     expect(resolvePreviewType(file("drive/c.txt", "text/plain"))).toBeUndefined();
   });
 
+  it("recognises PDF by extension or content type", () => {
+    expect(resolvePreviewType(file("drive/Contract.PDF"))).toBe("pdf");
+    expect(resolvePreviewType(file("drive/scan", "application/pdf"))).toBe("pdf");
+  });
+
   it("returns nothing for types without a viewer", () => {
-    expect(resolvePreviewType(file("drive/d.pdf", "application/pdf"))).toBeUndefined();
+    expect(resolvePreviewType(file("drive/d.docx"))).toBeUndefined();
+    expect(resolvePreviewType(file("drive/e.zip", "application/zip"))).toBeUndefined();
     expect(resolvePreviewType(file("drive/no-extension"))).toBeUndefined();
   });
 });
@@ -34,8 +49,17 @@ describe("filePreviewConfig", () => {
     expect(filePreviewConfig.rendererResolver("text")).toBeUndefined();
   });
 
-  it("caps Markdown previews at 10 MB (bytes) and keeps built-in limits otherwise", () => {
+  it("uses the lazily loaded PDF viewer for pdf", () => {
+    expect(filePreviewConfig.rendererResolver("pdf")).toBe(PdfPreviewLazy);
+  });
+
+  it("caps Markdown at 10 MB and PDF at 50 MB (bytes), keeping built-in limits otherwise", () => {
     expect(filePreviewConfig.maxFileSize("markdown")).toBe(10 * 1024 * 1024);
+    expect(filePreviewConfig.maxFileSize("pdf")).toBe(50 * 1024 * 1024);
     expect(filePreviewConfig.maxFileSize("image")).toBeUndefined();
+  });
+
+  it("doesn't load the PDF library until a PDF is previewed", () => {
+    expect(pdfLibraryLoaded).toBe(false);
   });
 });
