@@ -6,9 +6,8 @@ import type { PreviewTypeEntry } from "./types";
  * File types the drive previews beyond Storage Browser's built-in ones.
  *
  * Built in (no entry needed): "image", "video", "text", detected by Storage
- * Browser from the content type or extension, with its own viewers and limits
- * (image 200 MB, video 2 GB, text 10 MB). Anything else shows "no preview"
- * with a download button.
+ * Browser from the content type or extension, with its own viewers. Anything
+ * else shows "no preview" with a download button.
  *
  * To support a new type: add a viewer component in this folder and one entry
  * below. Load heavy viewer libraries lazily (see PdfPreviewLazy).
@@ -19,16 +18,31 @@ export const PREVIEW_TYPES: PreviewTypeEntry[] = [
     extensions: ["md", "markdown"],
     contentTypes: ["text/markdown", "text/x-markdown"],
     renderer: MarkdownPreview,
-    maxBytes: 10 * 1024 * 1024,
   },
   {
     type: "pdf",
     extensions: ["pdf"],
     contentTypes: ["application/pdf"],
     renderer: PdfPreviewLazy,
-    maxBytes: 50 * 1024 * 1024,
   },
 ];
+
+/**
+ * Largest file any type may preview, in bytes. Storage Browser refuses files
+ * whose size is greater than this and shows `previewDisplayText` instead.
+ * An entry's own `maxBytes` can only lower it.
+ */
+export const MAX_PREVIEW_BYTES = 50 * 1024 * 1024;
+
+/** Overrides for Storage Browser's "too large to preview" message. */
+export const previewDisplayText = {
+  LocationDetailView: {
+    filePreview: {
+      sizeLimitMessage: "File is too big to preview",
+      fileSizeLimitDescription: "Previews are available for files up to 50 MB. Download the file to open it.",
+    },
+  },
+};
 
 const byType = new Map(PREVIEW_TYPES.map((entry) => [entry.type, entry]));
 
@@ -55,5 +69,5 @@ export function resolvePreviewType(file: { key: string; contentType?: string }):
 export const filePreviewConfig = {
   fileTypeResolver: resolvePreviewType,
   rendererResolver: (fileType: string) => byType.get(fileType)?.renderer,
-  maxFileSize: (fileType: string) => byType.get(fileType)?.maxBytes,
+  maxFileSize: (fileType: string) => Math.min(byType.get(fileType)?.maxBytes ?? MAX_PREVIEW_BYTES, MAX_PREVIEW_BYTES),
 };

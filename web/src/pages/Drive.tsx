@@ -4,7 +4,7 @@ import { signOutSafely } from "../session";
 import { createAmplifyAuthAdapter, createStorageBrowser } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
 import { driveLocation } from "../config";
-import { filePreviewConfig } from "../preview/registry";
+import { filePreviewConfig, previewDisplayText } from "../preview/registry";
 
 export default function Drive({ email }: { email: string }) {
   // Created after App has run Amplify.configure: the adapter reads the storage
@@ -31,7 +31,7 @@ export default function Drive({ email }: { email: string }) {
         </button>
       </header>
       <main className="browser">
-        <StorageBrowser defaultValue={{ location }} />
+        <StorageBrowser defaultValue={{ location }} displayText={previewDisplayText} />
       </main>
     </div>
   );

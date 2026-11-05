@@ -23,6 +23,6 @@ export interface PreviewTypeEntry {
   contentTypes?: string[];
   /** Viewer component; receives the file's metadata and a short-lived URL. */
   renderer: (props: FilePreviewProps) => ReactNode;
-  /** Largest file to preview, in BYTES (Storage Browser compares against the size in bytes). */
+  /** Lower preview size limit for this type, in BYTES; capped at MAX_PREVIEW_BYTES. */
   maxBytes?: number;
 }

@@ -7,7 +7,7 @@ vi.mock("react-pdf", () => {
   return { Document: () => null, Page: () => null, pdfjs: { GlobalWorkerOptions: {} } };
 });
 
-import { filePreviewConfig, resolvePreviewType } from "../src/preview/registry";
+import { filePreviewConfig, MAX_PREVIEW_BYTES, previewDisplayText, resolvePreviewType } from "../src/preview/registry";
 import MarkdownPreview from "../src/preview/MarkdownPreview";
 import PdfPreviewLazy from "../src/preview/PdfPreviewLazy";
 
@@ -53,10 +53,18 @@ describe("filePreviewConfig", () => {
     expect(filePreviewConfig.rendererResolver("pdf")).toBe(PdfPreviewLazy);
   });
 
-  it("caps Markdown at 10 MB and PDF at 50 MB (bytes), keeping built-in limits otherwise", () => {
-    expect(filePreviewConfig.maxFileSize("markdown")).toBe(10 * 1024 * 1024);
-    expect(filePreviewConfig.maxFileSize("pdf")).toBe(50 * 1024 * 1024);
-    expect(filePreviewConfig.maxFileSize("image")).toBeUndefined();
+  it("limits every preview type, built-in or ours, to 50 MB (bytes)", () => {
+    const fiftyMb = 50 * 1024 * 1024;
+    expect(MAX_PREVIEW_BYTES).toBe(fiftyMb);
+    for (const type of ["image", "video", "text", "markdown", "pdf", "something-new"]) {
+      expect(filePreviewConfig.maxFileSize(type)).toBe(fiftyMb);
+    }
+  });
+
+  it("tells people a too-large file can't be previewed", () => {
+    const text = previewDisplayText.LocationDetailView.filePreview;
+    expect(text.sizeLimitMessage).toBe("File is too big to preview");
+    expect(text.fileSizeLimitDescription).toContain("50 MB");
   });
 
   it("doesn't load the PDF library until a PDF is previewed", () => {
