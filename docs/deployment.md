@@ -148,13 +148,14 @@ Attach [`ci/iam/app-pipeline-policy.json`](../ci/iam/app-pipeline-policy.json) t
 aws iam put-role-policy --role-name <app-pipeline-role> --policy-name family-drive-app --policy-document file://ci/iam/app-pipeline-policy.json
 ```
 
-(Current role: `CodePipelineStarterTemplate-Terraf-CodePipelineRole-MMM6C1KhxXts`.)
+(Current role: `CodePipelineStarterTemplate-Terraf-CodePipelineRole-Rlc9BkIMwwfd`.)
 
 As with the foundation policy, adjust the `PipelineArtifacts` statement if your artifact bucket has a different name.
 
 **What the policy allows:**
 - manage the app's Cognito, Lambda, log group, CloudFront and web-bucket resources;
-- create IAM roles named `family-drive-*`, attaching only the Lambda basic execution policy and passing them only to Lambda and Cognito;
+- create IAM roles named `family-drive-*`, attaching only the Lambda basic execution policy;
+- pass the two Lambda roles only to Lambda, and the `family-drive-authenticated` role to the Identity Pool;
 - read the SSM parameters;
 - set CORS on the files bucket.
 
@@ -234,6 +235,7 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | `AccessDenied … ssm:GetParameter` / `s3:CreateBucket` / … | Policy not attached to the role the action runs as | Attach the matching file from `ci/iam/`. |
 | Plan stops: `…still the CHANGE_ME placeholder` / `must be an email address` | SSM values not set | Do step 2. |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
+| `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | `Node >= 20.19 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
 | Google shows `redirect_uri_mismatch` | Step 4 not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse`. |
 

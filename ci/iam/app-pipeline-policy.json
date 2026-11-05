@@ -123,11 +123,20 @@
       "Condition": { "ArnEquals": { "iam:PolicyARN": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" } }
     },
     {
-      "Sid": "PassAppRoles",
+      "Sid": "PassLambdaRoles",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::084519186805:role/family-drive-*",
-      "Condition": { "StringEquals": { "iam:PassedToService": ["lambda.amazonaws.com", "cognito-identity.amazonaws.com"] } }
+      "Resource": [
+        "arn:aws:iam::084519186805:role/family-drive-pre-sign-up",
+        "arn:aws:iam::084519186805:role/family-drive-pre-token-generation"
+      ],
+      "Condition": { "StringEquals": { "iam:PassedToService": "lambda.amazonaws.com" } }
+    },
+    {
+      "Sid": "PassIdentityPoolRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::084519186805:role/family-drive-authenticated"
     }
   ]
 }
