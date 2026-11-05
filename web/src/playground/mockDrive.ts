@@ -70,7 +70,10 @@ export const mockSetup = {
   },
   actions: {
     default: {
-      listLocationItems: async (input: { prefix: string }) => ({ items: listUnder(input.prefix), nextToken: undefined }),
+      listLocationItems: async (input: { prefix: string; options?: { exclude?: "FILE" | "FOLDER" } }) => ({
+        items: listUnder(input.prefix).filter((i) => i.type !== input.options?.exclude),
+        nextToken: undefined,
+      }),
     },
   },
 };

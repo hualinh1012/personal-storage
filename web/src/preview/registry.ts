@@ -34,8 +34,10 @@ export const PREVIEW_TYPES: PreviewTypeEntry[] = [
  */
 export const MAX_PREVIEW_BYTES = 50 * 1024 * 1024;
 
-/** Overrides for Storage Browser's "too large to preview" message. */
+/** Storage Browser text overrides: the "too large to preview" message, and a
+ * destination label that reads right for both Copy and Move (Move reuses Copy's parts). */
 export const previewDisplayText = {
+  CopyView: { actionDestinationLabel: "Destination" },
   LocationDetailView: {
     filePreview: {
       sizeLimitMessage: "File is too big to preview",

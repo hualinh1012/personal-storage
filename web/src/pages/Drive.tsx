@@ -11,6 +11,8 @@ import {
 import "@aws-amplify/ui-react-storage/styles.css";
 import { driveLocation } from "../config";
 import { filePreviewConfig, previewDisplayText } from "../preview/registry";
+import { moveActionConfig } from "../move/moveAction";
+import { makeMoveView, type MoveViewDeps } from "../move/MoveView";
 
 type StorageBrowserSetup = Pick<CreateStorageBrowserInput, "config" | "actions">;
 
@@ -19,14 +21,19 @@ type StorageBrowserSetup = Pick<CreateStorageBrowserInput, "config" | "actions">
  * render the exact same layout with sample data instead of AWS.
  */
 export function DriveView({ email, bucket, setup }: { email: string; bucket: string; setup: StorageBrowserSetup }) {
-  const StorageBrowser = useMemo(
-    () =>
-      createStorageBrowser({
-        ...setup,
-        filePreview: filePreviewConfig,
-      }).StorageBrowser,
-    [setup],
-  );
+  const { StorageBrowser, views } = useMemo(() => {
+    const created = createStorageBrowser({
+      ...setup,
+      actions: { ...setup.actions, custom: { ...setup.actions?.custom, move: moveActionConfig as never } },
+      filePreview: filePreviewConfig,
+    });
+    const MoveView = makeMoveView({
+      CopyView: created.StorageBrowser.CopyView as unknown as MoveViewDeps["CopyView"],
+      useView: created.useView as unknown as MoveViewDeps["useView"],
+      useAction: created.useAction as unknown as MoveViewDeps["useAction"],
+    });
+    return { StorageBrowser: created.StorageBrowser, views: { MoveView } };
+  }, [setup]);
 
   // Storage Browser stays uncontrolled: in controlled mode it only reports
   // changes to its internal state, so an action opened from outside (our
@@ -70,6 +77,7 @@ export function DriveView({ email, bucket, setup }: { email: string; bucket: str
         <StorageBrowser
           key={mount.key}
           defaultValue={mount.defaultValue}
+          views={views as never}
           onValueChange={onValueChange}
           displayText={previewDisplayText}
         />

@@ -48,4 +48,11 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
   /* While a preview is open it takes the whole width; its Close button returns to the list. */
   .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__drop-zone { display: none; }
   .browser .amplify-storage-browser__file-preview { flex: 1 1 100%; width: 100%; }
+  /* Copy/Move/Upload summary: let the status counts wrap instead of running off screen. */
+  .browser .amplify-storage-browser__summary,
+  .browser .amplify-storage-browser__status-display { flex-wrap: wrap; row-gap: 0.25rem; }
 }
+.move-hint { margin: 0.75rem 0 0.25rem; color: #52606d; }
+.move-summary { flex: 1; font-size: 0.9rem; }
+.move-summary p { margin: 0; font-weight: 600; }
+.move-summary ul { margin: 0.25rem 0 0; padding-left: 1.2rem; color: #b42318; }
