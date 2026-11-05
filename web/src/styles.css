@@ -5,6 +5,8 @@ body { margin: 0; font-family: system-ui, sans-serif; color: #1f2933; background
 .spacer { flex: 1; }
 button { font: inherit; cursor: pointer; }
 button.primary { padding: 0.6rem 1.2rem; border: 0; border-radius: 6px; background: #1a73e8; color: #fff; }
+button.primary:disabled { opacity: 0.5; cursor: default; }
+.topbar button.primary { padding: 0.4rem 1rem; }
 button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-decoration: underline; }
 /* Drive: app-style layout. The page never scrolls; the file list and the
    preview panel each scroll vertically on their own; nothing scrolls sideways. */
