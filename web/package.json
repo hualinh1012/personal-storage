@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "copy-sw": "copy-serviceworker public",
+    "predev": "npm run copy-sw",
+    "prebuild": "npm run copy-sw",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

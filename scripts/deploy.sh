@@ -16,7 +16,8 @@ WEB_BUCKET="$(tf_output web_bucket)"
 DISTRIBUTION_ID="$(tf_output cloudfront_distribution_id)"
 
 DIST="$ROOT/web/dist"
-ENTRY=(--exclude index.html --exclude config.json)
+SW=amplify-storage-download/download-sw.js
+ENTRY=(--exclude index.html --exclude config.json --exclude "$SW")
 
 # 1. Content-hashed assets: cache forever (their names change on every build).
 aws s3 sync "$DIST" "s3://${WEB_BUCKET}" "${ENTRY[@]}" \
@@ -27,7 +28,8 @@ aws s3 cp "$DIST" "s3://${WEB_BUCKET}" --recursive --exclude "*" --include "*.mj
   --content-type "text/javascript" --cache-control "public,max-age=31536000,immutable"
 # 2. Entry points: always revalidate, so browsers pick up new asset names and
 #    config (e.g. a changed Cognito domain) on the next load.
-for f in index.html config.json; do
+# The download service worker (Storage Browser) also must not be cached long-term.
+for f in index.html config.json "$SW"; do
   aws s3 cp "$DIST/$f" "s3://${WEB_BUCKET}/$f" --cache-control "no-cache"
 done
 # 3. Only now remove assets from previous builds.

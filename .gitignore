@@ -8,3 +8,4 @@ web/public/config.json
 *.zip
 infra/tfplan
 *_override.tf
+web/public/amplify-storage-download/

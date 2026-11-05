@@ -1,21 +1,32 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, sans-serif; color: #1f2933; background: #f7f8fa; }
 .center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; min-height: 60vh; padding: 1rem; text-align: center; }
-.drive { min-height: 100vh; }
 .topbar { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e4e7eb; }
 .spacer { flex: 1; }
 button { font: inherit; cursor: pointer; }
 button.primary { padding: 0.6rem 1.2rem; border: 0; border-radius: 6px; background: #1a73e8; color: #fff; }
 button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-decoration: underline; }
-.drive { display: flex; flex-direction: column; }
-.browser { flex: 1; padding: 1rem; max-width: 1200px; width: 100%; margin: 0 auto; }
-.markdown-preview { overflow: auto; max-height: 70vh; padding: 0.5rem 1rem; line-height: 1.6; text-align: left; }
+/* Drive: app-style layout. The page never scrolls; the file list and the
+   preview panel each scroll vertically on their own; nothing scrolls sideways. */
+.drive { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.browser { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.75rem 1rem; }
+.browser .amplify-storage-browser { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.browser .amplify-storage-browser__content-with-preview { flex: 1; min-height: 0; }
+.browser .amplify-storage-browser__drop-zone { min-width: 0; }
+.browser .amplify-storage-browser__data-table { height: 100%; overflow-x: hidden; overflow-y: auto; }
+.browser .amplify-storage-browser__table { width: 100%; }
+.browser .amplify-storage-browser__table th,
+.browser .amplify-storage-browser__table td { white-space: normal; overflow-wrap: anywhere; }
+/* File names are buttons that default to nowrap; let long names wrap instead of widening the table. */
+.browser .amplify-storage-browser__table td .amplify-button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.browser .amplify-storage-browser__file-preview { height: 100%; max-height: none; overflow-x: hidden; overflow-y: auto; }
+.markdown-preview { padding: 0.5rem 1rem; line-height: 1.6; text-align: left; }
 .markdown-preview pre { overflow: auto; padding: 0.75rem; background: #f1f3f5; border-radius: 4px; }
 .markdown-preview code { font-family: ui-monospace, monospace; font-size: 0.9em; }
 .markdown-preview table { border-collapse: collapse; }
 .markdown-preview th, .markdown-preview td { border: 1px solid #d0d7de; padding: 0.25rem 0.5rem; }
 .preview-status { padding: 1rem; color: #52606d; }
-.pdf-preview { width: 100%; max-height: 75vh; overflow: auto; }
+.pdf-preview { width: 100%; }
 .pdf-preview canvas { max-width: 100%; height: auto !important; }
 .pdf-pager { position: sticky; bottom: 0; display: flex; gap: 0.75rem; align-items: center; justify-content: center; padding: 0.5rem; background: #fff; border-top: 1px solid #e4e7eb; }
 .playground { display: flex; gap: 1rem; padding: 1rem; align-items: flex-start; }
@@ -24,3 +35,15 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 .playground-list .active { font-weight: 600; }
 .playground-panel { flex: 1; background: #fff; border: 1px solid #e4e7eb; border-radius: 6px; padding: 0.5rem 1rem; min-height: 60vh; }
 .markdown-preview ul.contains-task-list { list-style: none; padding-left: 1rem; }
+/* Phones: wrap the toolbar so refresh and the actions menu (Upload, Create
+   folder) stay on screen, and drop the Type / Last modified columns. */
+@media (max-width: 640px) {
+  .browser { padding: 0.5rem; }
+  .browser .amplify-storage-browser__controls { flex-wrap: wrap; row-gap: 0.5rem; }
+  .browser .amplify-storage-browser__search { flex: 1 1 100%; }
+  .browser .amplify-storage-browser__table tr > :nth-child(3),
+  .browser .amplify-storage-browser__table tr > :nth-child(4) { display: none; }
+  /* While a preview is open it takes the whole width; its Close button returns to the list. */
+  .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__drop-zone { display: none; }
+  .browser .amplify-storage-browser__file-preview { flex: 1 1 100%; width: 100%; }
+}

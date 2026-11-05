@@ -25,6 +25,7 @@ npm run typecheck              # tsc -p .
 # Web app (web)
 npm run dev                    # Vite on http://localhost:5173 (needs web/public/config.json)
                                # /playground.html: preview viewers with sample files, no AWS (dev only)
+                               # /playground.html?view=drive: the real drive screen (DriveView) with mock data
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
 
@@ -91,6 +92,9 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - **`ci/iam/*-pipeline-policy.json`** are the least-privilege inline policies for the pipeline roles. **When adding a new AWS resource type to either stack, add its actions to the matching policy**, or the pipeline fails with AccessDenied.
 
 ## Conventions and gotchas
+
+- Drive layout (`web/src/styles.css`): the page never scrolls; the file list and preview panel each scroll vertically, nothing scrolls sideways; phones hide Type/Last modified and show the preview full-width. These rules target Storage Browser's `amplify-storage-browser__*` classes, so re-check `?view=drive` in the playground after upgrading `@aws-amplify/ui-react-storage`.
+- Storage Browser's download service worker (`public/amplify-storage-download/download-sw.js`) is copied from the package by `npm run copy-sw` (runs before dev/build, git-ignored) and deployed with `no-cache`. Without it, downloads fall back to in-memory blobs.
 
 - In bash scripts, never write `export X="$(cmd)"`. `export` hides a failing command even under `set -e`. Assign first, then export.
 - `.gitattributes` forces LF for `*.sh`, so scripts keep working after a Windows checkout.

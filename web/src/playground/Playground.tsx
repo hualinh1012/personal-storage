@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PREVIEW_TYPES, MAX_PREVIEW_BYTES, previewDisplayText } from "../preview/registry";
 import samplePdfUrl from "./sample.pdf?url";
+import { sampleMarkdown } from "./samples";
 
 /*
  * Dev-only playground: renders this app's own preview viewers with local
@@ -9,31 +10,6 @@ import samplePdfUrl from "./sample.pdf?url";
  * Browser's built-in viewers and only appear in the real app.
  */
 
-const sampleMarkdown = `# Tết 2026 plan
-
-Things to bring for the **family trip** to Đà Lạt:
-
-- Warm jackets
-- *Bánh chưng* for grandma
-- Camera batteries
-
-| Day | Plan |
-| --- | --- |
-| 1 | Drive up |
-| 2 | Flower garden |
-
-- [x] Book the hotel
-- [ ] ~~Rent a car~~ taking the bus
-
-[Weather forecast](https://example.com/weather)
-
-## What the viewer refuses
-
-<script>alert("raw HTML is skipped")</script>
-[a javascript: link](javascript:alert(1)) loses its target.
-
-![an outside image](https://example.com/tracker.png) shows as a link, not an image.
-`;
 
 const samples = [
   { name: "Tết 2026 plan.md", type: "markdown", url: `data:text/markdown;charset=utf-8,${encodeURIComponent(sampleMarkdown)}`, size: sampleMarkdown.length },
@@ -66,6 +42,7 @@ export default function Playground() {
         <strong>Family Drive</strong>
         <span>· preview playground (dev only)</span>
         <span className="spacer" />
+        <a href="?view=drive">Drive layout (sample data)</a>
         <span>limit {MAX_PREVIEW_BYTES / 1024 / 1024} MB</span>
       </header>
       <main className="playground">
