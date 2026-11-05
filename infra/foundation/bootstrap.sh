@@ -2,6 +2,7 @@
 # Creates or updates the retained foundation stack. Run from an admin machine
 # (AWS CLI signed in to the target account) before the first pipeline run, and
 # again whenever infra/foundation changes. Safe to re-run.
+# Asks for confirmation before applying; set AUTO_APPROVE=1 in a pipeline.
 #
 # First run: the state bucket doesn't exist yet, so the stack is applied with
 # local state and the state is then migrated into the new bucket.
@@ -36,14 +37,14 @@ echo "Account ${ACCOUNT_ID}, state bucket ${BUCKET}"
 if aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
   tf init -input=false -reconfigure -backend-config="bucket=${BUCKET}"
   import_existing_params
-  tf apply -input=false
+  tf apply ${AUTO_APPROVE:+-auto-approve}
 else
   echo "State bucket not found: first run, applying with local state."
   trap 'rm -f "$OVERRIDE"' EXIT
   printf 'terraform {\n  backend "local" {}\n}\n' > "$OVERRIDE"
   tf init -input=false -reconfigure
   import_existing_params
-  tf apply -input=false
+  tf apply ${AUTO_APPROVE:+-auto-approve}
   rm -f "$OVERRIDE"
   echo "Migrating state into s3://${BUCKET}/foundation/terraform.tfstate"
   tf init -input=false -migrate-state -force-copy -backend-config="bucket=${BUCKET}"
