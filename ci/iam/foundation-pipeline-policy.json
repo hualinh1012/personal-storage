@@ -1,0 +1,57 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CommandsActionLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": [
+        "arn:aws:logs:ap-southeast-1:084519186805:log-group:/aws/codepipeline/*",
+        "arn:aws:logs:ap-southeast-1:084519186805:log-group:/aws/codepipeline/*:log-stream:*"
+      ]
+    },
+    {
+      "Sid": "PipelineArtifacts",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:GetBucketLocation", "s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::codepipeline-ap-southeast-1-*", "arn:aws:s3:::codepipeline-ap-southeast-1-*/*"]
+    },
+    {
+      "Sid": "FoundationBuckets",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket", "s3:ListBucket",
+        "s3:GetBucket*", "s3:PutBucket*",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetEncryptionConfiguration", "s3:PutEncryptionConfiguration",
+        "s3:GetLifecycleConfiguration", "s3:PutLifecycleConfiguration",
+        "s3:GetReplicationConfiguration"
+      ],
+      "Resource": [
+        "arn:aws:s3:::family-drive-tfstate-084519186805",
+        "arn:aws:s3:::family-drive-files-084519186805"
+      ]
+    },
+    {
+      "Sid": "FoundationStateObjects",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::family-drive-tfstate-084519186805/foundation/*"
+    },
+    {
+      "Sid": "FoundationParameters",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:PutParameter", "ssm:GetParameter", "ssm:GetParameters",
+        "ssm:AddTagsToResource", "ssm:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:ssm:ap-southeast-1:084519186805:parameter/family-drive/*"
+    },
+    {
+      "Sid": "DescribeParameters",
+      "Effect": "Allow",
+      "Action": "ssm:DescribeParameters",
+      "Resource": "*"
+    }
+  ]
+}
