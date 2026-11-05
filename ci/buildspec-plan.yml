@@ -1,0 +1,45 @@
+# CodeBuild: test, build the Lambda bundles and produce a Terraform plan.
+# The output artifact (source + infra/tfplan + Lambda bundles) feeds buildspec-apply.yml
+# after the pipeline's manual approval.
+#
+# Needs SSM parameters in the pipeline's region:
+#   /family-drive/google_client_id      String
+#   /family-drive/google_client_secret  SecureString
+#   /family-drive/allowed_emails        String, JSON list e.g. ["you@gmail.com"]
+version: 0.2
+
+env:
+  variables:
+    TF_VERSION: "1.16.6"
+    TF_IN_AUTOMATION: "true"
+    TF_INPUT: "0"
+  parameter-store:
+    TF_VAR_google_client_id: /family-drive/google_client_id
+    TF_VAR_google_client_secret: /family-drive/google_client_secret
+    TF_VAR_allowed_emails: /family-drive/allowed_emails
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - bash ci/install-terraform.sh
+  pre_build:
+    commands:
+      - npm ci --prefix functions/allowlist
+      - npm test --prefix functions/allowlist
+      - npm run build --prefix functions/allowlist
+      - npm ci --prefix web
+      - npm test --prefix web
+      - terraform fmt -check -recursive infra
+      - bash ci/tf-init.sh
+  build:
+    commands:
+      - terraform -chdir=infra plan -out=tfplan
+
+artifacts:
+  files:
+    - '**/*'
+  exclude-paths:
+    - '**/node_modules/**'
+    - 'infra/.terraform/**'

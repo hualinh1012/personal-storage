@@ -1,0 +1,24 @@
+# CodeBuild: apply the plan approved in the pipeline, then publish the web app.
+# Input artifact is the output of buildspec-plan.yml (contains infra/tfplan and the
+# Lambda bundles the plan was made from). Applying a saved plan needs no TF_VAR_*.
+version: 0.2
+
+env:
+  variables:
+    TF_VERSION: "1.16.6"
+    TF_IN_AUTOMATION: "true"
+    TF_INPUT: "0"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - bash ci/install-terraform.sh
+  pre_build:
+    commands:
+      - bash ci/tf-init.sh
+  build:
+    commands:
+      - terraform -chdir=infra apply -input=false tfplan
+      - bash scripts/deploy.sh
