@@ -16,6 +16,13 @@ variable "allowed_emails" {
     condition     = length([for e in split(",", var.allowed_emails) : e if trimspace(e) != ""]) > 0
     error_message = "allowed_emails must contain at least one email, or nobody can sign in."
   }
+
+  validation {
+    condition = alltrue([
+      for e in split(",", var.allowed_emails) : can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", trimspace(e))) if trimspace(e) != ""
+    ])
+    error_message = "Every entry in allowed_emails must be an email address. Replace the CHANGE_ME placeholder in SSM /family-drive/allowed_emails."
+  }
 }
 
 locals {

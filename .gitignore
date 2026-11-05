@@ -7,3 +7,4 @@ infra/terraform.tfvars
 web/public/config.json
 *.zip
 infra/tfplan
+*_override.tf

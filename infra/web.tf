@@ -1,5 +1,8 @@
 resource "aws_s3_bucket" "web" {
   bucket = "${var.project}-web-${local.account_id}"
+
+  # Only holds the built SPA, so the app stack can be destroyed freely.
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_public_access_block" "web" {

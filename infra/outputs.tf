@@ -3,7 +3,7 @@ output "region" {
 }
 
 output "files_bucket" {
-  value = aws_s3_bucket.files.id
+  value = data.aws_s3_bucket.files.id
 }
 
 output "web_bucket" {

@@ -42,7 +42,7 @@ data "aws_iam_policy_document" "authenticated" {
   statement {
     sid       = "ListDriveFolder"
     actions   = ["s3:ListBucket"]
-    resources = [aws_s3_bucket.files.arn]
+    resources = [data.aws_s3_bucket.files.arn]
 
     condition {
       test     = "StringLike"
@@ -60,7 +60,7 @@ data "aws_iam_policy_document" "authenticated" {
       "s3:AbortMultipartUpload",
       "s3:ListMultipartUploadParts",
     ]
-    resources = ["${aws_s3_bucket.files.arn}/drive/*"]
+    resources = ["${data.aws_s3_bucket.files.arn}/drive/*"]
   }
 }
 
