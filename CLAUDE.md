@@ -94,7 +94,7 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 ## Conventions and gotchas
 
 - Drive layout (`web/src/styles.css`): the page never scrolls; the file list and preview panel each scroll vertically, nothing scrolls sideways; phones hide Type/Last modified and show the preview full-width. These rules target Storage Browser's `amplify-storage-browser__*` classes, so re-check `?view=drive` in the playground after upgrading `@aws-amplify/ui-react-storage`.
-- Upload is a top-bar button (hidden from Storage Browser's ⋮ menu via `actionListItem.hide`). Keep `StorageBrowser` **uncontrolled**: with `value`/`onValueChange` it only reports changes to its internal state, so a view opened from outside never reports its Exit. The button remounts the browser (`key`) with `defaultValue` `{ location, actionType: "upload" }` instead.
+- Upload is both in Storage Browser's ⋮ menu and a top-bar button (owner's choice). Keep `StorageBrowser` **uncontrolled**: with `value`/`onValueChange` it only reports changes to its internal state, so a view opened from outside never reports its Exit. The button remounts the browser (`key`) with `defaultValue` `{ location, actionType: "upload" }` instead.
 - Storage Browser's download service worker (`public/amplify-storage-download/download-sw.js`) is copied from the package by `npm run copy-sw` (runs before dev/build, git-ignored) and deployed with `no-cache`. Without it, downloads fall back to in-memory blobs.
 
 - In bash scripts, never write `export X="$(cmd)"`. `export` hides a failing command even under `set -e`. Assign first, then export.

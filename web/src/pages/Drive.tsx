@@ -4,7 +4,6 @@ import { signOutSafely } from "../session";
 import {
   createAmplifyAuthAdapter,
   createStorageBrowser,
-  defaultActionConfigs,
   type CreateStorageBrowserInput,
   type StorageBrowserEventValue,
   type StorageBrowserValue,
@@ -15,12 +14,6 @@ import { filePreviewConfig, previewDisplayText } from "../preview/registry";
 
 type StorageBrowserSetup = Pick<CreateStorageBrowserInput, "config" | "actions">;
 
-// Upload has its own button in the top bar, so it's hidden from the ⋮ actions menu.
-const uploadOutsideMenu = {
-  ...defaultActionConfigs.upload,
-  actionListItem: { ...defaultActionConfigs.upload.actionListItem, hide: () => true },
-};
-
 /**
  * The drive screen. Takes the Storage Browser setup so the dev playground can
  * render the exact same layout with sample data instead of AWS.
@@ -30,7 +23,6 @@ export function DriveView({ email, bucket, setup }: { email: string; bucket: str
     () =>
       createStorageBrowser({
         ...setup,
-        actions: { ...setup.actions, default: { ...setup.actions?.default, upload: uploadOutsideMenu } },
         filePreview: filePreviewConfig,
       }).StorageBrowser,
     [setup],
