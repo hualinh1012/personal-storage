@@ -287,6 +287,7 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 - The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files and can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
 - Click a file name to preview it in a panel beside the list: photos, videos (streamed), text files, Markdown (`.md`, shown formatted, including tables and checklists; raw HTML in the file is ignored and images appear as links) and PDFs (page by page, with Previous/Next; the PDF viewer loads the first time a PDF is opened). Other types show a download button. Files over **50 MB** aren't previewed (any type): the panel says "File is too big to preview" and offers the download.
 - **Move** (in the ⋮ menu, with files selected) moves files to another folder: pick the destination like Copy (click `drive` in the destination path to go up), then Move. A file is never overwritten: if the destination already has a file with that name, that file isn't moved. The original is deleted only after the copy succeeds. Failed files are listed with the reason. Folders can't be moved yet.
+- **On a phone**, the drive can be added to the home screen and then opens full-screen like an app. Android (Chrome): ⋮ → **Add to Home screen** / **Install app**. iPhone (Safari): Share → **Add to Home Screen**. It still needs the internet; nothing is stored offline.
 - Both foundation buckets refuse any request that isn't over HTTPS.
 
 ## Local development
@@ -323,10 +324,12 @@ Run after a deploy, ideally in a private window.
 - [ ] Move two files into another folder; they disappear from the old folder and appear in the new one. Move one back onto a same-named file: it's refused with "already exists" and both stay.
 - [ ] Delete a file, then confirm a previous version still exists: `aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix drive/`.
 - [ ] Sign out returns to the landing page.
+- [ ] On an Android phone and an iPhone, add the drive to the home screen: the icon is the blue folder, it opens without the browser bar, and Google sign-in comes back into the app (not a browser tab) and lands in the drive.
 - [ ] Remove an email from SSM, re-run the app pipeline, and confirm that account is refused within about 2 hours (or at once after deleting its Cognito user).
 
 ## Known gaps
 
-- No custom domain: the CloudFront link changes if the app stack is recreated.
+- No custom domain: the CloudFront link changes if the app stack is recreated. Home-screen installs point at the old link, so everyone has to re-add the app after that.
+- Home-screen app on iPhone: iOS runs it separately from Safari, so you sign in once more inside it. If Google sign-in opens in Safari and doesn't come back, use the drive from Safari instead.
 
 - The IAM policies are based on the Terraform resources in this repo and haven't been exercised against every AWS provider read. If a run reports `AccessDenied` for a `Get…` or `List…` action, add that action to the matching policy file.

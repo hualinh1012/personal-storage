@@ -17,7 +17,8 @@ DISTRIBUTION_ID="$(tf_output cloudfront_distribution_id)"
 
 DIST="$ROOT/web/dist"
 SW=amplify-storage-download/download-sw.js
-ENTRY=(--exclude index.html --exclude config.json --exclude "$SW")
+MANIFEST=manifest.webmanifest
+ENTRY=(--exclude index.html --exclude config.json --exclude "$SW" --exclude "$MANIFEST" --exclude "icons/*")
 
 # 1. Content-hashed assets: cache forever (their names change on every build).
 aws s3 sync "$DIST" "s3://${WEB_BUCKET}" "${ENTRY[@]}" \
@@ -32,6 +33,12 @@ aws s3 cp "$DIST" "s3://${WEB_BUCKET}" --recursive --exclude "*" --include "*.mj
 for f in index.html config.json "$SW"; do
   aws s3 cp "$DIST/$f" "s3://${WEB_BUCKET}/$f" --cache-control "no-cache"
 done
+# The PWA manifest and app icons keep fixed names, so they revalidate too. The CLI
+# doesn't know .webmanifest; set its type explicitly.
+aws s3 cp "$DIST/$MANIFEST" "s3://${WEB_BUCKET}/$MANIFEST" \
+  --content-type "application/manifest+json" --cache-control "no-cache"
+aws s3 cp "$DIST/icons" "s3://${WEB_BUCKET}/icons" --recursive \
+  --content-type "image/png" --cache-control "no-cache"
 # 3. Only now remove assets from previous builds.
 aws s3 sync "$DIST" "s3://${WEB_BUCKET}" "${ENTRY[@]}" --delete \
   --cache-control "public,max-age=31536000,immutable"
