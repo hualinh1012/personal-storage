@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Amplify } from "aws-amplify";
-import { fetchUserAttributes, getCurrentUser } from "aws-amplify/auth";
+import { getCurrentUser } from "aws-amplify/auth";
 import { loadConfig, toAmplifyOutputs } from "./config";
+import { currentUserEmail } from "./session";
 import { isAccessDeniedRedirect } from "./authErrors";
 import Landing from "./pages/Landing";
 import AccessDenied from "./pages/AccessDenied";
@@ -37,8 +38,7 @@ export default function App() {
         return set({ kind: "landing" });
       }
       try {
-        const attrs = await fetchUserAttributes();
-        set({ kind: "drive", email: attrs.email ?? "" });
+        set({ kind: "drive", email: await currentUserEmail() });
       } catch (e) {
         set({ kind: "error", message: e instanceof Error ? e.message : String(e) });
       }
