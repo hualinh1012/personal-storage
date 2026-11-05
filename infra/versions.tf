@@ -10,6 +10,8 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.4"
     }
+    # No longer used by any resource; kept so Terraform can remove the old
+    # random_string.domain_suffix from existing state. Safe to drop afterwards.
     random = {
       source  = "hashicorp/random"
       version = "~> 3.6"

@@ -150,16 +150,11 @@ resource "aws_cognito_identity_provider" "google" {
   }
 }
 
-resource "random_string" "domain_suffix" {
-  length  = 8
-  lower   = true
-  upper   = false
-  numeric = true
-  special = false
-}
-
+# Deterministic prefix (unique per account) so the Google OAuth redirect URI
+# https://<domain>.auth.<region>.amazoncognito.com/oauth2/idpresponse stays the
+# same when the app stack is destroyed and recreated.
 resource "aws_cognito_user_pool_domain" "main" {
-  domain       = "${var.project}-${random_string.domain_suffix.result}"
+  domain       = "${var.project}-${local.account_id}"
   user_pool_id = aws_cognito_user_pool.main.id
 }
 
@@ -179,6 +174,18 @@ resource "aws_cognito_user_pool_client" "web" {
   logout_urls   = ["${local.app_url}/", "${var.dev_origin}/"]
 
   explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
+
+  # Bounds how long a removed person keeps access: an ID token lives 1 hour and
+  # the Identity Pool credentials obtained with it up to 1 more hour. Every
+  # refresh re-runs the allowlist check (pre token generation trigger).
+  id_token_validity      = 60
+  access_token_validity  = 60
+  refresh_token_validity = 30
+  token_validity_units {
+    id_token      = "minutes"
+    access_token  = "minutes"
+    refresh_token = "days"
+  }
 
   depends_on = [aws_cognito_identity_provider.google]
 }
