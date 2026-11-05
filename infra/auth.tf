@@ -63,7 +63,7 @@ resource "aws_lambda_function" "pre_sign_up" {
 
   environment {
     variables = {
-      ALLOWED_EMAILS = join(",", var.allowed_emails)
+      ALLOWED_EMAILS = join(",", local.allowed_emails)
     }
   }
 
@@ -83,7 +83,7 @@ resource "aws_lambda_function" "pre_token_generation" {
 
   environment {
     variables = {
-      ALLOWED_EMAILS = join(",", var.allowed_emails)
+      ALLOWED_EMAILS = join(",", local.allowed_emails)
     }
   }
 

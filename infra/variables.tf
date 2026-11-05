@@ -9,8 +9,20 @@ variable "region" {
 }
 
 variable "allowed_emails" {
-  description = "Google account emails allowed to sign in. Empty denies everyone."
-  type        = list(string)
+  description = "Comma-separated Google account emails allowed to sign in (the format of an SSM StringList), e.g. \"you@gmail.com,mom@gmail.com\"."
+  type        = string
+
+  validation {
+    condition     = length([for e in split(",", var.allowed_emails) : e if trimspace(e) != ""]) > 0
+    error_message = "allowed_emails must contain at least one email, or nobody can sign in."
+  }
+}
+
+locals {
+  # Trimmed, lower-cased, de-duplicated; empty entries from stray commas are dropped.
+  allowed_emails = distinct([
+    for e in split(",", var.allowed_emails) : lower(trimspace(e)) if trimspace(e) != ""
+  ])
 }
 
 variable "google_client_id" {

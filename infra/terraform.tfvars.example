@@ -1,7 +1,7 @@
 # Copy to terraform.tfvars (git-ignored) and fill in. Never commit real values.
 project              = "family-drive"
 region               = "ap-southeast-1"
-allowed_emails       = ["mom@example.com", "dad@example.com"]
+allowed_emails       = "mom@example.com,dad@example.com"
 google_client_id     = "000000000000-example.apps.googleusercontent.com"
 google_client_secret = "GOCSPX-replace-me"
 dev_origin           = "http://localhost:5173"

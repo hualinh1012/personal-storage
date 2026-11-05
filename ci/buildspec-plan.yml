@@ -5,7 +5,7 @@
 # Needs SSM parameters in the pipeline's region:
 #   /family-drive/google_client_id      String
 #   /family-drive/google_client_secret  SecureString
-#   /family-drive/allowed_emails        String, JSON list e.g. ["you@gmail.com"]
+#   /family-drive/allowed_emails        StringList, e.g. you@gmail.com,mom@gmail.com
 version: 0.2
 
 env:
