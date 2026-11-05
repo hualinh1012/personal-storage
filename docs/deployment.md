@@ -305,6 +305,8 @@ Run the web app on your machine against the deployed AWS backend. `http://localh
 
 Tests: `npm test --prefix functions/allowlist` and `npm test --prefix web`.
 
+**Preview playground (no AWS needed):** with `npm run dev --prefix web` running, open `http://localhost:5173/playground.html`. It renders this app's own preview viewers (Markdown, PDF) and the too-big message with sample files. It's dev-only and not in the production build.
+
 ## End-to-end test checklist
 
 Run after a deploy, ideally in a private window.

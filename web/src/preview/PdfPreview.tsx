@@ -23,6 +23,11 @@ export default function PdfPreview({ url }: FilePreviewProps) {
     setPages(0);
   }, [url]);
 
+  // Start each page at its top, not where the previous page was scrolled to.
+  useEffect(() => {
+    box.current?.scrollTo({ top: 0 });
+  }, [page]);
+
   useEffect(() => {
     const el = box.current;
     if (!el) return;

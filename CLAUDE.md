@@ -24,6 +24,7 @@ npm run typecheck              # tsc -p .
 
 # Web app (web)
 npm run dev                    # Vite on http://localhost:5173 (needs web/public/config.json)
+                               # /playground.html: preview viewers with sample files, no AWS (dev only)
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
 
