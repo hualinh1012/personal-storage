@@ -1,7 +1,5 @@
-# Copy to terraform.tfvars (git-ignored) and fill in. Never commit real values.
+# Optional overrides for local runs (copy to terraform.tfvars, git-ignored).
+# Google client and allowed emails come from SSM, managed by infra/foundation.
 project              = "family-drive"
 region               = "ap-southeast-1"
-allowed_emails       = "mom@example.com,dad@example.com"
-google_client_id     = "000000000000-example.apps.googleusercontent.com"
-google_client_secret = "GOCSPX-replace-me"
 dev_origin           = "http://localhost:5173"

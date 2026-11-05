@@ -166,7 +166,7 @@ A small React SPA:
 - One AWS account and one environment, in region `ap-southeast-1`.
 - **Two Terraform stacks** (owner decision, 2026-11-05):
   - `infra/foundation/` is **retained** (`prevent_destroy`) and applied by hand with `bootstrap.sh`: the state bucket, the files bucket (with versioning and lifecycle rules) and the SSM parameters (`/family-drive/google_client_id`, `google_client_secret`, `allowed_emails` as a comma-separated StringList). Terraform creates the parameters with a placeholder and never overwrites their values.
-  - `infra/` is the **app** stack, deployed by CodePipeline and safe to destroy: Cognito, Lambdas, Identity Pool, CloudFront, the web bucket and the files bucket CORS rule. It reads the files bucket as a data source.
+  - `infra/` is the **app** stack, deployed by CodePipeline and safe to destroy: Cognito, Lambdas, Identity Pool, CloudFront, the web bucket and the files bucket CORS rule. It reads the files bucket and the three SSM parameters as data sources, and stops the plan if they still hold the CHANGE_ME placeholders.
 - Terraform, with state in an S3 backend that uses native S3 locking. A
   small bootstrap creates the state bucket.
 - Terraform outputs feed the SPA's runtime config: User Pool ID, client ID,

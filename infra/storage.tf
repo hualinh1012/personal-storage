@@ -3,13 +3,6 @@ locals {
   app_url    = "https://${aws_cloudfront_distribution.web.domain_name}"
 }
 
-# The files bucket is owned by the retained foundation stack (infra/foundation).
-# This stack only reads it and attaches CORS, so destroying the app never
-# touches the family's files.
-data "aws_s3_bucket" "files" {
-  bucket = "${var.project}-files-${local.account_id}"
-}
-
 # Header list follows the Storage Browser for S3 CORS requirements.
 resource "aws_s3_bucket_cors_configuration" "files" {
   bucket = data.aws_s3_bucket.files.id
