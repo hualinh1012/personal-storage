@@ -285,6 +285,7 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 - The drive shows only what's under the **`drive/`** prefix of `family-drive-files-084519186805`. That is the only place signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `drive/`.
 - The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files and can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
+- Click a file name to preview it in a panel beside the list: photos, videos (streamed), text files, and Markdown (`.md`, shown formatted; raw HTML in the file is ignored and images appear as links). Other types show a download button. Limits: images 200 MB, videos 2 GB, text and Markdown 10 MB.
 - Both foundation buckets refuse any request that isn't over HTTPS.
 
 ## Local development
@@ -313,6 +314,7 @@ Run after a deploy, ideally in a private window.
 - [ ] A file placed under `drive/` in S3 shows up in the list (name, last modified, size).
 - [ ] Upload a small file and a large one (over 100 MB); both appear when done.
 - [ ] Create folder `Tết 2026`, upload `ảnh gia đình.jpg` into it, then download it and check it opens.
+- [ ] Preview a photo, a video, a `.txt` file and a `.md` file (formatted headings/lists); a PDF shows no preview but can be downloaded.
 - [ ] Copy a file, then delete the copy.
 - [ ] Delete a file, then confirm a previous version still exists: `aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix drive/`.
 - [ ] Sign out returns to the landing page.

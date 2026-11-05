@@ -4,6 +4,7 @@ import { signOutSafely } from "../session";
 import { createAmplifyAuthAdapter, createStorageBrowser } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
 import { driveLocation } from "../config";
+import { filePreviewConfig } from "../preview/registry";
 
 export default function Drive({ email }: { email: string }) {
   // Created after App has run Amplify.configure: the adapter reads the storage
@@ -11,7 +12,10 @@ export default function Drive({ email }: { email: string }) {
   const { StorageBrowser, location } = useMemo(() => {
     const bucket = Amplify.getConfig().Storage?.S3?.bucket ?? "";
     return {
-      StorageBrowser: createStorageBrowser({ config: createAmplifyAuthAdapter() }).StorageBrowser,
+      StorageBrowser: createStorageBrowser({
+        config: createAmplifyAuthAdapter(),
+        filePreview: filePreviewConfig,
+      }).StorageBrowser,
       location: driveLocation(bucket),
     };
   }, []);
