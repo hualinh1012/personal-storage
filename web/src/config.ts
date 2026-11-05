@@ -32,7 +32,7 @@ const CONFIG_KEYS: (keyof AppConfig)[] = [
 ];
 
 export async function loadConfig(): Promise<AppConfig> {
-  const res = await fetch("/config.json");
+  const res = await fetch("/config.json", { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load /config.json (HTTP ${res.status})`);
 
   let raw: Record<string, unknown>;

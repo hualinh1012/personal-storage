@@ -47,7 +47,7 @@ describe("loadConfig", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => c });
     vi.stubGlobal("fetch", fetchMock);
     await expect(loadConfig()).resolves.toEqual(c);
-    expect(fetchMock).toHaveBeenCalledWith("/config.json");
+    expect(fetchMock).toHaveBeenCalledWith("/config.json", { cache: "no-store" });
   });
 
   it("throws when the file is missing", async () => {

@@ -20,11 +20,26 @@ describe("signOutSafely", () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
-  it("falls back to reloading the landing page if sign-out fails", async () => {
+  it("falls back to clearing local Amplify tokens and reloading the landing page", async () => {
     signOut.mockRejectedValue(new Error("network"));
     const assign = vi.fn();
     vi.stubGlobal("location", { assign });
+    const store = new Map<string, string>([
+      ["CognitoIdentityServiceProvider.client.user.idToken", "x"],
+      ["com.amplify.Cognito.ap-southeast-1:pool.identityId", "y"],
+      ["unrelated", "keep"],
+    ]);
+    vi.stubGlobal("localStorage", {
+      get length() {
+        return store.size;
+      },
+      key: (i: number) => [...store.keys()][i] ?? null,
+      removeItem: (k: string) => store.delete(k),
+    });
+
     await signOutSafely();
+
+    expect([...store.keys()]).toEqual(["unrelated"]);
     expect(assign).toHaveBeenCalledWith("/");
   });
 });

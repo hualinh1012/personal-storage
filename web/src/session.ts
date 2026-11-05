@@ -1,10 +1,22 @@
 import { fetchAuthSession, signOut } from "aws-amplify/auth";
 
-/** Sign out via Cognito; if that fails, at least drop back to the landing page. */
+// localStorage key prefixes Amplify v6 uses for Cognito tokens and Identity Pool data.
+const AMPLIFY_KEY_PREFIXES = ["CognitoIdentityServiceProvider.", "com.amplify."];
+
+/**
+ * Sign out via Cognito. If that fails (e.g. offline), drop the locally stored
+ * tokens ourselves, so reloading the landing page doesn't sign the user back in.
+ */
 export async function signOutSafely(): Promise<void> {
   try {
     await signOut();
   } catch {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && AMPLIFY_KEY_PREFIXES.some((p) => key.startsWith(p))) keys.push(key);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
     location.assign("/");
   }
 }

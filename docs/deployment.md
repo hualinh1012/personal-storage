@@ -132,12 +132,12 @@ The app plan **stops on purpose** while any of these still holds `CHANGE_ME`, or
    ```
 
    `ci/pipeline.sh` does the following, in order:
-   1. Checks Terraform and Node (it needs Node ≥ 20.19).
-   2. Tests and builds the allowlist Lambdas.
+   1. Checks Terraform and Node (it needs Node ≥ 22.12).
+   2. Tests and builds the allowlist Lambdas, and runs the web tests.
    3. Runs `terraform fmt -check`, then `init` against the state bucket.
    4. Runs `plan` and `apply` in `infra/`. Terraform reads the SSM parameters itself.
    5. Writes `web/public/config.json` from the Terraform outputs and builds the web app.
-   6. Syncs the build to the web bucket and invalidates CloudFront.
+   6. Uploads the build to the web bucket (hashed assets cached long-term; `index.html` and `config.json` with `no-cache`) and invalidates CloudFront.
 
 **Don't put a Destroy stage in this pipeline.** Use the separate destroy pipeline in step 5.
 
@@ -265,6 +265,8 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 **Change the foundation:** edit `infra/foundation/` and push. The foundation pipeline picks it up.
 
+**When a policy in `ci/iam/` changes:** re-run its `aws iam put-role-policy` command (steps 1 and 3) **before** pushing the change that needs it. The pipelines don't update their own roles.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -275,7 +277,7 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | Plan stops: `…still the CHANGE_ME placeholder` / `must be an email address` | SSM values not set | Do step 2. |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
 | `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
-| `Node >= 20.19 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
+| `Node >= 22.12 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
 | Google shows `redirect_uri_mismatch` | Step 4 not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse` (step 4). Google's error details page shows the exact URI it received. |
 | Google says the account can't access the app (consent screen in Testing) | The account isn't a test user | Add it under **Test users**, or publish the app (step 4). |
 

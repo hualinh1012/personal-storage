@@ -45,5 +45,11 @@ resource "terraform_data" "foundation_inputs_check" {
       condition     = !contains(["CHANGE_ME", ""], nonsensitive(data.aws_ssm_parameter.google_client_id.value))
       error_message = "SSM /${var.project}/google_client_id is still the CHANGE_ME placeholder."
     }
+
+    precondition {
+      # Only the comparison result leaves the sensitive value.
+      condition     = !contains(["CHANGE_ME", ""], nonsensitive(data.aws_ssm_parameter.google_client_secret.value))
+      error_message = "SSM /${var.project}/google_client_secret is still the CHANGE_ME placeholder."
+    }
   }
 }

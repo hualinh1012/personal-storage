@@ -4,7 +4,11 @@
     {
       "Sid": "CommandsActionLogs",
       "Effect": "Allow",
-      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
       "Resource": [
         "arn:aws:logs:ap-southeast-1:084519186805:log-group:/aws/codepipeline/*",
         "arn:aws:logs:ap-southeast-1:084519186805:log-group:/aws/codepipeline/*:log-stream:*"
@@ -13,57 +17,112 @@
     {
       "Sid": "PipelineArtifacts",
       "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:GetBucketLocation", "s3:ListBucket"],
-      "Resource": ["arn:aws:s3:::codepipeline-ap-southeast-1-*", "arn:aws:s3:::codepipeline-ap-southeast-1-*/*"]
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:GetBucketLocation",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::codepipeline-ap-southeast-1-*",
+        "arn:aws:s3:::codepipeline-ap-southeast-1-*/*"
+      ]
     },
     {
       "Sid": "AppState",
       "Effect": "Allow",
-      "Action": ["s3:ListBucket"],
+      "Action": [
+        "s3:ListBucket"
+      ],
       "Resource": "arn:aws:s3:::family-drive-tfstate-084519186805",
-      "Condition": { "StringLike": { "s3:prefix": ["family-drive/*"] } }
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "family-drive/*"
+          ]
+        }
+      }
     },
     {
       "Sid": "AppStateObjects",
       "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
       "Resource": "arn:aws:s3:::family-drive-tfstate-084519186805/family-drive/*"
     },
     {
       "Sid": "ReadFoundationParams",
       "Effect": "Allow",
-      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
       "Resource": "arn:aws:ssm:ap-southeast-1:084519186805:parameter/family-drive/*"
     },
     {
       "Sid": "FilesBucketCorsOnly",
       "Effect": "Allow",
-      "Action": ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetBucketCORS", "s3:PutBucketCORS"],
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:GetBucketCORS",
+        "s3:PutBucketCORS"
+      ],
       "Resource": "arn:aws:s3:::family-drive-files-084519186805"
     },
     {
       "Sid": "WebBucket",
       "Effect": "Allow",
       "Action": [
-        "s3:CreateBucket", "s3:DeleteBucket", "s3:ListBucket", "s3:ListBucketVersions",
-        "s3:GetBucket*", "s3:PutBucket*", "s3:DeleteBucketPolicy",
-        "s3:GetAccelerateConfiguration", "s3:GetEncryptionConfiguration", "s3:PutEncryptionConfiguration",
-        "s3:GetLifecycleConfiguration", "s3:GetReplicationConfiguration",
-        "s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion"
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:ListBucket",
+        "s3:ListBucketVersions",
+        "s3:GetBucket*",
+        "s3:PutBucket*",
+        "s3:DeleteBucketPolicy",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetLifecycleConfiguration",
+        "s3:GetReplicationConfiguration",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion"
       ],
-      "Resource": ["arn:aws:s3:::family-drive-web-084519186805", "arn:aws:s3:::family-drive-web-084519186805/*"]
+      "Resource": [
+        "arn:aws:s3:::family-drive-web-084519186805",
+        "arn:aws:s3:::family-drive-web-084519186805/*"
+      ]
     },
     {
       "Sid": "CloudFront",
       "Effect": "Allow",
       "Action": [
-        "cloudfront:CreateDistribution", "cloudfront:GetDistribution", "cloudfront:GetDistributionConfig",
-        "cloudfront:UpdateDistribution", "cloudfront:DeleteDistribution",
-        "cloudfront:CreateOriginAccessControl", "cloudfront:GetOriginAccessControl",
-        "cloudfront:UpdateOriginAccessControl", "cloudfront:DeleteOriginAccessControl",
-        "cloudfront:ListOriginAccessControls", "cloudfront:GetCachePolicy", "cloudfront:ListCachePolicies",
-        "cloudfront:CreateInvalidation", "cloudfront:GetInvalidation",
-        "cloudfront:TagResource", "cloudfront:UntagResource", "cloudfront:ListTagsForResource"
+        "cloudfront:CreateDistribution",
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:ListOriginAccessControls",
+        "cloudfront:GetCachePolicy",
+        "cloudfront:ListCachePolicies",
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:ListTagsForResource",
+        "cloudfront:GetResponseHeadersPolicy",
+        "cloudfront:ListResponseHeadersPolicies"
       ],
       "Resource": "*"
     },
@@ -71,15 +130,36 @@
       "Sid": "Cognito",
       "Effect": "Allow",
       "Action": [
-        "cognito-idp:CreateUserPool", "cognito-idp:DescribeUserPool", "cognito-idp:UpdateUserPool", "cognito-idp:DeleteUserPool",
-        "cognito-idp:GetUserPoolMfaConfig", "cognito-idp:SetUserPoolMfaConfig",
-        "cognito-idp:CreateUserPoolClient", "cognito-idp:DescribeUserPoolClient", "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient",
-        "cognito-idp:CreateUserPoolDomain", "cognito-idp:DescribeUserPoolDomain", "cognito-idp:UpdateUserPoolDomain", "cognito-idp:DeleteUserPoolDomain",
-        "cognito-idp:CreateIdentityProvider", "cognito-idp:DescribeIdentityProvider", "cognito-idp:UpdateIdentityProvider", "cognito-idp:DeleteIdentityProvider",
-        "cognito-idp:TagResource", "cognito-idp:UntagResource", "cognito-idp:ListTagsForResource",
-        "cognito-identity:CreateIdentityPool", "cognito-identity:DescribeIdentityPool", "cognito-identity:UpdateIdentityPool", "cognito-identity:DeleteIdentityPool",
-        "cognito-identity:SetIdentityPoolRoles", "cognito-identity:GetIdentityPoolRoles",
-        "cognito-identity:TagResource", "cognito-identity:UntagResource", "cognito-identity:ListTagsForResource"
+        "cognito-idp:CreateUserPool",
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:DeleteUserPool",
+        "cognito-idp:GetUserPoolMfaConfig",
+        "cognito-idp:SetUserPoolMfaConfig",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:CreateUserPoolDomain",
+        "cognito-idp:DescribeUserPoolDomain",
+        "cognito-idp:UpdateUserPoolDomain",
+        "cognito-idp:DeleteUserPoolDomain",
+        "cognito-idp:CreateIdentityProvider",
+        "cognito-idp:DescribeIdentityProvider",
+        "cognito-idp:UpdateIdentityProvider",
+        "cognito-idp:DeleteIdentityProvider",
+        "cognito-idp:TagResource",
+        "cognito-idp:UntagResource",
+        "cognito-idp:ListTagsForResource",
+        "cognito-identity:CreateIdentityPool",
+        "cognito-identity:DescribeIdentityPool",
+        "cognito-identity:UpdateIdentityPool",
+        "cognito-identity:DeleteIdentityPool",
+        "cognito-identity:SetIdentityPoolRoles",
+        "cognito-identity:GetIdentityPoolRoles",
+        "cognito-identity:TagResource",
+        "cognito-identity:UntagResource",
+        "cognito-identity:ListTagsForResource"
       ],
       "Resource": "*"
     },
@@ -87,9 +167,16 @@
       "Sid": "Lambdas",
       "Effect": "Allow",
       "Action": [
-        "lambda:CreateFunction", "lambda:DeleteFunction", "lambda:Get*", "lambda:List*",
-        "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
-        "lambda:AddPermission", "lambda:RemovePermission", "lambda:TagResource", "lambda:UntagResource"
+        "lambda:CreateFunction",
+        "lambda:DeleteFunction",
+        "lambda:Get*",
+        "lambda:List*",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:TagResource",
+        "lambda:UntagResource"
       ],
       "Resource": "arn:aws:lambda:ap-southeast-1:084519186805:function:family-drive-*"
     },
@@ -97,30 +184,58 @@
       "Sid": "LambdaLogGroups",
       "Effect": "Allow",
       "Action": [
-        "logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy",
-        "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource", "logs:DescribeLogGroups"
+        "logs:CreateLogGroup",
+        "logs:DeleteLogGroup",
+        "logs:PutRetentionPolicy",
+        "logs:DeleteRetentionPolicy",
+        "logs:TagResource",
+        "logs:UntagResource",
+        "logs:ListTagsForResource"
       ],
       "Resource": [
         "arn:aws:logs:ap-southeast-1:084519186805:log-group:/aws/lambda/family-drive-*",
-        "arn:aws:logs:ap-southeast-1:084519186805:log-group:*"
+        "arn:aws:logs:ap-southeast-1:084519186805:log-group:/aws/lambda/family-drive-*:*"
       ]
+    },
+    {
+      "Sid": "DescribeLogGroups",
+      "Effect": "Allow",
+      "Action": "logs:DescribeLogGroups",
+      "Resource": "arn:aws:logs:ap-southeast-1:084519186805:log-group:*"
     },
     {
       "Sid": "AppRoles",
       "Effect": "Allow",
       "Action": [
-        "iam:CreateRole", "iam:GetRole", "iam:DeleteRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy",
-        "iam:TagRole", "iam:UntagRole", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
-        "iam:ListInstanceProfilesForRole", "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy"
+        "iam:CreateRole",
+        "iam:GetRole",
+        "iam:DeleteRole",
+        "iam:UpdateRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListInstanceProfilesForRole",
+        "iam:PutRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:DeleteRolePolicy"
       ],
       "Resource": "arn:aws:iam::084519186805:role/family-drive-*"
     },
     {
       "Sid": "AttachOnlyLambdaBasicExecution",
       "Effect": "Allow",
-      "Action": ["iam:AttachRolePolicy", "iam:DetachRolePolicy"],
+      "Action": [
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy"
+      ],
       "Resource": "arn:aws:iam::084519186805:role/family-drive-*",
-      "Condition": { "ArnEquals": { "iam:PolicyARN": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" } }
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        }
+      }
     },
     {
       "Sid": "PassLambdaRoles",
@@ -130,7 +245,11 @@
         "arn:aws:iam::084519186805:role/family-drive-pre-sign-up",
         "arn:aws:iam::084519186805:role/family-drive-pre-token-generation"
       ],
-      "Condition": { "StringEquals": { "iam:PassedToService": "lambda.amazonaws.com" } }
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
     },
     {
       "Sid": "PassIdentityPoolRole",

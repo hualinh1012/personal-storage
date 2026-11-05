@@ -83,11 +83,10 @@ allows S3 access only to `files-bucket/drive/*`, and listing only for prefixes u
 The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/` and `http://localhost:5173/`).
 
 ### CI/CD (AWS CodePipeline, Commands actions)
-- **`ci/pipeline.sh`** deploys the app. It tests and builds the Lambdas, runs plan and apply on `infra/`, then runs `scripts/deploy.sh`, which builds the SPA, syncs it to the web bucket and invalidates CloudFront.
+- **`ci/pipeline.sh`** deploys the app. It tests and builds the Lambdas, runs the web tests, runs plan and apply on `infra/`, then runs `scripts/deploy.sh`, which builds the SPA, uploads it (hashed assets cached forever, `index.html`/`config.json` with `no-cache`) and invalidates CloudFront.
 - **`ci/destroy-app.sh`** destroys the app stack only. It runs from a separate pipeline that's manual-only.
 - **`infra/foundation/bootstrap.sh`** runs from the foundation pipeline with `AUTO_APPROVE=1`.
 - **`ci/app-env.sh`** is shared setup that both app scripts source.
-- **`ci/buildspec-plan.yml` / `ci/buildspec-apply.yml`** are an alternative CodeBuild setup with a plan → approve → apply split.
 - **`ci/iam/*-pipeline-policy.json`** are the least-privilege inline policies for the pipeline roles. **When adding a new AWS resource type to either stack, add its actions to the matching policy**, or the pipeline fails with AccessDenied.
 
 ## Conventions and gotchas
@@ -95,7 +94,7 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - In bash scripts, never write `export X="$(cmd)"`. `export` hides a failing command even under `set -e`. Assign first, then export.
 - `.gitattributes` forces LF for `*.sh`, so scripts keep working after a Windows checkout.
 - Terraform: `>= 1.10`, AWS provider `~> 6.0`. The S3 backend uses `use_lockfile`, and the bucket name is passed as `-backend-config`.
-- The Lambdas run on `nodejs22.x` (esbuild targets node22). Building the web app needs Node ≥ 20.19.
+- The Lambdas run on `nodejs22.x` (esbuild targets node22). The web build and tests need Node ≥ 22.12.
 - `web/src/pages/Drive.tsx` renders Storage Browser (`@aws-amplify/ui-react-storage/browser`) with the Amplify auth adapter, opened at the `drive/` prefix via `driveLocation()` in `web/src/config.ts`. Create the browser after `Amplify.configure` (the adapter reads the storage config when built), never at module level.
 
 ## Docs
