@@ -285,7 +285,7 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 - The drive shows only what's under the **`drive/`** prefix of `family-drive-files-084519186805`. That is the only place signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `drive/`.
 - The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files and can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
-- Click a file name to preview it in a panel beside the list: photos, videos (streamed), text files, Markdown (`.md`, shown formatted; raw HTML in the file is ignored and images appear as links) and PDFs (page by page, with Previous/Next; the PDF viewer loads the first time a PDF is opened). Other types show a download button. Files over **50 MB** aren't previewed (any type): the panel says "File is too big to preview" and offers the download.
+- Click a file name to preview it in a panel beside the list: photos, videos (streamed), text files, Markdown (`.md`, shown formatted, including tables and checklists; raw HTML in the file is ignored and images appear as links) and PDFs (page by page, with Previous/Next; the PDF viewer loads the first time a PDF is opened). Other types show a download button. Files over **50 MB** aren't previewed (any type): the panel says "File is too big to preview" and offers the download.
 - Both foundation buckets refuse any request that isn't over HTTPS.
 
 ## Local development

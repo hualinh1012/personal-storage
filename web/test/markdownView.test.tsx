@@ -11,6 +11,17 @@ describe("MarkdownView", () => {
     expect(html).toContain("<li><strong>bold</strong> item</li>");
   });
 
+  it("renders GitHub-style tables, checklists and strikethrough", () => {
+    const html = render("| Day | Plan |\n| --- | --- |\n| 1 | Drive up |\n\n- [x] Jackets\n- [ ] Camera\n\n~~cancelled~~");
+    expect(html).toContain("<table>");
+    expect(html).toContain("<td>Drive up</td>");
+    const boxes = html.match(/<input[^>]*>/g) ?? [];
+    expect(boxes).toHaveLength(2);
+    expect(boxes.every((b) => b.includes('type="checkbox"') && b.includes("disabled"))).toBe(true);
+    expect(boxes.filter((b) => b.includes("checked"))).toHaveLength(1);
+    expect(html).toContain("<del>cancelled</del>");
+  });
+
   it("never turns raw HTML in the file into elements", () => {
     const html = render('<script>alert(1)</script>\n\n<img src=x onerror="alert(2)">');
     expect(html).not.toContain("<script");

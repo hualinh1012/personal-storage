@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { FilePreviewProps } from "./types";
 
 /*
@@ -8,6 +9,8 @@ import type { FilePreviewProps } from "./types";
  *  - skipHtml: raw HTML in the file is dropped, never turned into elements;
  *  - react-markdown's default urlTransform strips javascript:/data: style links;
  *  - images are shown as links and never loaded (no tracking pixels).
+ * remark-gfm adds GitHub syntax (tables, checklists, strikethrough, autolinks);
+ * it only changes how Markdown is parsed and adds no HTML pass-through.
  */
 const components: Components = {
   a: ({ href, children }) => (
@@ -25,7 +28,7 @@ const components: Components = {
 export function MarkdownView({ source }: { source: string }) {
   return (
     <div className="markdown-preview">
-      <Markdown skipHtml components={components}>
+      <Markdown skipHtml remarkPlugins={[remarkGfm]} components={components}>
         {source}
       </Markdown>
     </div>

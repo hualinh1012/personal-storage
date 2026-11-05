@@ -23,3 +23,4 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 .playground-list li { padding: 0.35rem 0; }
 .playground-list .active { font-weight: 600; }
 .playground-panel { flex: 1; background: #fff; border: 1px solid #e4e7eb; border-radius: 6px; padding: 0.5rem 1rem; min-height: 60vh; }
+.markdown-preview ul.contains-task-list { list-style: none; padding-left: 1rem; }
