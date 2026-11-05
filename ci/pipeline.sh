@@ -14,10 +14,20 @@ node -e 'const [a,b]=process.versions.node.split(".").map(Number);
   if (a < 20 || (a === 20 && b < 19)) { console.error("Node >= 20.19 required, found " + process.version); process.exit(1); }
   console.log("node " + process.version);'
 
-ssm() { aws ssm get-parameter --region "$REGION" --name "$1" "${@:2}" --query Parameter.Value --output text; }
-export TF_VAR_google_client_id="$(ssm /family-drive/google_client_id)"
-export TF_VAR_google_client_secret="$(ssm /family-drive/google_client_secret --with-decryption)"
-export TF_VAR_allowed_emails="$(ssm /family-drive/allowed_emails)"
+# Plain assignments (not `export X="$(...)"`) so a failed SSM read stops the script.
+ssm() {
+  local value
+  value="$(aws ssm get-parameter --region "$REGION" --name "$1" "${@:2}" --query Parameter.Value --output text)" || return 1
+  if [[ -z "$value" || "$value" == "None" ]]; then
+    echo "SSM parameter $1 is empty in $REGION" >&2
+    return 1
+  fi
+  printf '%s' "$value"
+}
+TF_VAR_google_client_id="$(ssm /family-drive/google_client_id)"
+TF_VAR_google_client_secret="$(ssm /family-drive/google_client_secret --with-decryption)"
+TF_VAR_allowed_emails="$(ssm /family-drive/allowed_emails)"
+export TF_VAR_google_client_id TF_VAR_google_client_secret TF_VAR_allowed_emails
 
 npm ci --prefix "$ROOT/functions/allowlist"
 npm test --prefix "$ROOT/functions/allowlist"
