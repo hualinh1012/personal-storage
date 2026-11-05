@@ -8,6 +8,19 @@ export interface AppConfig {
   appUrl: string;
 }
 
+/** Every family file lives under this prefix; the Identity Pool role only allows it. */
+export const DRIVE_PREFIX = "drive/";
+
+/** Storage Browser location for the shared drive, so it opens there instead of a location picker. */
+export function driveLocation(bucket: string) {
+  return {
+    bucket,
+    prefix: DRIVE_PREFIX,
+    type: "PREFIX" as const,
+    permissions: ["delete", "get", "list", "write"] as ("delete" | "get" | "list" | "write")[],
+  };
+}
+
 export async function loadConfig(): Promise<AppConfig> {
   const res = await fetch("/config.json");
   if (!res.ok) throw new Error(`Failed to load /config.json (HTTP ${res.status})`);
@@ -41,7 +54,7 @@ export function toAmplifyOutputs(c: AppConfig, origin: string) {
           name: "drive",
           bucket_name: c.filesBucket,
           aws_region: c.region,
-          paths: { "drive/*": { authenticated: ["get", "list", "write", "delete"] } },
+          paths: { [`${DRIVE_PREFIX}*`]: { authenticated: ["get", "list", "write", "delete"] } },
         },
       ],
     },

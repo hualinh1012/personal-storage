@@ -96,7 +96,7 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - `.gitattributes` forces LF for `*.sh`, so scripts keep working after a Windows checkout.
 - Terraform: `>= 1.10`, AWS provider `~> 6.0`. The S3 backend uses `use_lockfile`, and the bucket name is passed as `-backend-config`.
 - The Lambdas run on `nodejs22.x` (esbuild targets node22). Building the web app needs Node ≥ 20.19.
-- `web/src/pages/Drive.tsx` is still a placeholder. The Storage Browser screen (`@aws-amplify/ui-react-storage`) isn't wired up yet.
+- `web/src/pages/Drive.tsx` renders Storage Browser (`@aws-amplify/ui-react-storage/browser`) with the Amplify auth adapter, opened at the `drive/` prefix via `driveLocation()` in `web/src/config.ts`. Create the browser after `Amplify.configure` (the adapter reads the storage config when built), never at module level.
 
 ## Docs
 
