@@ -112,3 +112,11 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 `docs/` holds project documentation. Start with `docs/deployment.md`, the AWS setup runbook
 (pipelines, IAM policies, SSM values, Google OAuth redirect, troubleshooting). Update it when
 the deployment steps change.
+
+The project uses Matt Pocock's skills (`mattpocock-skills`), not superpowers (turned off in
+`.claude/settings.json`). Docs follow their layout:
+- **`docs/adr/`**: architecture decisions (`NNNN-slug.md`). Read the ones touching an area
+  before changing it, and say so explicitly if a change contradicts one.
+- **`GLOSSARY.md`** at the root: the project's terms. Created when the first term is settled.
+- **Specs and plans are tickets in the issue tracker**, not files in `docs/`.
+- **`docs/agents/`**: where issues live and how they're labelled, written by `/setup-matt-pocock-skills`.
