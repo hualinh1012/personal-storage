@@ -5,9 +5,12 @@ import "../styles.css";
 import Playground from "./Playground";
 import { DriveView } from "../pages/Drive";
 import { MOCK_BUCKET, installS3FetchStub, mockSetup } from "./mockDrive";
+import { mockGoogleImport } from "./mockGoogleImport";
 
 // Dev-only playground entry. ?view=drive renders the real drive screen with sample data.
-const driveView = new URLSearchParams(location.search).get("view") === "drive";
+const params = new URLSearchParams(location.search);
+const driveView = params.get("view") === "drive";
+const googleImport = mockGoogleImport(params.get("google") !== "off");
 if (driveView) {
   installS3FetchStub();
   // Previews call Amplify Storage (HeadObject, presigned URLs), which needs a bucket and region.
@@ -16,6 +19,10 @@ if (driveView) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {driveView ? <DriveView email="you@example.com" bucket={MOCK_BUCKET} setup={mockSetup} /> : <Playground />}
+    {driveView ? (
+      <DriveView email="you@example.com" bucket={MOCK_BUCKET} setup={mockSetup} googleImport={googleImport} />
+    ) : (
+      <Playground />
+    )}
   </StrictMode>,
 );
