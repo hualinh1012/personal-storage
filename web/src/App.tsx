@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Amplify } from "aws-amplify";
 import { getCurrentUser } from "aws-amplify/auth";
-import { loadConfig, toAmplifyOutputs } from "./config";
+import { googleImportConfig, loadConfig, toAmplifyOutputs, type GoogleImportConfig } from "./config";
 import { currentUserEmail } from "./session";
 import { isAccessDeniedRedirect } from "./authErrors";
 import Landing from "./pages/Landing";
@@ -13,7 +13,7 @@ type State =
   | { kind: "error"; message: string }
   | { kind: "denied" }
   | { kind: "landing" }
-  | { kind: "drive"; email: string };
+  | { kind: "drive"; email: string; google: GoogleImportConfig | null };
 
 export default function App() {
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -23,9 +23,11 @@ export default function App() {
     const set = (s: State) => !cancelled && setState(s);
 
     (async () => {
+      let google: GoogleImportConfig | null;
       try {
         const cfg = await loadConfig();
         Amplify.configure(toAmplifyOutputs(cfg, window.location.origin));
+        google = googleImportConfig(cfg);
       } catch (e) {
         return set({ kind: "error", message: e instanceof Error ? e.message : String(e) });
       }
@@ -38,7 +40,7 @@ export default function App() {
         return set({ kind: "landing" });
       }
       try {
-        set({ kind: "drive", email: await currentUserEmail() });
+        set({ kind: "drive", email: await currentUserEmail(), google });
       } catch (e) {
         set({ kind: "error", message: e instanceof Error ? e.message : String(e) });
       }
@@ -59,6 +61,6 @@ export default function App() {
     case "landing":
       return <Landing />;
     case "drive":
-      return <Drive email={state.email} />;
+      return <Drive email={state.email} google={state.google} />;
   }
 }

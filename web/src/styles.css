@@ -56,3 +56,19 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 .move-summary { flex: 1; font-size: 0.9rem; }
 .move-summary p { margin: 0; font-weight: 600; }
 .move-summary ul { margin: 0.25rem 0 0; padding-left: 1.2rem; color: #b42318; }
+
+/* Import from Google Drive (googleImport/GoogleImportView.tsx) */
+.google-import { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.google-import__body { flex: 1; min-height: 0; overflow-y: auto; }
+.google-import__error { color: #b42318; }
+.google-import__summary { font-weight: 600; }
+.google-import__table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
+.google-import__table th, .google-import__table td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #e4e7eb; vertical-align: top; }
+.google-import__table th:nth-child(2), .google-import__table td:nth-child(2) { width: 6rem; }
+.google-import__table th:nth-child(3), .google-import__table td:nth-child(3) { width: 40%; }
+.google-import__name { overflow-wrap: anywhere; }
+.google-import__reason { color: #52606d; font-size: 0.85rem; }
+.google-import__row--failed .google-import__reason { color: #b42318; }
+.google-import__row--done td:nth-child(3) { color: #067647; }
+.topbar button:not(.primary):not(.link) { padding: 0.4rem 1rem; border: 1px solid #c7ccd1; border-radius: 6px; background: #fff; }
+.topbar button:disabled { opacity: 0.5; cursor: default; }
