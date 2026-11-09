@@ -33,3 +33,16 @@ output "cognito_domain" {
 output "identity_pool_id" {
   value = aws_cognito_identity_pool.main.id
 }
+
+# Public values for the Google Drive import (the client secret stays out).
+output "google_client_id" {
+  value = nonsensitive(data.aws_ssm_parameter.google_client_id.value)
+}
+
+output "google_api_key" {
+  value = nonsensitive(data.aws_ssm_parameter.google_api_key.value)
+}
+
+output "google_project_number" {
+  value = nonsensitive(data.aws_ssm_parameter.google_project_number.value)
+}

@@ -25,6 +25,10 @@ const map = {
   identityPoolId: "identity_pool_id",
   filesBucket: "files_bucket",
   appUrl: "app_url",
+  // Google Drive import; CHANGE_ME until set up (the SPA then says so).
+  googleClientId: "google_client_id",
+  googleApiKey: "google_api_key",
+  googleProjectNumber: "google_project_number",
 };
 const cfg = {};
 for (const [key, tfName] of Object.entries(map)) {

@@ -20,6 +20,17 @@ data "aws_ssm_parameter" "allowed_emails" {
   name = "/${var.project}/allowed_emails"
 }
 
+# Google Drive import (issue #1). Public values for the SPA. Deliberately not
+# in the precondition below: while they're CHANGE_ME the app still deploys and
+# the import says it isn't set up yet.
+data "aws_ssm_parameter" "google_api_key" {
+  name = "/${var.project}/google_api_key"
+}
+
+data "aws_ssm_parameter" "google_project_number" {
+  name = "/${var.project}/google_project_number"
+}
+
 locals {
   allowed_emails_raw = [for e in split(",", nonsensitive(data.aws_ssm_parameter.allowed_emails.value)) : trimspace(e) if trimspace(e) != ""]
 
