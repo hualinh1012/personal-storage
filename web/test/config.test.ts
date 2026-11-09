@@ -35,7 +35,7 @@ describe("toAmplifyOutputs", () => {
     expect(o.storage.buckets[0].bucket_name).toBe(c.filesBucket);
     expect(o.storage.buckets[0].aws_region).toBe(c.region);
     expect(o.storage.buckets[0].paths).toEqual({
-      "drive/*": { authenticated: ["get", "list", "write", "delete"] },
+      "Global/*": { authenticated: ["get", "list", "write", "delete"] },
     });
   });
 });

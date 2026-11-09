@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { moveFile, type MoveOps } from "../src/move/moveFile";
 
-const item = { key: "drive/b/photo.jpg", sourceKey: "drive/a/photo.jpg" };
+const item = { key: "Global/b/photo.jpg", sourceKey: "Global/a/photo.jpg" };
 
 function ops(overrides: Partial<MoveOps> = {}) {
   const calls: string[] = [];
@@ -25,7 +25,7 @@ describe("moveFile", () => {
   it("checks the destination, copies, then deletes the original", async () => {
     const { o, calls } = ops();
     await expect(moveFile(item, o)).resolves.toEqual({ status: "COMPLETE" });
-    expect(calls).toEqual(["exists drive/b/photo.jpg", "copy drive/a/photo.jpg -> drive/b/photo.jpg", "remove drive/a/photo.jpg"]);
+    expect(calls).toEqual(["exists Global/b/photo.jpg", "copy Global/a/photo.jpg -> Global/b/photo.jpg", "remove Global/a/photo.jpg"]);
   });
 
   it("refuses to overwrite a file with the same name at the destination", async () => {

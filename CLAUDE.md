@@ -55,8 +55,8 @@ There is no linter configured.
 4. The SPA uses those credentials to talk **directly to S3**, through AWS's Storage Browser component.
 
 The Identity Pool's authenticated role (`infra/identity.tf`) is the security boundary. It
-allows S3 access only to `files-bucket/drive/*`, and listing only for prefixes under
-`drive/`. All family files live under `drive/`.
+allows S3 access only to `files-bucket/Global/*`, and listing only for prefixes under
+`Global/`. All family files live under `Global/`.
 
 ### Allowlist enforcement spans three places
 - `functions/allowlist/src/allowlist.ts` holds the pure logic: case-insensitive matching, ignores surrounding whitespace, requires `email_verified`, and an empty list denies everyone.
@@ -104,7 +104,7 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - `.gitattributes` forces LF for `*.sh`, so scripts keep working after a Windows checkout.
 - Terraform: `>= 1.10`, AWS provider `~> 6.0`. The S3 backend uses `use_lockfile`, and the bucket name is passed as `-backend-config`.
 - The Lambdas run on `nodejs22.x` (esbuild targets node22). The web build and tests need Node ≥ 22.12.
-- `web/src/pages/Drive.tsx` renders Storage Browser (`@aws-amplify/ui-react-storage/browser`) with the Amplify auth adapter, opened at the `drive/` prefix via `driveLocation()` in `web/src/config.ts`. Create the browser after `Amplify.configure` (the adapter reads the storage config when built), never at module level.
+- `web/src/pages/Drive.tsx` renders Storage Browser (`@aws-amplify/ui-react-storage/browser`) with the Amplify auth adapter, opened at the `Global/` prefix via `driveLocation()` in `web/src/config.ts`. Create the browser after `Amplify.configure` (the adapter reads the storage config when built), never at module level.
 - File preview (the panel beside the list) uses Storage Browser's `filePreview` option. Image, video and text use its built-in viewers; extra types are entries in `web/src/preview/registry.ts` (extensions/content types → viewer component). One limit, `MAX_PREVIEW_BYTES` (50 MB, in **bytes** despite the library docs saying KB), applies to every type; the "too big" wording is `previewDisplayText`, passed to `StorageBrowser` as `displayText`. PDF uses `react-pdf` (PDF.js), loaded lazily through `PdfPreviewLazy.tsx` so it stays out of the main bundle; it fetches the bytes because the pre-signed URL is `Content-Disposition: attachment` (an iframe would download), and `scripts/deploy.sh` uploads `.mjs` (the PDF.js worker) as `text/javascript`. Markdown: `MarkdownPreview.tsx` renders with `react-markdown` + `remark-gfm` (tables, checklists) using `skipHtml`, the default URL sanitising and images shown as links — keep those when touching it, since rendered files run in every family member's browser.
 
 ## Docs

@@ -9,9 +9,9 @@ describe("move summary", () => {
 
   it("lists each failed file by name with its reason", () => {
     const lines = failureLines([
-      { data: { sourceKey: "drive/a/photo.jpg" }, status: "FAILED", message: "A file with this name already exists in the destination." },
-      { data: { sourceKey: "drive/a/ok.jpg" }, status: "COMPLETE" },
-      { data: { sourceKey: "drive/a/x.pdf" }, status: "FAILED" },
+      { data: { sourceKey: "Global/a/photo.jpg" }, status: "FAILED", message: "A file with this name already exists in the destination." },
+      { data: { sourceKey: "Global/a/ok.jpg" }, status: "COMPLETE" },
+      { data: { sourceKey: "Global/a/x.pdf" }, status: "FAILED" },
     ]);
     expect(lines).toEqual(["photo.jpg: A file with this name already exists in the destination.", "x.pdf: Not moved."]);
   });

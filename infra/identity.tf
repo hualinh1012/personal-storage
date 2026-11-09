@@ -47,7 +47,7 @@ data "aws_iam_policy_document" "authenticated" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = ["drive/", "drive/*"]
+      values   = ["Global/", "Global/*"]
     }
   }
 
@@ -60,7 +60,7 @@ data "aws_iam_policy_document" "authenticated" {
       "s3:AbortMultipartUpload",
       "s3:ListMultipartUploadParts",
     ]
-    resources = ["${data.aws_s3_bucket.files.arn}/drive/*"]
+    resources = ["${data.aws_s3_bucket.files.arn}/Global/*"]
   }
 }
 

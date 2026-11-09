@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { DRIVE_PREFIX, driveLocation, toAmplifyOutputs } from "../src/config";
 
 describe("driveLocation", () => {
-  it("points Storage Browser at the shared drive/ prefix with full permissions", () => {
+  it("points Storage Browser at the shared Global/ prefix with full permissions", () => {
     expect(driveLocation("family-drive-files-123")).toEqual({
       bucket: "family-drive-files-123",
-      prefix: "drive/",
+      prefix: "Global/",
       type: "PREFIX",
       permissions: ["delete", "get", "list", "write"],
     });

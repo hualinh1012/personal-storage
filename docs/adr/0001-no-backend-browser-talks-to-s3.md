@@ -4,5 +4,5 @@ Family Drive has no API layer and no database. The SPA gets temporary AWS creden
 
 ## Consequences
 
-- The Identity Pool's authenticated role (`infra/identity.tf`) is the security boundary. It may touch only `files-bucket/drive/*`, so every family file lives under `drive/`.
+- The Identity Pool's authenticated role (`infra/identity.tf`) is the security boundary. It may touch only `files-bucket/Global/*`, so every family file lives under `Global/`.
 - Long-running work (for example importing from Google Drive) runs in the user's tab and stops when the tab closes.

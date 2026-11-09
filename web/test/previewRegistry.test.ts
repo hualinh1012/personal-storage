@@ -15,29 +15,29 @@ const file = (key: string, contentType?: string) => ({ key, contentType });
 
 describe("resolvePreviewType", () => {
   it("recognises Markdown by extension, case-insensitively", () => {
-    expect(resolvePreviewType(file("drive/README.md"))).toBe("markdown");
-    expect(resolvePreviewType(file("drive/notes/Plan.MARKDOWN"))).toBe("markdown");
+    expect(resolvePreviewType(file("Global/README.md"))).toBe("markdown");
+    expect(resolvePreviewType(file("Global/notes/Plan.MARKDOWN"))).toBe("markdown");
   });
 
   it("recognises Markdown by content type when there is no known extension", () => {
-    expect(resolvePreviewType(file("drive/notes", "text/markdown; charset=utf-8"))).toBe("markdown");
+    expect(resolvePreviewType(file("Global/notes", "text/markdown; charset=utf-8"))).toBe("markdown");
   });
 
   it("leaves photos, videos and text to Storage Browser's built-in detection", () => {
-    expect(resolvePreviewType(file("drive/a.jpg", "image/jpeg"))).toBeUndefined();
-    expect(resolvePreviewType(file("drive/b.mp4", "video/mp4"))).toBeUndefined();
-    expect(resolvePreviewType(file("drive/c.txt", "text/plain"))).toBeUndefined();
+    expect(resolvePreviewType(file("Global/a.jpg", "image/jpeg"))).toBeUndefined();
+    expect(resolvePreviewType(file("Global/b.mp4", "video/mp4"))).toBeUndefined();
+    expect(resolvePreviewType(file("Global/c.txt", "text/plain"))).toBeUndefined();
   });
 
   it("recognises PDF by extension or content type", () => {
-    expect(resolvePreviewType(file("drive/Contract.PDF"))).toBe("pdf");
-    expect(resolvePreviewType(file("drive/scan", "application/pdf"))).toBe("pdf");
+    expect(resolvePreviewType(file("Global/Contract.PDF"))).toBe("pdf");
+    expect(resolvePreviewType(file("Global/scan", "application/pdf"))).toBe("pdf");
   });
 
   it("returns nothing for types without a viewer", () => {
-    expect(resolvePreviewType(file("drive/d.docx"))).toBeUndefined();
-    expect(resolvePreviewType(file("drive/e.zip", "application/zip"))).toBeUndefined();
-    expect(resolvePreviewType(file("drive/no-extension"))).toBeUndefined();
+    expect(resolvePreviewType(file("Global/d.docx"))).toBeUndefined();
+    expect(resolvePreviewType(file("Global/e.zip", "application/zip"))).toBeUndefined();
+    expect(resolvePreviewType(file("Global/no-extension"))).toBeUndefined();
   });
 });
 

@@ -9,7 +9,7 @@ export interface AppConfig {
 }
 
 /** Every family file lives under this prefix; the Identity Pool role only allows it. */
-export const DRIVE_PREFIX = "drive/";
+export const DRIVE_PREFIX = "Global/";
 
 /** Storage Browser location for the shared drive, so it opens there instead of a location picker. */
 export function driveLocation(bucket: string) {

@@ -60,7 +60,7 @@ export default function Playground() {
           {sample.size > MAX_PREVIEW_BYTES || !Renderer ? (
             <TooBig />
           ) : (
-            <Renderer url={sample.url} fileData={{ key: `drive/${sample.name}`, size: sample.size }} />
+            <Renderer url={sample.url} fileData={{ key: `Global/${sample.name}`, size: sample.size }} />
           )}
         </section>
       </main>

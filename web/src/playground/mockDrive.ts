@@ -21,17 +21,17 @@ interface MockFile {
 }
 
 const files: MockFile[] = [
-  { key: "drive/linh/Quang Vu-UIUX Designer.pdf", size: 525_100, contentType: "application/pdf", body: () => fetch(samplePdfUrl).then((r) => r.blob()) },
-  { key: "drive/linh/Tết 2026 plan.md", size: sampleMarkdown.length, contentType: "text/markdown", body: async () => sampleMarkdown },
-  { key: "drive/linh/a very long file name that keeps going to test the table width - final v3.docx", size: 48_000, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
-  { key: "drive/linh/holiday-video.mp4", size: 120 * 1024 * 1024, contentType: "video/mp4" },
+  { key: "Global/linh/Quang Vu-UIUX Designer.pdf", size: 525_100, contentType: "application/pdf", body: () => fetch(samplePdfUrl).then((r) => r.blob()) },
+  { key: "Global/linh/Tết 2026 plan.md", size: sampleMarkdown.length, contentType: "text/markdown", body: async () => sampleMarkdown },
+  { key: "Global/linh/a very long file name that keeps going to test the table width - final v3.docx", size: 48_000, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+  { key: "Global/linh/holiday-video.mp4", size: 120 * 1024 * 1024, contentType: "video/mp4" },
   ...Array.from({ length: 25 }, (_, i) => ({
-    key: `drive/linh/photo-${String(i + 1).padStart(3, "0")}.jpg`,
+    key: `Global/linh/photo-${String(i + 1).padStart(3, "0")}.jpg`,
     size: 2_400_000 + i * 1000,
     contentType: "image/jpeg",
   })),
 ];
-const folders = ["drive/linh/", "drive/Tết 2026/", "drive/documents/"];
+const folders = ["Global/linh/", "Global/Tết 2026/", "Global/documents/"];
 const modified = new Date("2026-11-05T08:32:00Z");
 
 function listUnder(prefix: string): Items {
@@ -55,7 +55,7 @@ export const mockSetup = {
   config: {
     region: REGION,
     listLocations: async () => ({
-      items: [{ id: "drive", bucket: MOCK_BUCKET, prefix: "drive/", type: "PREFIX" as const, permissions: ["delete", "get", "list", "write"] as ("delete" | "get" | "list" | "write")[] }],
+      items: [{ id: "Global", bucket: MOCK_BUCKET, prefix: "Global/", type: "PREFIX" as const, permissions: ["delete", "get", "list", "write"] as ("delete" | "get" | "list" | "write")[] }],
       nextToken: undefined,
     }),
     getLocationCredentials: async () => ({
