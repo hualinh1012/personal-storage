@@ -6,6 +6,30 @@ export interface AppConfig {
   identityPoolId: string;
   filesBucket: string;
   appUrl: string;
+  // Google Drive import. Optional: absent from older config.json files, and
+  // "CHANGE_ME" until set up. Read them through googleImportConfig().
+  googleClientId?: string;
+  googleApiKey?: string;
+  googleProjectNumber?: string;
+}
+
+export interface GoogleImportConfig {
+  clientId: string;
+  apiKey: string;
+  projectNumber: string;
+}
+
+const PLACEHOLDER = "CHANGE_ME";
+
+function usable(v: string | undefined): v is string {
+  return typeof v === "string" && v.trim() !== "" && v.trim() !== PLACEHOLDER;
+}
+
+/** The Google values the import needs, or null while Google import isn't set up. */
+export function googleImportConfig(c: AppConfig): GoogleImportConfig | null {
+  const { googleClientId: clientId, googleApiKey: apiKey, googleProjectNumber: projectNumber } = c;
+  if (!usable(clientId) || !usable(apiKey) || !usable(projectNumber)) return null;
+  return { clientId, apiKey, projectNumber };
 }
 
 /** Every family file lives under this prefix; the Identity Pool role only allows it. */

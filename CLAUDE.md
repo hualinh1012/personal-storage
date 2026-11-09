@@ -120,3 +120,17 @@ The project uses Matt Pocock's skills (`mattpocock-skills`), not superpowers (tu
 - **`GLOSSARY.md`** at the root: the project's terms. Created when the first term is settled.
 - **Specs and plans are tickets in the issue tracker**, not files in `docs/`.
 - **`docs/agents/`**: where issues live and how they're labelled, written by `/setup-matt-pocock-skills`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are GitHub issues on `hualinh1012/personal-storage`, managed with `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

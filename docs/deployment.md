@@ -113,9 +113,12 @@ aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/a
 | `/family-drive/google_client_id` | String | Google OAuth client ID |
 | `/family-drive/google_client_secret` | SecureString | Google OAuth client secret |
 | `/family-drive/allowed_emails` | StringList | Comma-separated Google emails allowed in |
+| `/family-drive/google_api_key` | String | Browser API key for Google Drive import (step 4b) |
+| `/family-drive/google_project_number` | String | Google Cloud project number for Google Drive import (step 4b) |
 
-The app plan **stops on purpose** while any of these still holds `CHANGE_ME`, or if
-`allowed_emails` has no valid email addresses.
+The app plan **stops on purpose** while any of the first three still holds `CHANGE_ME`, or if
+`allowed_emails` has no valid email addresses. The two Google Drive import values don't block it:
+while they're `CHANGE_ME` the app deploys and the import says "Import from Google Drive isn't set up yet".
 
 ## 3. App deploy pipeline
 
@@ -193,7 +196,7 @@ In Google Cloud Console, go to **APIs & Services → Credentials** and open the 
    - It must start with `https://`.
    - Don't add a trailing slash.
    - It's the Cognito domain, not the CloudFront URL.
-2. You can leave **Authorized JavaScript origins** empty.
+2. Sign-in alone doesn't need **Authorized JavaScript origins**; Google Drive import does (step 4b).
 3. Click **Save**. Google says the change can take a few minutes to a few hours. It's usually about 5 minutes.
 
 ### Check the OAuth consent screen
@@ -202,8 +205,8 @@ Go to **APIs & Services → OAuth consent screen** (or **Google Auth Platform �
 - **User type:** External.
 - **Publishing status:**
   - **Testing:** only accounts listed under **Test users** can sign in. Add yourself and each family member.
-  - **Published:** skips the test-user list. With only the basic scopes, Google doesn't require verification, though users may see an "unverified app" notice.
-- **Scopes:** `openid`, `email`, `profile`. Nothing else.
+  - **Published:** skips the test-user list. With only the basic scopes, Google doesn't require verification, though users may see an "unverified app" notice. **Not an option once Google Drive import is set up** (step 4b): its restricted scope would need Google's verification and a security assessment.
+- **Scopes:** `openid`, `email`, `profile`, plus `drive.readonly` for Google Drive import (step 4b). Nothing else.
 
 ### Test
 Open `app_url` in a private window and sign in.
@@ -214,6 +217,47 @@ Open `app_url` in a private window and sign in.
 
 Because the Cognito domain is fixed, this redirect URI keeps working when the app stack is destroyed and
 redeployed. (Deployments made before the domain was fixed used a random suffix; remove that old URI from Google.)
+
+## 4b. Google Drive import setup (optional)
+
+"Import from Google Drive" talks to Google straight from the browser, with Google Picker for choosing files
+and the Drive API for downloading them. Until this is done, the drive works normally and the import says it
+isn't set up yet. All of it happens in the same Google Cloud project as the sign-in OAuth client.
+
+1. **Enable the APIs.** In **APIs & Services → Library**, enable the **Google Drive API** and the
+   **Google Picker API**. (Not the *Google Photos Picker API*: that's a different product.)
+2. **Add JavaScript origins.** Open the OAuth client from step 4 (**APIs & Services → Credentials**) and add,
+   under **Authorized JavaScript origins**:
+   - the site, `app_url` (`https://<id>.cloudfront.net`, no trailing slash);
+   - `http://localhost:5173`, for local development.
+
+   Click **Save**.
+3. **Create a browser API key.** **APIs & Services → Credentials → Create credentials → API key**, then edit it:
+   - **Application restrictions:** Websites, with `https://<id>.cloudfront.net/*` and `http://localhost:5173/*`;
+   - **API restrictions:** Restrict key, **Google Picker API** only.
+
+   The key ends up in the public `config.json`; the restrictions are what protect it.
+4. **Find the project number.** It's on the project's **Dashboard** (or **IAM & Admin → Settings**). It's also
+   the digits before the first `-` in the OAuth client ID.
+5. **Add the Drive scope to the consent screen.** In **Google Auth Platform → Data access**, add
+   `https://www.googleapis.com/auth/drive.readonly`. It's a *restricted* scope (see
+   [ADR 0008](adr/0008-google-drive-import-scope.md)), so keep the app in **Testing**, with yourself and every
+   family member listed under **Audience → Test users**. On their first import, family members see Google's
+   "unverified app" warning and a consent line reading "See and download all your Google Drive files".
+6. **Set the SSM values** and re-run the app pipeline (**Release change**):
+
+   ```bash
+   aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/google_api_key --value '<browser API key>'
+   ```
+   ```bash
+   aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/google_project_number --value '<project number>'
+   ```
+
+**Check the result:** `https://<id>.cloudfront.net/config.json` carries `googleApiKey` and `googleProjectNumber`
+with real values instead of `CHANGE_ME`.
+
+If the CloudFront URL changes (the app stack was destroyed and redeployed), update the JavaScript origin and the
+API key's website restriction to the new `app_url`.
 
 ## 5. App destroy pipeline (optional, manual only)
 
@@ -253,6 +297,8 @@ family's files and all Terraform state. It needs manual steps:
 **Add or remove a family member:**
 1. Edit `/family-drive/allowed_emails` in SSM.
 2. Re-run the app pipeline (**Release change**).
+3. While the OAuth consent screen is in **Testing** (always, once Google Drive import is set up), also add or
+   remove them under **Google Auth Platform → Audience → Test users**. Google blocks sign-in for anyone not listed.
 
 A removed person loses access within about **2 hours**: ID and access tokens are set to last 60 minutes, and the AWS credentials obtained with them up to another hour. Every token refresh re-checks the allowlist. To cut them off sooner, also delete their user in the Cognito user pool.
 

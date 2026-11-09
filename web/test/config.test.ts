@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadConfig, toAmplifyOutputs, type AppConfig } from "../src/config";
+import { googleImportConfig, loadConfig, toAmplifyOutputs, type AppConfig } from "../src/config";
 
 const c: AppConfig = {
   region: "ap-southeast-1",
@@ -70,5 +70,48 @@ describe("loadConfig", () => {
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...c, filesBucket: "" }) }));
     await expect(loadConfig()).rejects.toThrow("config.json is missing filesBucket");
+  });
+});
+
+describe("googleImportConfig", () => {
+  const google = {
+    googleClientId: "123-abc.apps.googleusercontent.com",
+    googleApiKey: "AIzaTestKey",
+    googleProjectNumber: "123",
+  };
+
+  it("returns the Google values when all are set", () => {
+    expect(googleImportConfig({ ...c, ...google })).toEqual({
+      clientId: google.googleClientId,
+      apiKey: google.googleApiKey,
+      projectNumber: google.googleProjectNumber,
+    });
+  });
+
+  it("is null when any value is the CHANGE_ME placeholder", () => {
+    for (const key of Object.keys(google) as (keyof typeof google)[]) {
+      expect(googleImportConfig({ ...c, ...google, [key]: "CHANGE_ME" })).toBeNull();
+    }
+  });
+
+  it("is null when any value is missing or empty (e.g. a config.json from before the import)", () => {
+    expect(googleImportConfig(c)).toBeNull();
+    expect(googleImportConfig({ ...c, ...google, googleApiKey: "" })).toBeNull();
+    expect(googleImportConfig({ ...c, ...google, googleProjectNumber: "  " })).toBeNull();
+  });
+});
+
+describe("loadConfig with Google values", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("doesn't require them, so a missing Google setup never stops the drive", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => c }));
+    await expect(loadConfig()).resolves.toEqual(c);
+  });
+
+  it("passes them through when present", async () => {
+    const withGoogle = { ...c, googleClientId: "id", googleApiKey: "CHANGE_ME", googleProjectNumber: "1" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => withGoogle }));
+    await expect(loadConfig()).resolves.toEqual(withGoogle);
   });
 });

@@ -11,5 +11,7 @@ output "ssm_parameters" {
     aws_ssm_parameter.google_client_id.name,
     aws_ssm_parameter.google_client_secret.name,
     aws_ssm_parameter.allowed_emails.name,
+    aws_ssm_parameter.google_api_key.name,
+    aws_ssm_parameter.google_project_number.name,
   ]
 }

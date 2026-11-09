@@ -46,7 +46,7 @@ import_if_missing() { # <address> <import id>
 # state is lost with the build container).
 import_existing() {
   local name
-  for name in google_client_id google_client_secret allowed_emails; do
+  for name in google_client_id google_client_secret allowed_emails google_api_key google_project_number; do
     if param_exists "/${PROJECT}/${name}"; then
       import_if_missing "aws_ssm_parameter.${name}" "/${PROJECT}/${name}"
     fi
@@ -83,3 +83,6 @@ echo "Next: set real values (Terraform never overwrites them):"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_client_id --value '<client id>'"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_client_secret --value '<client secret>'"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/allowed_emails --value 'you@gmail.com,mom@gmail.com'"
+echo "  # Google Drive import (optional; see docs/deployment.md):"
+echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_api_key --value '<browser API key>'"
+echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_project_number --value '<project number>'"
