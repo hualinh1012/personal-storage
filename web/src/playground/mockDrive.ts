@@ -8,6 +8,7 @@ import samplePdfUrl from "./sample.pdf?url";
 import { sampleMarkdown } from "./samples";
 import type { ListLocationItemsHandlerOutput } from "@aws-amplify/ui-react-storage/browser";
 import { listDriveLocations, personalPrefix } from "../config";
+import type { Access } from "../access";
 
 type Items = ListLocationItemsHandlerOutput["items"];
 
@@ -57,10 +58,21 @@ function listUnder(prefix: string): Items {
   return items;
 }
 
-export const mockSetup = {
+/**
+ * The playground's access level from `?access=`: `read` (read-only Global/, no
+ * personal folder), `read+personal`, `write` (no personal folder), or
+ * `write+personal` (the default when absent).
+ */
+export function mockAccess(param: string | null): Access {
+  if (param === null) return { globalWrite: true, personal: true };
+  const [global, ...flags] = param.split(/[+ ]/);
+  return { globalWrite: global === "write", personal: flags.includes("personal") };
+}
+
+export const mockSetup = (access: Access) => ({
   config: {
     region: REGION,
-    listLocations: listDriveLocations(MOCK_BUCKET, MOCK_EMAIL),
+    listLocations: listDriveLocations(MOCK_BUCKET, MOCK_EMAIL, access),
     getLocationCredentials: async () => ({
       credentials: {
         accessKeyId: "AKIAPLAYGROUND",
@@ -79,7 +91,7 @@ export const mockSetup = {
       }),
     },
   },
-};
+});
 
 /** Answers S3 requests for the mock bucket from the sample files. Call once. */
 export function installS3FetchStub() {

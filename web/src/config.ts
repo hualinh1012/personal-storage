@@ -1,3 +1,5 @@
+import type { Access } from "./access";
+
 export interface AppConfig {
   region: string;
   userPoolId: string;
@@ -32,7 +34,7 @@ export function googleImportConfig(c: AppConfig): GoogleImportConfig | null {
   return { clientId, apiKey, projectNumber };
 }
 
-/** The shared drive: everyone signed in can use it. */
+/** The shared drive: everyone signed in can read it; writing depends on their access level. */
 export const DRIVE_PREFIX = "Global/";
 
 /**
@@ -43,10 +45,22 @@ export const PERSONAL_PREFIX = "Personal/";
 
 type Permission = "delete" | "get" | "list" | "write";
 const FULL_ACCESS: Permission[] = ["delete", "get", "list", "write"];
+// Storage Browser hides Upload, Delete, Create folder (and our Move and
+// Google import) for a location without "write"/"delete".
+const READ_ACCESS: Permission[] = ["get", "list"];
 
-/** Storage Browser location for the shared drive, so it opens there instead of a location picker. */
-export function driveLocation(bucket: string) {
-  return { bucket, prefix: DRIVE_PREFIX, type: "PREFIX" as const, permissions: [...FULL_ACCESS] };
+/**
+ * Storage Browser location for the shared drive, so it opens there instead of
+ * a location picker. Read-only unless the person has write access to Global/.
+ */
+export function driveLocation(bucket: string, access: Access) {
+  const permissions = access.globalWrite ? FULL_ACCESS : READ_ACCESS;
+  return { bucket, prefix: DRIVE_PREFIX, type: "PREFIX" as const, permissions: [...permissions] };
+}
+
+/** True when the location allows uploads (and so imports). */
+export function canWrite(location: { permissions: readonly string[] } | undefined): boolean {
+  return !!location?.permissions.includes("write");
 }
 
 /**
@@ -69,14 +83,14 @@ export function isPersonalPrefix(prefix: string): boolean {
 }
 
 /**
- * What Home lists: the shared drive and the signed-in person's own folder.
- * Nobody else's folder: listing them would need the allowlist in the browser,
- * and IAM denies opening them anyway. Replaces the Amplify adapter's
+ * What Home lists: the shared drive and, if the person has one, their own
+ * folder. Nobody else's folder: listing them would need the allowlist in the
+ * browser, and IAM denies opening them anyway. Replaces the Amplify adapter's
  * listLocations, which can only derive paths from the identity ID.
  */
-export function listDriveLocations(bucket: string, email: string) {
-  const items = [{ id: "Global", ...driveLocation(bucket) }];
-  if (email.trim()) items.push({ id: "Personal", ...personalLocation(bucket, email) });
+export function listDriveLocations(bucket: string, email: string, access: Access) {
+  const items = [{ id: "Global", ...driveLocation(bucket, access) }];
+  if (access.personal && email.trim()) items.push({ id: "Personal", ...personalLocation(bucket, email) });
   return async () => ({ items, nextToken: undefined });
 }
 

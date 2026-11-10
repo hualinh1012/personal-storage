@@ -27,6 +27,7 @@ npm run dev                    # Vite on http://localhost:5173 (needs web/public
                                # /playground.html: preview viewers with sample files, no AWS (dev only)
                                # /playground.html?view=drive: the real drive screen (DriveView) with mock data,
                                #   including Import from Google Drive with fake Google/S3 (&google=off: not set up)
+                               #   &access=read | read%2Bpersonal | write: preview another access level
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
 
@@ -64,6 +65,15 @@ identity ID, so they survive recreating the app stack ([ADR 0009](docs/adr/0009-
 The SPA builds the prefix lower-cased (`personalPrefix()` in `web/src/config.ts`); IAM compares
 it with the raw claim, which Google sends lower-case.
 
+Per-person access levels ([ADR 0010](docs/adr/0010-per-person-access-levels-in-ssm.md)) use the
+same mechanism. Everyone can list and read `Global/`; writes there need the session tag
+`global_access` = `write`, and every personal-folder statement needs `personal` = `yes`. Both
+tags come from ID-token claims the pre token generation trigger adds. A missing tag fails the
+condition, so the fallback is read-only. The SPA reads the same claims (`web/src/access.ts`)
+only to hide what IAM would refuse: a read-only `Global/` location gets Storage Browser
+permissions `["get", "list"]`, Move and Google import hide without `write`, and Home lists the
+personal folder only when `personal` is `yes`.
+
 ### Allowlist enforcement spans three places
 - `functions/allowlist/src/allowlist.ts` holds the pure logic: case-insensitive matching, ignores surrounding whitespace, requires `email_verified`, and an empty list denies everyone.
 - Two Cognito triggers use it:
@@ -71,14 +81,18 @@ it with the raw claim, which Google sends lower-case.
   - **Pre token generation** runs on every sign-in and token refresh, so removing an email takes effect.
 - Both triggers deny by throwing `Error("ACCESS_DENIED")`. Cognito puts that text in the redirect's `error_description`, and `web/src/authErrors.ts` matches the same string to show the access-denied page. **Keep the string identical in both places.**
 - The allowlist reaches the Lambdas as env `ALLOWED_EMAILS`. It's built in Terraform from the SSM parameter `/family-drive/allowed_emails` (StringList).
+- Access levels: SSM `/family-drive/access` is a **JSON `String`** (not StringList: JSON has commas), e.g. `{"a@x.com": {"global": "write", "personal": true}}`. Unlisted allowlisted emails get read-only `Global/` and no personal folder.
+  - `functions/allowlist/src/access.ts` parses it (lower-cased keys; rejects bad JSON, unknown keys, bad values and the same email twice in different case) and turns it into string claims `global_access` (`read`/`write`) and `personal` (`yes`/`no`).
+  - Terraform (`infra/foundation_inputs.tf`) checks the same rules in preconditions, plus that every email is allowlisted, and passes a normalized `jsonencode` to pre token generation as env `ACCESS_LEVELS`.
+  - Adding a flag (e.g. `trash`, #24) means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping and an IAM condition.
 
 ### Two Terraform stacks
-- **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules) and the three SSM parameters. Every resource has `prevent_destroy`.
+- **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules) and the SSM parameters. Every resource has `prevent_destroy`.
   - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters and buckets.
   - The SSM parameters are created with a `CHANGE_ME` placeholder and `ignore_changes` on their value, so Terraform never overwrites real values.
 - **`infra/` is the app stack and is disposable:** Cognito, the Lambdas, the Identity Pool, CloudFront, the web bucket, and the files bucket's CORS rule.
   - It finds foundation resources **by naming convention through data sources** (`infra/foundation_inputs.tf`), not through remote state.
-  - A `terraform_data` precondition stops the plan while the SSM values are placeholders or not email addresses.
+  - A `terraform_data` precondition stops the plan while the SSM values are placeholders or not email addresses, or `access` is invalid.
 - Both stacks keep state in `family-drive-tfstate-<account>`: the app under `family-drive/`, the foundation under `foundation/`.
 - `archive_file` in `infra/auth.tf` zips `functions/allowlist/dist/*.js`, so the Lambdas must be built first.
 

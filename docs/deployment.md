@@ -108,17 +108,42 @@ aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/g
 aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/allowed_emails --value 'you@gmail.com,mom@gmail.com'
 ```
 
+Access levels (ADR 0010) are JSON. Write them to a file, e.g. `access.json`:
+
+```json
+{
+  "you@gmail.com": { "global": "write", "personal": true },
+  "mom@gmail.com": { "global": "read", "personal": true },
+  "kid@gmail.com": { "global": "read" }
+}
+```
+
+```bash
+aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/access --type String --value file://access.json
+```
+
+- `global` (required): `"write"` can upload, overwrite, delete, move, create folders and import in the shared drive; `"read"` can only browse, preview and download it.
+- `personal` (optional, default `false`): `true` gives the person their own private folder.
+- Emails are matched case-insensitively and must also be in `allowed_emails`. Anyone on the allowlist with no entry gets read-only shared drive and no personal folder.
+
 | Parameter | Type | Value |
 |---|---|---|
 | `/family-drive/google_client_id` | String | Google OAuth client ID |
 | `/family-drive/google_client_secret` | SecureString | Google OAuth client secret |
 | `/family-drive/allowed_emails` | StringList | Comma-separated Google emails allowed in |
+| `/family-drive/access` | String | JSON access levels per email (above) |
 | `/family-drive/google_api_key` | String | Browser API key for Google Drive import (step 4b) |
 | `/family-drive/google_project_number` | String | Google Cloud project number for Google Drive import (step 4b) |
 
-The app plan **stops on purpose** while any of the first three still holds `CHANGE_ME`, or if
-`allowed_emails` has no valid email addresses. The two Google Drive import values don't block it:
-while they're `CHANGE_ME` the app deploys and the import says "Import from Google Drive isn't set up yet".
+The app plan **stops on purpose** while any of the first four still holds `CHANGE_ME`, if
+`allowed_emails` has no valid email addresses, or if `access` isn't valid (not JSON, an unknown key,
+a bad value, an email listed twice, or an email that isn't on the allowlist). The two Google Drive
+import values don't block it: while they're `CHANGE_ME` the app deploys and the import says
+"Import from Google Drive isn't set up yet".
+
+> **Upgrading an existing deployment:** run the foundation pipeline (it creates `/family-drive/access`),
+> then set `access` **before** the app pipeline runs. Until it's set the app plan stops; if it were set
+> to `{}`, everyone would fall back to read-only with no personal folder.
 
 ## 3. App deploy pipeline
 
@@ -302,6 +327,10 @@ family's files and all Terraform state. It needs manual steps:
 
 A removed person loses access within about **2 hours**: ID and access tokens are set to last 60 minutes, and the AWS credentials obtained with them up to another hour. Every token refresh re-checks the allowlist. To cut them off sooner, also delete their user in the Cognito user pool.
 
+When adding someone, also give them an entry in `/family-drive/access` if they need more than read-only (step 2); when removing them, drop their entry too, or the plan stops because the email isn't on the allowlist.
+
+**Change someone's access level:** edit `/family-drive/access` (step 2) and re-run the app pipeline. It takes effect at their next token refresh, within about 2 hours, or at once when they sign out and back in.
+
 **Recover a deleted or overwritten file (within 30 days):**
 ```bash
 aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix "Global/<path>"
@@ -321,6 +350,9 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | `S3 bucket "family-drive-tfstate-…" does not exist` | App pipeline ran before the foundation | Run the foundation pipeline first. |
 | `AccessDenied … ssm:GetParameter` / `s3:CreateBucket` / … | Policy not attached to the role the action runs as | Attach the matching file from `ci/iam/`. |
 | Plan stops: `…still the CHANGE_ME placeholder` / `must be an email address` | SSM values not set | Do step 2. |
+| Plan stops: `SSM /family-drive/access must be a JSON object…` / `Every entry in SSM /family-drive/access…` / `…same email more than once` / `…must also be in /family-drive/allowed_emails` | `access` not set, or not in the format of step 2 | Fix the value (step 2). Check the JSON with `jq . access.json`. |
+| Everyone suddenly read-only, no personal folders | `access` is `{}` or misses them, or the app was deployed before it was set | Set `access` (step 2), re-run the app pipeline, then sign out and back in. |
+| A person can't upload or delete in the shared drive, or has no personal folder on Home | That's their access level in `access` | Change it (Day-to-day). |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
 | `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | AccessDenied opening your own personal folder | The Identity Pool's principal tag mapping is missing (stack not re-applied), or the account's email has capitals in its claim | Re-run the app pipeline; check the `email` claim in the ID token is lower case (ADR 0009). |
@@ -334,9 +366,10 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 ## Using the drive
 
-- The drive shows only what's under the **`Global/`** prefix of `family-drive-files-084519186805` (the shared drive, opened by default) and the signed-in person's own **`Personal/<email>/`** folder. Click **Home** in the path to switch between them. Those are the only places signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `Global/`.
+- The drive shows only what's under the **`Global/`** prefix of `family-drive-files-084519186805` (the shared drive, opened by default) and, for people who have one, their own **`Personal/<email>/`** folder. Click **Home** in the path to switch between them. Those are the only places signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `Global/`.
+- **Access levels** (SSM `/family-drive/access`, ADR 0010): with read-only access to the shared drive, Upload, Import, Create folder, Delete and Move are hidden there, and S3 refuses them anyway. A personal folder is always fully writable by its owner.
 - **Personal folders** are private in the app: only their owner can open them, enforced by IAM (ADR 0009). The account owner still sees them in the S3 console. The folder name is the email in lower case; to give someone files privately, upload them to `Personal/<their email>/` in the console. When someone leaves the allowlist their folder stays in S3, unreachable from the app; delete it in the console if it's no longer needed (versioning keeps deleted files for 30 days).
-- The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files and can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
+- The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files; those with write access can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
 - Click a file name to preview it in a panel beside the list: photos, videos (streamed), text files, Markdown (`.md`, shown formatted, including tables and checklists; raw HTML in the file is ignored and images appear as links) and PDFs (page by page, with Previous/Next; the PDF viewer loads the first time a PDF is opened). Other types show a download button. Files over **50 MB** aren't previewed (any type): the panel says "File is too big to preview" and offers the download.
 - **Move** (in the ⋮ menu, with files selected) moves files to another folder: pick the destination like Copy (click `Global` in the destination path to go up), then Move. A file is never overwritten: if the destination already has a file with that name, that file isn't moved. The original is deleted only after the copy succeeds. Failed files are listed with the reason. Folders can't be moved yet.
 - **On a phone**, the drive can be added to the home screen and then opens full-screen like an app. Android (Chrome): ⋮ → **Add to Home screen** / **Install app**. iPhone (Safari): Share → **Add to Home Screen**. It still needs the internet; nothing is stored offline.
@@ -359,7 +392,7 @@ Run the web app on your machine against the deployed AWS backend. `http://localh
 
 Tests: `npm test --prefix functions/allowlist` and `npm test --prefix web`.
 
-**Preview playground (no AWS needed):** with `npm run dev --prefix web` running, open `http://localhost:5173/playground.html`. It renders this app's own preview viewers (Markdown, PDF) and the too-big message with sample files. It's dev-only and not in the production build. `playground.html?view=drive` shows the real drive screen with sample folders and files, for checking layout; previews there show an error because there is no real S3.
+**Preview playground (no AWS needed):** with `npm run dev --prefix web` running, open `http://localhost:5173/playground.html`. It renders this app's own preview viewers (Markdown, PDF) and the too-big message with sample files. It's dev-only and not in the production build. `playground.html?view=drive` shows the real drive screen with sample folders and files, for checking layout; previews there show an error because there is no real S3. Add `&access=read`, `&access=read%2Bpersonal` or `&access=write` to preview another access level (default: write with a personal folder).
 
 ## End-to-end test checklist
 
@@ -378,6 +411,13 @@ Run after a deploy, ideally in a private window.
 - [ ] **Home** lists `Global/` and `Personal/<your email>/`, nothing else. In your personal folder, upload, preview, download, move a file into a subfolder and delete it.
 - [ ] Signed in as A, a direct request for B's folder is denied: in the browser console on the drive, a list of `Personal/<B's email>/` (e.g. with the `list` API from `aws-amplify/storage`) fails with AccessDenied. Or check the role with the IAM policy simulator, setting the `aws:PrincipalTag/email` context key.
 - [ ] Import from Google Drive while your personal folder is open: the files land there.
+- [ ] **Access levels**, with `access` set to A = `write` + personal, B = `read`, C = `read` + personal:
+  - A sees Upload, Import, and Create folder/Delete/Move in the ⋮ menu in `Global/`, and has a personal folder.
+  - B's Home lists only `Global/`; there the top bar has no Upload/Import and the ⋮ menu offers only Download.
+  - C sees the same read-only `Global/`, but in `Personal/<C's email>/` can upload, move and delete.
+  - Signed in as B or C, a direct upload or delete under `Global/` (e.g. `uploadData`/`remove` from `aws-amplify/storage` in the console) fails with AccessDenied; as B, so does listing `Personal/<B's email>/`. Or check with the IAM policy simulator, setting `aws:PrincipalTag/global_access` and `aws:PrincipalTag/personal`.
+  - An allowlisted email with no entry behaves like B.
+  - Change B to `write`, re-run the app pipeline, sign B out and in: B can now upload in `Global/`.
 - [ ] Sign out returns to the landing page.
 - [ ] On an Android phone and an iPhone, add the drive to the home screen: the icon is the blue folder, it opens without the browser bar, and Google sign-in comes back into the app (not a browser tab) and lands in the drive.
 - [ ] Remove an email from SSM, re-run the app pipeline, and confirm that account is refused within about 2 hours (or at once after deleting its Cognito user).

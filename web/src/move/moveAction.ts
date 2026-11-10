@@ -49,13 +49,18 @@ function storageOps({ config, data }: HandlerInput): MoveOps {
   };
 }
 
-/** Custom Storage Browser action: "Move" in the ⋮ menu, enabled for the same selections as Copy. */
+/**
+ * Custom Storage Browser action: "Move" in the ⋮ menu, enabled for the same
+ * selections as Copy. Hidden in read-only locations, since a move writes the
+ * copy and deletes the original.
+ */
 export const moveActionConfig = {
   viewName: "MoveView" as const,
   actionListItem: {
     icon: "folder" as const,
     label: "Move",
     disable: defaultActionConfigs.copy.actionListItem.disable,
+    hide: (permissions: string[]) => !permissions.includes("write") || !permissions.includes("delete"),
   },
   handler: (input: HandlerInput) => ({
     result: moveFile(input.data, storageOps(input)).then((r) =>
