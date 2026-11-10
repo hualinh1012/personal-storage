@@ -34,11 +34,17 @@ const files: MockFile[] = [
     size: 2_400_000 + i * 1000,
     contentType: "image/jpeg",
   })),
+  // A folder bigger than one page (Storage Browser shows 100 rows a page), for the pager.
+  ...Array.from({ length: 250 }, (_, i) => ({
+    key: `Global/photos/IMG_${String(i + 1).padStart(4, "0")}.jpg`,
+    size: 3_100_000 + i * 1000,
+    contentType: "image/jpeg",
+  })),
   // The signed-in person's own folder (Home lists it next to Global/).
   { key: `${personalPrefix(MOCK_EMAIL)}tax return 2025.pdf`, size: 525_100, contentType: "application/pdf", body: () => fetch(samplePdfUrl).then((r) => r.blob()) },
   { key: `${personalPrefix(MOCK_EMAIL)}passport scan.jpg`, size: 1_800_000, contentType: "image/jpeg" },
 ];
-const folders = ["Global/linh/", "Global/Tết 2026/", "Global/documents/", `${personalPrefix(MOCK_EMAIL)}receipts/`];
+const folders = ["Global/linh/", "Global/photos/", "Global/Tết 2026/", "Global/documents/", `${personalPrefix(MOCK_EMAIL)}receipts/`];
 const modified = new Date("2026-11-05T08:32:00Z");
 
 function listUnder(prefix: string): Items {
@@ -69,6 +75,18 @@ export function mockAccess(param: string | null): Access {
   return { globalWrite: global === "write", personal: flags.includes("personal") };
 }
 
+/**
+ * The pager's folder count from the sample data, after a short delay like a
+ * real LIST. `?count=fail` makes it fail, to preview the fallback pager.
+ */
+export function mockCountFolder(param: string | null) {
+  return async (_config: unknown, prefix: string) => {
+    await new Promise((r) => setTimeout(r, 600));
+    if (param === "fail") throw new Error("count failed (playground)");
+    return listUnder(prefix).length;
+  };
+}
+
 export const mockSetup = (access: Access) => ({
   config: {
     region: REGION,
@@ -85,10 +103,17 @@ export const mockSetup = (access: Access) => ({
   },
   actions: {
     default: {
-      listLocationItems: async (input: { prefix: string; options?: { exclude?: "FILE" | "FOLDER" } }) => ({
-        items: listUnder(input.prefix).filter((i) => i.type !== input.options?.exclude),
-        nextToken: undefined,
-      }),
+      // Pages like S3: pageSize items at a time, with the offset as the continuation token.
+      listLocationItems: async (input: {
+        prefix: string;
+        options?: { exclude?: "FILE" | "FOLDER"; pageSize?: number; nextToken?: string };
+      }) => {
+        await new Promise((r) => setTimeout(r, 300));
+        const all = listUnder(input.prefix).filter((i) => i.type !== input.options?.exclude);
+        const start = Number(input.options?.nextToken ?? 0);
+        const end = start + (input.options?.pageSize ?? all.length);
+        return { items: all.slice(start, end), nextToken: end < all.length ? String(end) : undefined };
+      },
     },
   },
 });
