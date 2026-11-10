@@ -85,3 +85,18 @@ resource "aws_ssm_parameter" "google_project_number" {
     ignore_changes  = [value, insecure_value]
   }
 }
+
+# The Deleted folder's retention (issue #25), published for the app stack, which
+# finds foundation values by name rather than reading this stack's state; the SPA
+# shows it in Deleted/. Unlike the parameters above, Terraform owns this value:
+# change var.deleted_retention_days (main.tf) and re-run bootstrap.sh, never the
+# parameter itself.
+resource "aws_ssm_parameter" "deleted_retention_days" {
+  name  = "/${var.project}/deleted_retention_days"
+  type  = "String"
+  value = tostring(var.deleted_retention_days)
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}

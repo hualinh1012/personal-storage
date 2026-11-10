@@ -10,7 +10,8 @@ import {
   type StorageBrowserValue,
 } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
-import { canWrite, driveLocation, isPersonalPrefix, listDriveLocations } from "../config";
+import { canWrite, driveLocation, isDeletedPrefix, isPersonalPrefix, listDriveLocations } from "../config";
+import { retentionNote } from "../trash/retention";
 import type { Access } from "../access";
 import { filePreviewConfig, previewDisplayText } from "../preview/registry";
 import { moveActionConfig } from "../move/moveAction";
@@ -48,6 +49,7 @@ export function DriveView({
   googleImport,
   countFolder,
   trash,
+  deletedRetentionDays = null,
 }: {
   email: string;
   /** Display only: IAM enforces the same access level. setup.config.listLocations must match it. */
@@ -59,6 +61,8 @@ export function DriveView({
   countFolder: CountFolder<never>;
   /** The Deleted folder's S3 operations (issue #24): Delete moves files there. */
   trash: TrashDeps;
+  /** Days before S3 removes files in Deleted/ (issue #25); null hides the note. */
+  deletedRetentionDays?: number | null;
 }) {
   const { StorageBrowser, views, tracker } = useMemo(() => {
     // Watches the file list's listing so the pager can show the folder's total.
@@ -141,6 +145,9 @@ export function DriveView({
     tracker,
     listPrefix: current.location && !current.actionType ? location.prefix + path : null,
   };
+  // In the Deleted folder's file list, say when S3 removes its files.
+  const note =
+    current.location && !current.actionType && isDeletedPrefix(location.prefix) ? retentionNote(deletedRetentionDays) : null;
 
   return (
     <div className="drive">
@@ -168,6 +175,11 @@ export function DriveView({
         </button>
       </header>
       <main className="browser">
+        {note && (
+          <p className="folder-note" role="note">
+            {note}
+          </p>
+        )}
         <GoogleImportContext.Provider value={importContext}>
           <TrashContext.Provider value={{ deps: trash, onExit: exitToFolder }}>
             <PagerContext.Provider value={pagerContext}>
@@ -190,10 +202,12 @@ export default function Drive({
   email,
   access,
   google,
+  deletedRetentionDays,
 }: {
   email: string;
   access: Access;
   google: GoogleImportConfig | null;
+  deletedRetentionDays: number | null;
 }) {
   // Created after App has run Amplify.configure: the adapter reads the storage
   // config when it's built, so this can't live at module level.
@@ -233,6 +247,7 @@ export default function Drive({
       googleImport={googleImport}
       countFolder={countFolder as CountFolder<never>}
       trash={trash}
+      deletedRetentionDays={deletedRetentionDays}
     />
   );
 }

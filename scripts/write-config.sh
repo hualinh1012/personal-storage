@@ -29,6 +29,8 @@ const map = {
   googleClientId: "google_client_id",
   googleApiKey: "google_api_key",
   googleProjectNumber: "google_project_number",
+  // Days files stay in Deleted/ (issue #25); a string, parsed by the SPA.
+  deletedRetentionDays: "deleted_retention_days",
 };
 const cfg = {};
 for (const [key, tfName] of Object.entries(map)) {

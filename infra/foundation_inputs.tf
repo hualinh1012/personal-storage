@@ -38,6 +38,13 @@ data "aws_ssm_parameter" "google_project_number" {
   name = "/${var.project}/google_project_number"
 }
 
+# Days files stay in Deleted/ before the files bucket's lifecycle rule removes
+# them (issue #25). Owned by the foundation (var.deleted_retention_days); the
+# SPA only displays it.
+data "aws_ssm_parameter" "deleted_retention_days" {
+  name = "/${var.project}/deleted_retention_days"
+}
+
 locals {
   allowed_emails_raw = [for e in split(",", nonsensitive(data.aws_ssm_parameter.allowed_emails.value)) : trimspace(e) if trimspace(e) != ""]
 
