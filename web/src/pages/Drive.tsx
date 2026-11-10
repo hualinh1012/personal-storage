@@ -9,7 +9,8 @@ import {
   type StorageBrowserValue,
 } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
-import { driveLocation, isPersonalPrefix, listDriveLocations } from "../config";
+import { canWrite, driveLocation, isPersonalPrefix, listDriveLocations } from "../config";
+import type { Access } from "../access";
 import { filePreviewConfig, previewDisplayText } from "../preview/registry";
 import { moveActionConfig } from "../move/moveAction";
 import { makeMoveView, type MoveViewDeps } from "../move/MoveView";
@@ -27,11 +28,14 @@ type StorageBrowserSetup =Pick<CreateStorageBrowserInput, "config" | "actions">;
  */
 export function DriveView({
   email,
+  access,
   bucket,
   setup,
   googleImport,
 }: {
   email: string;
+  /** Display only: IAM enforces the same access level. setup.config.listLocations must match it. */
+  access: Access;
   bucket: string;
   setup: StorageBrowserSetup;
   googleImport: GoogleImportDeps;
@@ -62,10 +66,10 @@ export function DriveView({
   // Upload button) never reports its Exit and the view gets stuck. Instead we
   // track where the user is from onValueChange, and the Upload and Import
   // buttons remount the browser straight into that action's view for that folder.
-  const [current, setCurrent] = useState<StorageBrowserValue>(() => ({ location: driveLocation(bucket) }));
+  const [current, setCurrent] = useState<StorageBrowserValue>(() => ({ location: driveLocation(bucket, access) }));
   const [mount, setMount] = useState<{ key: number; defaultValue: StorageBrowserValue }>(() => ({
     key: 0,
-    defaultValue: { location: driveLocation(bucket) },
+    defaultValue: { location: driveLocation(bucket, access) },
   }));
   const onValueChange = (next: StorageBrowserEventValue) =>
     setCurrent({ actionType: next.actionType, location: next.location });
@@ -83,7 +87,11 @@ export function DriveView({
     setMount((m) => ({ key: m.key + 1, defaultValue: { location: current.location } }));
   };
 
-  const location: LocationValue = current.location ?? driveLocation(bucket);
+  const location: LocationValue = current.location ?? driveLocation(bucket, access);
+  // Upload and Import only where the open location allows writing; Home (no
+  // location) shows them disabled when the person can write somewhere.
+  const writable = canWrite(current.location);
+  const showWriteButtons = current.location ? writable : access.globalWrite || access.personal;
   const path = location.path ?? "";
   const importContext: GoogleImportContextValue = {
     deps: googleImport,
@@ -96,17 +104,21 @@ export function DriveView({
     <div className="drive">
       <header className="topbar">
         <strong>Family Drive</strong>
-        <button
-          type="button"
-          className="primary"
-          disabled={!current.location || busy}
-          onClick={() => openAction("upload")}
-        >
-          Upload
-        </button>
-        <button type="button" disabled={!current.location || busy} onClick={() => openAction(GOOGLE_IMPORT_ACTION)}>
-          Import from Google Drive
-        </button>
+        {showWriteButtons && (
+          <>
+            <button
+              type="button"
+              className="primary"
+              disabled={!writable || busy}
+              onClick={() => openAction("upload")}
+            >
+              Upload
+            </button>
+            <button type="button" disabled={!writable || busy} onClick={() => openAction(GOOGLE_IMPORT_ACTION)}>
+              Import from Google Drive
+            </button>
+          </>
+        )}
         <span className="spacer" />
         <span>{email}</span>
         <button className="link" onClick={signOutSafely}>
@@ -128,15 +140,23 @@ export function DriveView({
   );
 }
 
-export default function Drive({ email, google }: { email: string; google: GoogleImportConfig | null }) {
+export default function Drive({
+  email,
+  access,
+  google,
+}: {
+  email: string;
+  access: Access;
+  google: GoogleImportConfig | null;
+}) {
   // Created after App has run Amplify.configure: the adapter reads the storage
   // config when it's built, so this can't live at module level.
   const { setup, bucket } = useMemo(() => {
     const bucket = Amplify.getConfig().Storage?.S3?.bucket ?? "";
-    // Home lists the shared drive and this person's folder (see listDriveLocations).
-    const config = { ...createAmplifyAuthAdapter(), listLocations: listDriveLocations(bucket, email) };
+    // Home lists the shared drive and, if they have one, this person's folder (see listDriveLocations).
+    const config = { ...createAmplifyAuthAdapter(), listLocations: listDriveLocations(bucket, email, access) };
     return { setup: { config }, bucket };
-  }, [email]);
+  }, [email, access]);
   const googleImport = useMemo(() => realGoogleImportDeps(google), [google]);
-  return <DriveView email={email} bucket={bucket} setup={setup} googleImport={googleImport} />;
+  return <DriveView email={email} access={access} bucket={bucket} setup={setup} googleImport={googleImport} />;
 }

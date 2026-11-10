@@ -39,6 +39,7 @@ resource "aws_iam_role" "authenticated" {
 }
 
 data "aws_iam_policy_document" "authenticated" {
+  # Everyone signed in can browse and download the shared drive.
   statement {
     sid       = "ListDriveFolder"
     actions   = ["s3:ListBucket"]
@@ -52,20 +53,36 @@ data "aws_iam_policy_document" "authenticated" {
   }
 
   statement {
-    sid = "ManageDriveObjects"
+    sid       = "ReadDriveObjects"
+    actions   = ["s3:GetObject"]
+    resources = ["${data.aws_s3_bucket.files.arn}/Global/*"]
+  }
+
+  # Per-person access levels (issue #15, ADR 0010): the pre token generation
+  # trigger sets the `global_access` and `personal` claims from SSM
+  # /family-drive/access, and the principal tag mapping below passes them to
+  # STS as session tags. A missing tag fails these conditions: read-only.
+  statement {
+    sid = "WriteDriveObjects"
     actions = [
-      "s3:GetObject",
       "s3:PutObject",
       "s3:DeleteObject",
       "s3:AbortMultipartUpload",
       "s3:ListMultipartUploadParts",
     ]
     resources = ["${data.aws_s3_bucket.files.arn}/Global/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/global_access"
+      values   = ["write"]
+    }
   }
 
   # Personal folders (ADR 0009): Personal/<email>/, where <email> is the
-  # caller's `email` session tag (see the principal tag mapping below). "$$"
-  # keeps the IAM variable literal instead of Terraform interpolation.
+  # caller's `email` session tag (see the principal tag mapping below), only
+  # for people whose `personal` tag is "yes". "$$" keeps the IAM variable
+  # literal instead of Terraform interpolation.
   statement {
     sid       = "ListOwnPersonalFolder"
     actions   = ["s3:ListBucket"]
@@ -75,6 +92,12 @@ data "aws_iam_policy_document" "authenticated" {
       test     = "StringLike"
       variable = "s3:prefix"
       values   = ["Personal/$${aws:PrincipalTag/email}/", "Personal/$${aws:PrincipalTag/email}/*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/personal"
+      values   = ["yes"]
     }
   }
 
@@ -88,18 +111,27 @@ data "aws_iam_policy_document" "authenticated" {
       "s3:ListMultipartUploadParts",
     ]
     resources = ["${data.aws_s3_bucket.files.arn}/Personal/$${aws:PrincipalTag/email}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/personal"
+      values   = ["yes"]
+    }
   }
 }
 
-# Passes the ID token's `email` claim to STS as the `email` session tag, which
-# the personal-folder statements above match on. Keyed by email rather than
-# identity ID so folders survive recreating this stack.
+# Passes ID-token claims to STS as session tags, which the statements above
+# match on. `email` keys the personal folder (by email rather than identity ID,
+# so folders survive recreating this stack); `global_access` and `personal` are
+# the access level added by the pre token generation trigger.
 resource "aws_cognito_identity_pool_provider_principal_tag" "email" {
   identity_pool_id       = aws_cognito_identity_pool.main.id
   identity_provider_name = aws_cognito_user_pool.main.endpoint
   use_defaults           = false
   principal_tags = {
-    email = "email"
+    email         = "email"
+    global_access = "global_access"
+    personal      = "personal"
   }
 }
 

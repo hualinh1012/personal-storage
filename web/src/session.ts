@@ -1,4 +1,5 @@
 import { fetchAuthSession, signOut } from "aws-amplify/auth";
+import { accessFromIdTokenPayload, type Access } from "./access";
 
 // localStorage key prefixes Amplify v6 uses for Cognito tokens and Identity Pool data.
 const AMPLIFY_KEY_PREFIXES = ["CognitoIdentityServiceProvider.", "com.amplify."];
@@ -27,9 +28,10 @@ export async function signOutSafely(): Promise<void> {
  * aws.cognito.signin.user.admin scope. The app client doesn't grant it, because
  * it would also let users change their own email attribute.
  */
-export async function currentUserEmail(): Promise<string> {
+export async function currentUser(): Promise<{ email: string; access: Access }> {
   const session = await fetchAuthSession();
-  return emailFromIdTokenPayload(session.tokens?.idToken?.payload);
+  const payload = session.tokens?.idToken?.payload;
+  return { email: emailFromIdTokenPayload(payload), access: accessFromIdTokenPayload(payload) };
 }
 
 export function emailFromIdTokenPayload(payload: Record<string, unknown> | undefined): string {

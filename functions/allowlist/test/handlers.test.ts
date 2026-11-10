@@ -60,3 +60,38 @@ describe("preTokenGeneration", () => {
     await expect(preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "mom@gmail.com", "false"))).rejects.toThrow("ACCESS_DENIED");
   });
 });
+
+describe("preTokenGeneration access claims", () => {
+  const claims = async (email: string) => {
+    const event = await preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", email));
+    return event.response.claimsOverrideDetails?.claimsToAddOrOverride;
+  };
+
+  afterEach(() => {
+    delete process.env.ACCESS_LEVELS;
+  });
+
+  it("adds the person's access level as ID-token claims", async () => {
+    process.env.ACCESS_LEVELS = JSON.stringify({ "mom@gmail.com": { global: "write", personal: true } });
+    expect(await claims("Mom@gmail.com")).toEqual({ global_access: "write", personal: "yes" });
+  });
+
+  it("gives an allowlisted email with no entry read-only Global/ and no personal folder", async () => {
+    process.env.ACCESS_LEVELS = JSON.stringify({ "dad@gmail.com": { global: "write" } });
+    expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no" });
+  });
+
+  it("uses the default when ACCESS_LEVELS is not set", async () => {
+    expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no" });
+  });
+
+  it("still denies people who aren't allowlisted, even with an access entry", async () => {
+    process.env.ACCESS_LEVELS = JSON.stringify({ "stranger@gmail.com": { global: "write" } });
+    await expect(preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "stranger@gmail.com"))).rejects.toThrow("ACCESS_DENIED");
+  });
+
+  it("fails rather than guessing when ACCESS_LEVELS is malformed", async () => {
+    process.env.ACCESS_LEVELS = "CHANGE_ME";
+    await expect(claims("mom@gmail.com")).rejects.toThrow(/not valid JSON/);
+  });
+});

@@ -6,3 +6,4 @@ Only emails listed in SSM `/family-drive/allowed_emails` get in. Two Lambda trig
 
 - Both triggers deny with `Error("ACCESS_DENIED")`, and `web/src/authErrors.ts` matches that exact string to show the access-denied page. Keep them identical.
 - A removed person keeps their current AWS credentials until they expire (tokens last 60 minutes).
+- Pre token generation also adds the access-level claims `global_access` and `personal` from SSM `/family-drive/access` ([0010](0010-per-person-access-levels-in-ssm.md)).
