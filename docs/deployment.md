@@ -325,7 +325,10 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | `Node >= 22.12 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
 | Google shows `redirect_uri_mismatch` | Step 4 not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse` (step 4). Google's error details page shows the exact URI it received. |
-| Google says the account can't access the app (consent screen in Testing) | The account isn't a test user | Add it under **Test users**, or publish the app (step 4). |
+| Google says the account can't access the app (consent screen in Testing) | The account isn't a test user | Add it under **Test users** (step 4; publishing isn't an option once Google Drive import is set up). |
+| Import from Google Drive: `Error 400: origin_mismatch` | The site isn't an **Authorized JavaScript origin** on the OAuth client | Add `https://<id>.cloudfront.net` exactly, no trailing slash (step 4b). |
+| Import from Google Drive: Picker says "The API developer key is invalid" | The API key's website restriction doesn't include the site (Picker reports it as an invalid key) | Add `https://<id>.cloudfront.net/*` to the key's **Websites** restriction (step 4b). |
+| Import from Google Drive says "isn't set up yet" | The two Google SSM values are still `CHANGE_ME`, or the app pipeline hasn't run since they were set | Set them and re-run the app pipeline (step 4b). |
 
 ## Using the drive
 
@@ -373,9 +376,19 @@ Run after a deploy, ideally in a private window.
 - [ ] On an Android phone and an iPhone, add the drive to the home screen: the icon is the blue folder, it opens without the browser bar, and Google sign-in comes back into the app (not a browser tab) and lands in the drive.
 - [ ] Remove an email from SSM, re-run the app pipeline, and confirm that account is refused within about 2 hours (or at once after deleting its Cognito user).
 
+**Import from Google Drive** (needs step 4b; use a test folder in Family Drive):
+
+- [ ] From the top bar, import a few ordinary files (a photo, a PDF): Google asks for consent the first time, the Picker opens on **My Drive**, and the files appear in the open folder after **Done**.
+- [ ] From the ⋮ menu, import a nested folder (a folder with a subfolder and an empty folder): the structure is recreated, the empty folder included.
+- [ ] Import a Google Doc and a Google Sheet: they arrive as `.pdf` and `.xlsx` and open. A Google Form is listed as not supported.
+- [ ] Run the same imports again: everything is "Already imported" and nothing new appears. Put a different file with the same name as an imported one in Google Drive and import it: it lands as `name (1).ext`.
+- [ ] Start an import of something large and press **Cancel**: the rest are marked cancelled. While one runs, reloading the page asks first.
+- [ ] On a phone (best-effort, not a blocker): import one photo.
+
 ## Known gaps
 
 - No custom domain: the CloudFront link changes if the app stack is recreated. Home-screen installs point at the old link, so everyone has to re-add the app after that.
 - Home-screen app on iPhone: iOS runs it separately from Safari, so you sign in once more inside it. If Google sign-in opens in Safari and doesn't come back, use the drive from Safari instead.
+- Import from Google Drive runs in the browser tab: closing it stops the import (re-running picks up where it left off, skipping what's done). Files over 500 MB, and Google Docs/Sheets/Slides whose converted copy would be over about 10 MB, have to be downloaded from Google by hand. The Google token lasts about an hour, so a very long import can fail part-way; run it again.
 
 - The IAM policies are based on the Terraform resources in this repo and haven't been exercised against every AWS provider read. If a run reports `AccessDenied` for a `Get…` or `List…` action, add that action to the matching policy file.

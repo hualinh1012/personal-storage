@@ -1,6 +1,6 @@
 import type { DriveClient } from "./driveClient";
 import { FOLDER_MIME, listFolderTree } from "./listing";
-import { folderPlaceholder, planFolder, type ExistingFile, type ImportItem, type PickedFile } from "./plan";
+import { ALREADY_IMPORTED, folderPlaceholder, planFolder, type ExistingFile, type ImportItem, type PickedFile } from "./plan";
 import type { RetryOptions } from "./retry";
 
 export interface PreparedImport {
@@ -14,6 +14,8 @@ export interface PrepareDeps {
   drive: Pick<DriveClient, "listChildren">;
   /** Files directly in a destination folder; [] when it doesn't exist yet. */
   listExisting(prefix: string): Promise<ExistingFile[]>;
+  /** Whether an object exists (used for empty-folder placeholders). */
+  exists(key: string): Promise<boolean>;
   retry?: RetryOptions;
 }
 
@@ -42,7 +44,11 @@ export async function prepareImport(picked: PickedFile[], root: string, deps: Pr
   for (const [dir, files] of byDir) {
     items.push(...planFolder(files, root, dir, await deps.listExisting(root + dir)));
   }
-  for (const dir of new Set(emptyDirs)) items.push(folderPlaceholder(root, dir));
+  for (const dir of new Set(emptyDirs)) {
+    const placeholder = folderPlaceholder(root, dir);
+    const there = await deps.exists(placeholder.key);
+    items.push(there ? { ...placeholder, status: "skipped", reason: ALREADY_IMPORTED } : placeholder);
+  }
 
   const pickedFolders = picked.filter((p) => p.mimeType === FOLDER_MIME).length;
   return { items, pickedFiles: picked.length - pickedFolders, pickedFolders };

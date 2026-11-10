@@ -112,6 +112,7 @@ export function GoogleImportView() {
       const plan = await prepareImport(files, prefix, {
         drive: google.drive(token.current),
         listExisting: storage.list,
+        exists: storage.exists,
       });
       setPhase({ kind: "ready", plan });
     } catch (e) {

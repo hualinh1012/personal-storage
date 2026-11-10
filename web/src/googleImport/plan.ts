@@ -40,7 +40,8 @@ export interface Placement {
   size?: number;
 }
 
-export type Decision = { action: "copy"; name: string } | { action: "skip"; reason: string };
+/** "skip" carries the existing file that already accounts for this one. */
+export type Decision = { action: "copy"; name: string } | { action: "skip"; reason: string; name: string };
 
 export const ALREADY_IMPORTED = "Already imported.";
 /** Bigger files would have to sit in the browser's memory whole; there's no streaming yet. */
@@ -65,8 +66,8 @@ export function decideNames(incoming: Placement[], existing: ExistingFile[]): De
       (e) => isSameOrSibling(file.name, e.name) && (file.size === undefined || e.size === file.size),
     );
     if (match >= 0) {
-      unclaimed.splice(match, 1);
-      return { action: "skip", reason: ALREADY_IMPORTED };
+      const [existingFile] = unclaimed.splice(match, 1);
+      return { action: "skip", reason: ALREADY_IMPORTED, name: existingFile.name };
     }
     let name = file.name;
     for (let n = 1; taken.has(name); n++) name = withSuffix(file.name, n);
@@ -101,7 +102,7 @@ export function planFolder(files: PickedFile[], root: string, dir: string, exist
 
   return targets.map((t): ImportItem => {
     const d = decisions.get(t);
-    const name = d?.action === "copy" ? d.name : t.name;
+    const name = d?.name ?? t.name;
     const item = {
       id: `${root}${dir}${name}#${t.file.id}`,
       kind: "file" as const,

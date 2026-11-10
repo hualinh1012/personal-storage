@@ -52,7 +52,7 @@ describe("withSuffix / isSameOrSibling", () => {
 describe("decideNames", () => {
   it("skips a file with the same name and size as already imported", () => {
     expect(decideNames([{ name: "a.jpg", size: 5 }], [{ name: "a.jpg", size: 5 }])).toEqual([
-      { action: "skip", reason: ALREADY_IMPORTED },
+      { action: "skip", reason: ALREADY_IMPORTED, name: "a.jpg" },
     ]);
   });
 
@@ -61,7 +61,9 @@ describe("decideNames", () => {
       { name: "a.jpg", size: 5 },
       { name: "a (1).jpg", size: 9 },
     ];
-    expect(decideNames([{ name: "a.jpg", size: 9 }], existing)).toEqual([{ action: "skip", reason: ALREADY_IMPORTED }]);
+    expect(decideNames([{ name: "a.jpg", size: 9 }], existing)).toEqual([
+      { action: "skip", reason: ALREADY_IMPORTED, name: "a (1).jpg" },
+    ]);
   });
 
   it("imports a same-name, different-size file as the next free (n), never overwriting", () => {
@@ -85,15 +87,15 @@ describe("decideNames", () => {
       { name: "a (1).jpg", size: 5 },
     ];
     expect(decideNames([{ name: "a.jpg", size: 5 }, { name: "a.jpg", size: 5 }, { name: "a.jpg", size: 5 }], existing)).toEqual([
-      { action: "skip", reason: ALREADY_IMPORTED },
-      { action: "skip", reason: ALREADY_IMPORTED },
+      { action: "skip", reason: ALREADY_IMPORTED, name: "a.jpg" },
+      { action: "skip", reason: ALREADY_IMPORTED, name: "a (1).jpg" },
       { action: "copy", name: "a (2).jpg" },
     ]);
   });
 
   it("with an unknown size (converted files), any same-name or sibling file counts as imported", () => {
     expect(decideNames([{ name: "Doc.pdf" }], [{ name: "Doc (1).pdf", size: 1 }])).toEqual([
-      { action: "skip", reason: ALREADY_IMPORTED },
+      { action: "skip", reason: ALREADY_IMPORTED, name: "Doc (1).pdf" },
     ]);
     expect(decideNames([{ name: "Doc.pdf" }], [])).toEqual([{ action: "copy", name: "Doc.pdf" }]);
   });
@@ -180,7 +182,7 @@ describe("planFolder", () => {
     const items = planFolder(
       [file({ id: "same" }), file({ id: "bigger", name: "photo.jpg", sizeBytes: 200 }), file({ id: "dup", name: "photo.jpg ", sizeBytes: 300 })], "Global/", "", [{ name: "photo.jpg", size: 100 }]);
     expect(items.map((i) => [i.status, i.key])).toEqual([
-      ["skipped", "Global/photo.jpg"],
+      ["skipped", "Global/photo.jpg"], // the existing file it matched
       ["queued", "Global/photo (1).jpg"],
       ["queued", "Global/photo (2).jpg"],
     ]);
@@ -243,7 +245,7 @@ describe("prepareImport", () => {
 
   it("plans picked files and folders recursively, listing each destination folder once", async () => {
     const listExisting = vi.fn(async (_prefix: string) => []);
-    const plan = await prepareImport(picked, "Global/linh/", { drive: fakeDrive(tree), listExisting });
+    const plan = await prepareImport(picked, "Global/linh/", { drive: fakeDrive(tree), listExisting, exists: async () => false });
     expect(plan).toMatchObject({ pickedFiles: 1, pickedFolders: 1 });
     expect(plan.items.map((i) => [i.kind, i.key])).toEqual([
       ["file", "Global/linh/top.jpg"],
@@ -274,12 +276,11 @@ describe("prepareImport", () => {
       upload: async (k, data) => void stored.set(k, data.size),
     };
     const signal = new AbortController().signal;
-    const first = await prepareImport(picked, "Global/", { drive: fakeDrive(tree), listExisting });
+    const first = await prepareImport(picked, "Global/", { drive: fakeDrive(tree), listExisting, exists: ops.exists });
     await runQueue(first.items, (it, s) => importItem(it, ops, s), { concurrency: 3, signal });
 
-    const second = await prepareImport(picked, "Global/", { drive: fakeDrive(tree), listExisting });
-    const files = second.items.filter((i) => i.kind === "file");
-    expect(files.every((i) => i.status === "skipped" && i.reason === ALREADY_IMPORTED)).toBe(true);
+    const second = await prepareImport(picked, "Global/", { drive: fakeDrive(tree), listExisting, exists: ops.exists });
+    expect(second.items.every((i) => i.status === "skipped" && i.reason === ALREADY_IMPORTED)).toBe(true);
     const rerun = await runQueue(second.items, (it, s) => importItem(it, ops, s), { concurrency: 3, signal });
     expect(rerun.every((i) => i.status === "skipped")).toBe(true);
   });
