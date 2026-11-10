@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { GoogleImportDeps } from "./deps";
-import { importFile } from "./importFile";
-import { planPickedFiles, type ImportItem } from "./plan";
+import { importItem } from "./importFile";
+import { warnOnLeave } from "./leaveWarning";
+import type { ImportItem } from "./plan";
+import { prepareImport, type PreparedImport } from "./prepare";
 import { runQueue } from "./queue";
 import { STATUS_LABEL, formatBytes, summaryLine } from "./summary";
 
@@ -22,7 +24,8 @@ const CONCURRENCY = 3;
 
 type Phase =
   | { kind: "choose"; error?: string }
-  | { kind: "ready"; items: ImportItem[] }
+  | { kind: "preparing" }
+  | { kind: "ready"; plan: PreparedImport }
   | { kind: "running"; items: ImportItem[] }
   | { kind: "finished"; items: ImportItem[] };
 
@@ -57,7 +60,7 @@ function ItemsTable({ items }: { items: ImportItem[] }) {
       <tbody>
         {items.map((it) => (
           <tr key={it.id} className={`google-import__row--${it.status}`}>
-            <td className="google-import__name">{it.name}</td>
+            <td className="google-import__name">{it.kind === "folder" ? `${it.path} (empty folder)` : it.path}</td>
             <td>{it.size != null ? formatBytes(it.size) : ""}</td>
             <td>
               {STATUS_LABEL[it.status]}
@@ -87,8 +90,10 @@ export function GoogleImportView() {
   useEffect(() => {
     if (config) google.load().catch((e) => setLoadError(message(e)));
   }, [config, google]);
-  // Leaving the view mid-import cancels it.
+  // Leaving the view mid-import cancels it; leaving the page asks first.
   useEffect(() => () => abort.current?.abort(), []);
+  const running = phase.kind === "running";
+  useEffect(() => (running ? warnOnLeave() : undefined), [running]);
 
   if (!config) {
     return (
@@ -102,7 +107,14 @@ export function GoogleImportView() {
     try {
       token.current = await google.token(config.clientId);
       const files = await google.pick(config, token.current);
-      if (files.length > 0) setPhase({ kind: "ready", items: planPickedFiles(files, prefix) });
+      if (files.length === 0) return;
+      setPhase({ kind: "preparing" });
+      const plan = await prepareImport(files, prefix, {
+        drive: google.drive(token.current),
+        listExisting: storage.list,
+        exists: storage.exists,
+      });
+      setPhase({ kind: "ready", plan });
     } catch (e) {
       setPhase({ kind: "choose", error: message(e) });
     }
@@ -112,12 +124,14 @@ export function GoogleImportView() {
     const ac = new AbortController();
     abort.current = ac;
     setPhase({ kind: "running", items });
+    const drive = google.drive(token.current!);
     const ops = {
       exists: storage.exists,
       upload: storage.upload,
-      download: (id: string, signal: AbortSignal) => google.download(token.current!, id, signal),
+      download: (id: string, signal: AbortSignal) => drive.download(id, signal),
+      exportFile: (id: string, mimeType: string, signal: AbortSignal) => drive.exportFile(id, mimeType, signal),
     };
-    const final = await runQueue(items, (it, signal) => importFile(it, ops, signal), {
+    const final = await runQueue(items, (it, signal) => importItem(it, ops, signal), {
       concurrency: CONCURRENCY,
       signal: ac.signal,
       onChange: (next) => setPhase({ kind: "running", items: next }),
@@ -146,24 +160,35 @@ export function GoogleImportView() {
         </Frame>
       );
 
+    case "preparing":
+      return (
+        <Frame footer={<Button onClick={onExit}>Back</Button>}>
+          <p>Looking through the picked folders and what's already in {folderLabel}…</p>
+        </Frame>
+      );
+
     case "ready": {
-      const toCopy = phase.items.filter((i) => i.status === "queued").length;
+      const { items, pickedFiles, pickedFolders } = phase.plan;
+      const toCopy = items.filter((i) => i.status === "queued" && i.kind === "file").length;
+      const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
       return (
         <Frame
           footer={
             <>
               <Button onClick={onExit}>Back</Button>
               <Button onClick={choose}>Choose again</Button>
-              <Button primary disabled={toCopy === 0} onClick={() => start(phase.items)}>
+              <Button primary disabled={!items.some((i) => i.status === "queued")} onClick={() => start(items)}>
                 Start
               </Button>
             </>
           }
         >
           <p>
-            {toCopy} {toCopy === 1 ? "file" : "files"} → into <strong>{folderLabel}</strong>
+            {plural(pickedFiles, "file")}, {plural(pickedFolders, "folder")} selected → into <strong>{folderLabel}</strong>
+            {" · "}
+            {plural(toCopy, "file")} to copy
           </p>
-          <ItemsTable items={phase.items} />
+          <ItemsTable items={items} />
         </Frame>
       );
     }

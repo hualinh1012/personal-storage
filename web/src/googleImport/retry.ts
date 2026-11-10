@@ -8,9 +8,17 @@ export interface RetryOptions {
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
-/** Google's "slow down" answers: rate limits (403/429) and transient server errors. */
+const RATE_LIMIT_REASONS = ["rateLimitExceeded", "userRateLimitExceeded"];
+
+/**
+ * Google's "slow down" answers: 429, transient server errors, and 403s that are
+ * rate limits (or don't say why). A 403 with another reason, such as no
+ * permission, won't get better by waiting.
+ */
 export function isRetryable(error: unknown): boolean {
-  return error instanceof DriveError && [403, 429, 500, 502, 503, 504].includes(error.status);
+  if (!(error instanceof DriveError)) return false;
+  if (error.status === 403) return error.reason === undefined || RATE_LIMIT_REASONS.includes(error.reason);
+  return [429, 500, 502, 503, 504].includes(error.status);
 }
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {

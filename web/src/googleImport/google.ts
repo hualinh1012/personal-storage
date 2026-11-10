@@ -91,19 +91,25 @@ export function getDriveToken(clientId: string): Promise<string> {
           resolve(r.access_token);
         },
         error_callback: (e) =>
-          reject(new Error(e.type === "popup_closed" ? "Google sign-in was closed." : (e.message ?? "Google sign-in failed."))),
+          reject(
+            new Error(
+              e.type === "popup_closed"
+                ? "Google sign-in didn't finish (its window was closed). If Google showed an error there, tell whoever set up Family Drive."
+                : (e.message ?? "Google sign-in failed."),
+            ),
+          ),
       })
       .requestAccessToken();
   });
 }
 
-/** Opens Google Picker (files only, multi-select). Resolves with the picked files, or [] if cancelled. */
+/** Opens Google Picker (files and folders, multi-select). Resolves with the picked items, or [] if cancelled. */
 export function pickFiles(cfg: GoogleImportConfig, accessToken: string): Promise<PickedFile[]> {
   const p = window.google!.picker;
-  // My Drive opens at the top of the person's own Drive; folders are there to browse into, not to pick.
-  const myDrive = new p.DocsView(p.ViewId.DOCS).setParent("root").setIncludeFolders(true).setSelectFolderEnabled(false);
+  // My Drive opens at the top of the person's own Drive. Folders can be opened or picked whole.
+  const myDrive = new p.DocsView(p.ViewId.DOCS).setParent("root").setIncludeFolders(true).setSelectFolderEnabled(true);
   myDrive.setLabel?.("My Drive");
-  const shared = new p.DocsView(p.ViewId.DOCS).setOwnedByMe(false).setSelectFolderEnabled(false);
+  const shared = new p.DocsView(p.ViewId.DOCS).setOwnedByMe(false).setIncludeFolders(true).setSelectFolderEnabled(true);
   shared.setLabel?.("Shared with me");
 
   return new Promise((resolve) => {
@@ -115,7 +121,7 @@ export function pickFiles(cfg: GoogleImportConfig, accessToken: string): Promise
       .setDeveloperKey(cfg.apiKey)
       .setAppId(cfg.projectNumber)
       .setOrigin(window.location.origin)
-      .setTitle("Choose files to import")
+      .setTitle("Choose files and folders to import")
       .setCallback((data: { action: string; docs?: { id: string; name: string; mimeType: string; sizeBytes?: number }[] }) => {
         if (data.action === p.Action.PICKED) {
           resolve((data.docs ?? []).map((d) => ({ id: d.id, name: d.name, mimeType: d.mimeType, sizeBytes: d.sizeBytes })));
