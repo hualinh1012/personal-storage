@@ -21,6 +21,7 @@ const picked: PickedFile[] = [
   { id: "g7", name: "Trip notes", mimeType: "application/vnd.google-apps.document" },
   { id: "g8", name: "Huge sheet", mimeType: "application/vnd.google-apps.spreadsheet" },
   { id: "g9", name: "RSVP form", mimeType: "application/vnd.google-apps.form" },
+  { id: "g10", name: "Family reunion 4K.mov", mimeType: "video/quicktime", sizeBytes: 2_300_000_000 },
   { id: "f1", name: "Holiday 2025", mimeType: FOLDER },
 ];
 

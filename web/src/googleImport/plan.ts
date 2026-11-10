@@ -43,6 +43,9 @@ export interface Placement {
 export type Decision = { action: "copy"; name: string } | { action: "skip"; reason: string };
 
 export const ALREADY_IMPORTED = "Already imported.";
+/** Bigger files would have to sit in the browser's memory whole; there's no streaming yet. */
+export const MAX_IMPORT_BYTES = 500 * 1024 * 1024;
+export const TOO_LARGE = "Too large to import in the browser; download it from Google.";
 export const NOT_SUPPORTED = "This kind of Google file can't be imported (only Docs, Sheets and Slides).";
 
 /**
@@ -78,36 +81,40 @@ export function decideNames(incoming: Placement[], existing: ExistingFile[]): De
  * the files already in that folder.
  */
 export function planFolder(files: PickedFile[], root: string, dir: string, existing: ExistingFile[]): ImportItem[] {
-  // Where each file would land before collisions: converted files take the target
-  // extension and have no known size, so re-runs match them by name alone.
+  // What each file becomes before collisions are settled. Converted files take
+  // the target extension and have no known size, so re-runs match them by name.
   const targets = files.map((f) => {
     const conversion = conversionFor(f.mimeType);
-    if (conversion === "unsupported") return null;
     const name = sanitiseName(f.name);
-    return conversion
-      ? { file: f, name: convertedName(name, conversion.ext), size: undefined, contentType: conversion.exportMimeType, exportMimeType: conversion.exportMimeType }
-      : { file: f, name, size: f.sizeBytes, contentType: f.mimeType, exportMimeType: undefined };
+    const base = { file: f, name, size: f.sizeBytes, contentType: f.mimeType, exportMimeType: undefined as string | undefined };
+    if (conversion === "unsupported") return { ...base, skip: NOT_SUPPORTED };
+    if (conversion) {
+      const { exportMimeType, ext } = conversion;
+      return { ...base, name: convertedName(name, ext), size: undefined, contentType: exportMimeType, exportMimeType };
+    }
+    if (f.sizeBytes !== undefined && f.sizeBytes > MAX_IMPORT_BYTES) return { ...base, skip: TOO_LARGE };
+    return base;
   });
-  const placed = targets.filter((t) => t !== null);
-  const decisions = decideNames(placed, existing);
-  const byFile = new Map(placed.map((t, i) => [t.file, { target: t, decision: decisions[i] }]));
-  return files.map((f): ImportItem => {
-    const planned = byFile.get(f);
-    const d = planned?.decision;
-    const name = d?.action === "copy" ? d.name : (planned?.target.name ?? sanitiseName(f.name));
+
+  const placed = targets.filter((t) => !("skip" in t));
+  const decisions = new Map(decideNames(placed, existing).map((d, i) => [placed[i], d]));
+
+  return targets.map((t): ImportItem => {
+    const d = decisions.get(t);
+    const name = d?.action === "copy" ? d.name : t.name;
     const item = {
-      id: `${root}${dir}${name}#${f.id}`,
+      id: `${root}${dir}${name}#${t.file.id}`,
       kind: "file" as const,
-      fileId: f.id,
+      fileId: t.file.id,
       name,
       path: dir + name,
       key: root + dir + name,
-      contentType: planned?.target.contentType ?? f.mimeType,
-      size: planned?.target.size,
-      exportMimeType: planned?.target.exportMimeType,
+      contentType: t.contentType,
+      size: t.size,
+      exportMimeType: t.exportMimeType,
     };
-    if (!d) return { ...item, status: "skipped", reason: NOT_SUPPORTED };
-    if (d.action === "skip") return { ...item, status: "skipped", reason: d.reason };
+    if ("skip" in t) return { ...item, status: "skipped", reason: t.skip };
+    if (d?.action === "skip") return { ...item, status: "skipped", reason: d.reason };
     return { ...item, status: "queued" };
   });
 }

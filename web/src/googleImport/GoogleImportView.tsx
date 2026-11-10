@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { GoogleImportDeps } from "./deps";
 import { importItem } from "./importFile";
+import { warnOnLeave } from "./leaveWarning";
 import type { ImportItem } from "./plan";
 import { prepareImport, type PreparedImport } from "./prepare";
 import { runQueue } from "./queue";
@@ -89,8 +90,10 @@ export function GoogleImportView() {
   useEffect(() => {
     if (config) google.load().catch((e) => setLoadError(message(e)));
   }, [config, google]);
-  // Leaving the view mid-import cancels it.
+  // Leaving the view mid-import cancels it; leaving the page asks first.
   useEffect(() => () => abort.current?.abort(), []);
+  const running = phase.kind === "running";
+  useEffect(() => (running ? warnOnLeave() : undefined), [running]);
 
   if (!config) {
     return (

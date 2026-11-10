@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { isSameOrSibling, sanitiseName, withSuffix } from "../src/googleImport/names";
 import { conversionFor, convertedName } from "../src/googleImport/conversion";
-import { ALREADY_IMPORTED, NOT_SUPPORTED, decideNames, folderPlaceholder, planFolder, type ImportItem, type PickedFile } from "../src/googleImport/plan";
+import { warnOnLeave } from "../src/googleImport/leaveWarning";
+import { ALREADY_IMPORTED, MAX_IMPORT_BYTES, NOT_SUPPORTED, TOO_LARGE, decideNames, folderPlaceholder, planFolder, type ImportItem, type PickedFile } from "../src/googleImport/plan";
 import { listFolderTree } from "../src/googleImport/listing";
 import { prepareImport } from "../src/googleImport/prepare";
 import { isRetryable } from "../src/googleImport/retry";
@@ -152,6 +153,19 @@ describe("planFolder", () => {
       [],
     );
     expect(items.every((i) => i.status === "skipped" && i.reason === NOT_SUPPORTED)).toBe(true);
+  });
+
+  it("skips files over 500 MB (from the Drive size, before downloading) and keeps the rest", () => {
+    const items = planFolder(
+      [file({ id: "big", name: "big.mov", sizeBytes: MAX_IMPORT_BYTES + 1 }), file({ id: "edge", name: "edge.mov", sizeBytes: MAX_IMPORT_BYTES })],
+      "Global/",
+      "",
+      [],
+    );
+    expect(items.map((i) => [i.name, i.status, i.reason])).toEqual([
+      ["big.mov", "skipped", TOO_LARGE],
+      ["edge.mov", "queued", undefined],
+    ]);
   });
 
   it("skips a converted file by name (or an (n) sibling) without needing its size", () => {
@@ -498,5 +512,20 @@ describe("createDriveClient.listChildren", () => {
       status: 403,
       reason: "rateLimitExceeded",
     });
+  });
+});
+
+describe("warnOnLeave", () => {
+  it("asks before leaving while active, and stops asking after cleanup", () => {
+    const target = new EventTarget();
+    const stop = warnOnLeave(target);
+    const during = new Event("beforeunload", { cancelable: true });
+    target.dispatchEvent(during);
+    expect(during.defaultPrevented).toBe(true);
+
+    stop();
+    const after = new Event("beforeunload", { cancelable: true });
+    target.dispatchEvent(after);
+    expect(after.defaultPrevented).toBe(false);
   });
 });

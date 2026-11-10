@@ -91,7 +91,13 @@ export function getDriveToken(clientId: string): Promise<string> {
           resolve(r.access_token);
         },
         error_callback: (e) =>
-          reject(new Error(e.type === "popup_closed" ? "Google sign-in was closed." : (e.message ?? "Google sign-in failed."))),
+          reject(
+            new Error(
+              e.type === "popup_closed"
+                ? "Google sign-in didn't finish (its window was closed). If Google showed an error there, tell whoever set up Family Drive."
+                : (e.message ?? "Google sign-in failed."),
+            ),
+          ),
       })
       .requestAccessToken();
   });
