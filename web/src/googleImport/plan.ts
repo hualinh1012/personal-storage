@@ -1,7 +1,7 @@
 import { isSameOrSibling, sanitiseName, withSuffix } from "./names";
 import type { QueueItem } from "./queue";
 
-/** A file as Google Picker returns it (the fields we use). */
+/** A file or folder as Google Picker or the Drive listing returns it (the fields we use). */
 export interface PickedFile {
   id: string;
   name: string;
@@ -9,15 +9,22 @@ export interface PickedFile {
   sizeBytes?: number;
 }
 
-/** A file already in the destination folder (name relative to it). */
+/** A file already in a destination folder (name relative to it). */
 export interface ExistingFile {
   name: string;
   size?: number;
 }
 
-/** One row of an import: where a Google file goes and what happens to it. */
+/** One row of an import. */
 export interface ImportItem extends QueueItem {
+  kind: "file" | "folder";
+  /** Google file ID ("" for a folder placeholder). */
+  fileId: string;
+  /** Final name in Family Drive. */
   name: string;
+  /** Shown in the list: the name with its folder path below the open folder. */
+  path: string;
+  /** S3 key; a folder placeholder's ends in "/". */
   key: string;
   contentType: string;
   size?: number;
@@ -32,6 +39,8 @@ export interface Placement {
 export type Decision = { action: "copy"; name: string } | { action: "skip"; reason: string };
 
 export const ALREADY_IMPORTED = "Already imported.";
+const NOT_SUPPORTED_YET = "Google Docs, Sheets and Slides aren't supported yet.";
+const GOOGLE_NATIVE = "application/vnd.google-apps.";
 
 /**
  * Decides, for files going into one folder, which are already there and what
@@ -60,27 +69,47 @@ export function decideNames(incoming: Placement[], existing: ExistingFile[]): De
   });
 }
 
-const GOOGLE_NATIVE = "application/vnd.google-apps.";
-
 /**
- * Picked files → import items under `prefix` (the open folder, ending in "/"),
- * given the files already there. Google-native files are skipped until
- * conversion lands.
+ * Files going into one destination folder → import items. `root` is the open
+ * folder's prefix, `dir` the path below it ("" or "Photos/2024/"), `existing`
+ * the files already in that folder.
  */
-export function planPickedFiles(files: PickedFile[], prefix: string, existing: ExistingFile[]): ImportItem[] {
-  const base = (f: PickedFile) => ({ id: f.id, name: sanitiseName(f.name), contentType: f.mimeType, size: f.sizeBytes });
+export function planFolder(files: PickedFile[], root: string, dir: string, existing: ExistingFile[]): ImportItem[] {
   const copyable = files.filter((f) => !f.mimeType.startsWith(GOOGLE_NATIVE));
-  const decisions = new Map(
-    decideNames(copyable.map((f) => ({ name: sanitiseName(f.name), size: f.sizeBytes })), existing).map((d, i) => [
-      copyable[i].id,
-      d,
-    ]),
+  const decisions = decideNames(
+    copyable.map((f) => ({ name: sanitiseName(f.name), size: f.sizeBytes })),
+    existing,
   );
+  const byFile = new Map(copyable.map((f, i) => [f, decisions[i]]));
   return files.map((f): ImportItem => {
-    const b = base(f);
-    const d = decisions.get(f.id);
-    if (!d) return { ...b, key: prefix + b.name, status: "skipped", reason: "Google Docs, Sheets and Slides aren't supported yet." };
-    if (d.action === "skip") return { ...b, key: prefix + b.name, status: "skipped", reason: d.reason };
-    return { ...b, name: d.name, key: prefix + d.name, status: "queued" };
+    const d = byFile.get(f);
+    const name = d?.action === "copy" ? d.name : sanitiseName(f.name);
+    const item = {
+      id: `${root}${dir}${name}#${f.id}`,
+      kind: "file" as const,
+      fileId: f.id,
+      name,
+      path: dir + name,
+      key: root + dir + name,
+      contentType: f.mimeType,
+      size: f.sizeBytes,
+    };
+    if (!d) return { ...item, status: "skipped", reason: NOT_SUPPORTED_YET };
+    if (d.action === "skip") return { ...item, status: "skipped", reason: d.reason };
+    return { ...item, status: "queued" };
   });
+}
+
+/** An empty Drive folder → Storage Browser's zero-byte "name/" placeholder. */
+export function folderPlaceholder(root: string, dir: string): ImportItem {
+  return {
+    id: `${root}${dir}`,
+    kind: "folder",
+    fileId: "",
+    name: dir,
+    path: dir,
+    key: root + dir,
+    contentType: "application/x-directory",
+    status: "queued",
+  };
 }

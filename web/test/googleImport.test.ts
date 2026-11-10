@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { isSameOrSibling, sanitiseName, withSuffix } from "../src/googleImport/names";
-import { ALREADY_IMPORTED, decideNames, planPickedFiles, type PickedFile } from "../src/googleImport/plan";
+import { ALREADY_IMPORTED, decideNames, folderPlaceholder, planFolder, type ImportItem, type PickedFile } from "../src/googleImport/plan";
+import { listFolderTree } from "../src/googleImport/listing";
+import { prepareImport } from "../src/googleImport/prepare";
+import { isRetryable } from "../src/googleImport/retry";
 import { withRetry } from "../src/googleImport/retry";
 import { runQueue, type Outcome, type QueueItem } from "../src/googleImport/queue";
-import { importFile, type ImportOps } from "../src/googleImport/importFile";
+import { importFile, importItem, type ImportOps } from "../src/googleImport/importFile";
 import { createDriveClient, DriveError } from "../src/googleImport/driveClient";
 
 describe("sanitiseName", () => {
@@ -102,31 +105,30 @@ const file = (over: Partial<PickedFile> = {}): PickedFile => ({
   ...over,
 });
 
-describe("planPickedFiles", () => {
+describe("planFolder", () => {
   it("puts files under the open folder with sanitised names", () => {
-    const [item] = planPickedFiles([file({ name: " a/b.jpg " })], "Global/linh/", []);
-    expect(item).toMatchObject({ id: "id1", key: "Global/linh/a_b.jpg", status: "queued", size: 100 });
+    const [item] = planFolder([file({ name: " a/b.jpg " })], "Global/linh/", "", []);
+    expect(item).toMatchObject({ fileId: "id1", key: "Global/linh/a_b.jpg", path: "a_b.jpg", status: "queued", size: 100 });
+  });
+
+  it("maps a file below a picked folder to <open folder>/<folder path>/<name>", () => {
+    const [item] = planFolder([file()], "Global/linh/", "Holiday/Day 1/", []);
+    expect(item).toMatchObject({ key: "Global/linh/Holiday/Day 1/photo.jpg", path: "Holiday/Day 1/photo.jpg" });
   });
 
   it("skips Google-native files until conversion is supported", () => {
-    const [doc, shortcut] = planPickedFiles(
+    const [doc, shortcut] = planFolder(
       [
         file({ id: "d", mimeType: "application/vnd.google-apps.document" }),
         file({ id: "s", mimeType: "application/vnd.google-apps.shortcut" }),
-      ],
-      "Global/",
-      [],
-    );
+      ], "Global/", "", []);
     expect(doc).toMatchObject({ status: "skipped", reason: "Google Docs, Sheets and Slides aren't supported yet." });
     expect(shortcut).toMatchObject({ status: "skipped" });
   });
 
   it("applies the re-run rules against what's in the folder", () => {
-    const items = planPickedFiles(
-      [file({ id: "same" }), file({ id: "bigger", name: "photo.jpg", sizeBytes: 200 }), file({ id: "dup", name: "photo.jpg ", sizeBytes: 300 })],
-      "Global/",
-      [{ name: "photo.jpg", size: 100 }],
-    );
+    const items = planFolder(
+      [file({ id: "same" }), file({ id: "bigger", name: "photo.jpg", sizeBytes: 200 }), file({ id: "dup", name: "photo.jpg ", sizeBytes: 300 })], "Global/", "", [{ name: "photo.jpg", size: 100 }]);
     expect(items.map((i) => [i.status, i.key])).toEqual([
       ["skipped", "Global/photo.jpg"],
       ["queued", "Global/photo (1).jpg"],
@@ -136,9 +138,128 @@ describe("planPickedFiles", () => {
 
   it("re-running an import that finished shows everything as already imported", () => {
     const picked = [file({ id: "a", name: "x.jpg" }), file({ id: "b", name: "x.jpg", sizeBytes: 7 })];
-    const first = planPickedFiles(picked, "Global/", []);
+    const first = planFolder(picked, "Global/", "", []);
     const nowThere = first.map((i) => ({ name: i.name, size: i.size }));
-    expect(planPickedFiles(picked, "Global/", nowThere).map((i) => i.reason)).toEqual([ALREADY_IMPORTED, ALREADY_IMPORTED]);
+    expect(planFolder(picked, "Global/", "", nowThere).map((i) => i.reason)).toEqual([ALREADY_IMPORTED, ALREADY_IMPORTED]);
+  });
+});
+
+const FOLDER = "application/vnd.google-apps.folder";
+type Pages = Record<string, { name: string; id: string; mimeType?: string; size?: number }[][]>;
+function fakeDrive(pages: Pages) {
+  const listChildren = vi.fn(async (folderId: string, pageToken?: string) => {
+    const p = pages[folderId] ?? [[]];
+    const i = pageToken ? Number(pageToken) : 0;
+    return {
+      files: p[i].map((f) => ({ mimeType: "image/jpeg", ...f })),
+      nextPageToken: i + 1 < p.length ? String(i + 1) : undefined,
+    };
+  });
+  return { listChildren };
+}
+const tree: Pages = {
+  root: [
+    [{ id: "a", name: "a.jpg", size: 1 }, { id: "sub", name: "Sub/dir", mimeType: FOLDER }],
+    [{ id: "b", name: "b.jpg", size: 2 }, { id: "empty", name: "Empty", mimeType: FOLDER }],
+  ],
+  sub: [[{ id: "c", name: "c.jpg", size: 3 }, { id: "deep", name: "Deep", mimeType: FOLDER }]],
+  deep: [[{ id: "d", name: "d.jpg", size: 4 }]],
+};
+
+describe("listFolderTree", () => {
+  it("walks nested folders following every page, with sanitised folder paths", async () => {
+    const drive = fakeDrive(tree);
+    const result = await listFolderTree(drive, { id: "root", name: "Holiday" });
+    expect(result.files.map((f) => f.dir + f.file.name)).toEqual([
+      "Holiday/a.jpg",
+      "Holiday/Sub_dir/c.jpg",
+      "Holiday/Sub_dir/Deep/d.jpg",
+      "Holiday/b.jpg",
+    ]);
+    expect(drive.listChildren.mock.calls.filter((c) => c[0] === "root").map((c) => c[1])).toEqual([undefined, "1"]);
+  });
+
+  it("reports empty folders, including a picked folder with nothing in it", async () => {
+    expect((await listFolderTree(fakeDrive(tree), { id: "root", name: "Holiday" })).emptyDirs).toEqual(["Holiday/Empty/"]);
+    expect((await listFolderTree(fakeDrive({}), { id: "x", name: "Nothing" })).emptyDirs).toEqual(["Nothing/"]);
+  });
+});
+
+describe("prepareImport", () => {
+  const picked: PickedFile[] = [
+    { id: "top", name: "top.jpg", mimeType: "image/jpeg", sizeBytes: 9 },
+    { id: "root", name: "Holiday", mimeType: FOLDER },
+  ];
+
+  it("plans picked files and folders recursively, listing each destination folder once", async () => {
+    const listExisting = vi.fn(async (_prefix: string) => []);
+    const plan = await prepareImport(picked, "Global/linh/", { drive: fakeDrive(tree), listExisting });
+    expect(plan).toMatchObject({ pickedFiles: 1, pickedFolders: 1 });
+    expect(plan.items.map((i) => [i.kind, i.key])).toEqual([
+      ["file", "Global/linh/top.jpg"],
+      ["file", "Global/linh/Holiday/a.jpg"],
+      ["file", "Global/linh/Holiday/b.jpg"],
+      ["file", "Global/linh/Holiday/Sub_dir/c.jpg"],
+      ["file", "Global/linh/Holiday/Sub_dir/Deep/d.jpg"],
+      ["folder", "Global/linh/Holiday/Empty/"],
+    ]);
+    expect(listExisting.mock.calls.map((c) => c[0]).sort()).toEqual([
+      "Global/linh/",
+      "Global/linh/Holiday/",
+      "Global/linh/Holiday/Sub_dir/",
+      "Global/linh/Holiday/Sub_dir/Deep/",
+    ]);
+  });
+
+  it("importing a nested folder twice shows the second run as all skipped", async () => {
+    const stored = new Map<string, number>();
+    const listExisting = async (prefix: string) =>
+      [...stored]
+        .filter(([k]) => k.startsWith(prefix) && !k.slice(prefix.length).includes("/"))
+        .map(([k, size]) => ({ name: k.slice(prefix.length), size }));
+    const ops: ImportOps = {
+      exists: async (k) => stored.has(k),
+      download: async (id) => new Blob([new Uint8Array({ top: 9, a: 1, b: 2, c: 3, d: 4 }[id] ?? 0)]),
+      upload: async (k, data) => void stored.set(k, data.size),
+    };
+    const signal = new AbortController().signal;
+    const first = await prepareImport(picked, "Global/", { drive: fakeDrive(tree), listExisting });
+    await runQueue(first.items, (it, s) => importItem(it, ops, s), { concurrency: 3, signal });
+
+    const second = await prepareImport(picked, "Global/", { drive: fakeDrive(tree), listExisting });
+    const files = second.items.filter((i) => i.kind === "file");
+    expect(files.every((i) => i.status === "skipped" && i.reason === ALREADY_IMPORTED)).toBe(true);
+    const rerun = await runQueue(second.items, (it, s) => importItem(it, ops, s), { concurrency: 3, signal });
+    expect(rerun.every((i) => i.status === "skipped")).toBe(true);
+  });
+});
+
+describe("importItem for an empty folder", () => {
+  const placeholder: ImportItem = folderPlaceholder("Global/", "Holiday/Empty/");
+  const signal = new AbortController().signal;
+
+  it("creates the zero-byte placeholder", async () => {
+    const upload = vi.fn(async () => {});
+    const ops = { exists: async () => false, download: vi.fn(), upload };
+    await expect(importItem(placeholder, ops, signal)).resolves.toEqual({ status: "done", bytes: 0 });
+    expect(upload).toHaveBeenCalledWith("Global/Holiday/Empty/", expect.any(Blob), "application/x-directory", signal);
+    expect((upload.mock.calls[0] as unknown[])[1]).toMatchObject({ size: 0 });
+  });
+
+  it("is skipped when the folder is already there", async () => {
+    const ops = { exists: async () => true, download: vi.fn(), upload: vi.fn() };
+    await expect(importItem(placeholder, ops, signal)).resolves.toEqual({ status: "skipped", reason: ALREADY_IMPORTED });
+  });
+});
+
+describe("isRetryable", () => {
+  it("retries 429, 5xx and 403 rate limits, but not 403 for other reasons", () => {
+    expect(isRetryable(new DriveError(429))).toBe(true);
+    expect(isRetryable(new DriveError(503))).toBe(true);
+    expect(isRetryable(new DriveError(403, "userRateLimitExceeded"))).toBe(true);
+    expect(isRetryable(new DriveError(403))).toBe(true);
+    expect(isRetryable(new DriveError(403, "insufficientFilePermissions"))).toBe(false);
+    expect(isRetryable(new DriveError(404))).toBe(false);
   });
 });
 
@@ -252,7 +373,7 @@ describe("importFile", () => {
     upload: vi.fn(async () => {}),
     ...over,
   });
-  const target = { id: "g1", key: "Global/photo.jpg", contentType: "image/jpeg" };
+  const target = { fileId: "g1", key: "Global/photo.jpg", contentType: "image/jpeg" };
   const signal = new AbortController().signal;
   const retry = { sleep: () => Promise.resolve() };
 
@@ -300,5 +421,28 @@ describe("createDriveClient", () => {
   it("throws a DriveError carrying the HTTP status", async () => {
     const fetchMock = vi.fn(async () => new Response("", { status: 429 }));
     await expect(createDriveClient("tok", fetchMock as never).download("x")).rejects.toMatchObject({ status: 429 });
+  });
+});
+
+describe("createDriveClient.listChildren", () => {
+  it("asks for a folder's non-trashed children, a page at a time, and parses sizes", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ files: [{ id: "1", name: "a", mimeType: "image/jpeg", size: "42" }], nextPageToken: "p2" }),
+    );
+    const page = await createDriveClient("tok", fetchMock as never).listChildren("fold'er", "p1");
+    expect(page).toEqual({ files: [{ id: "1", name: "a", mimeType: "image/jpeg", size: 42 }], nextPageToken: "p2" });
+    const url = new URL((fetchMock.mock.calls[0] as unknown as [string])[0]);
+    expect(url.searchParams.get("q")).toBe(String.raw`'fold\'er' in parents and trashed = false`);
+    expect(url.searchParams.get("pageToken")).toBe("p1");
+  });
+
+  it("puts Google's error reason on the DriveError", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ error: { errors: [{ reason: "rateLimitExceeded" }] } }, { status: 403 }),
+    );
+    await expect(createDriveClient("tok", fetchMock as never).listChildren("x")).rejects.toMatchObject({
+      status: 403,
+      reason: "rateLimitExceeded",
+    });
   });
 });

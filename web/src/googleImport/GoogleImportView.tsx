@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { GoogleImportDeps } from "./deps";
-import { importFile } from "./importFile";
-import { planPickedFiles, type ImportItem } from "./plan";
+import { importItem } from "./importFile";
+import type { ImportItem } from "./plan";
+import { prepareImport, type PreparedImport } from "./prepare";
 import { runQueue } from "./queue";
 import { STATUS_LABEL, formatBytes, summaryLine } from "./summary";
 
@@ -23,7 +24,7 @@ const CONCURRENCY = 3;
 type Phase =
   | { kind: "choose"; error?: string }
   | { kind: "preparing" }
-  | { kind: "ready"; items: ImportItem[] }
+  | { kind: "ready"; plan: PreparedImport }
   | { kind: "running"; items: ImportItem[] }
   | { kind: "finished"; items: ImportItem[] };
 
@@ -58,7 +59,7 @@ function ItemsTable({ items }: { items: ImportItem[] }) {
       <tbody>
         {items.map((it) => (
           <tr key={it.id} className={`google-import__row--${it.status}`}>
-            <td className="google-import__name">{it.name}</td>
+            <td className="google-import__name">{it.kind === "folder" ? `${it.path} (empty folder)` : it.path}</td>
             <td>{it.size != null ? formatBytes(it.size) : ""}</td>
             <td>
               {STATUS_LABEL[it.status]}
@@ -105,8 +106,11 @@ export function GoogleImportView() {
       const files = await google.pick(config, token.current);
       if (files.length === 0) return;
       setPhase({ kind: "preparing" });
-      const existing = await storage.list(prefix);
-      setPhase({ kind: "ready", items: planPickedFiles(files, prefix, existing) });
+      const plan = await prepareImport(files, prefix, {
+        drive: google.drive(token.current),
+        listExisting: storage.list,
+      });
+      setPhase({ kind: "ready", plan });
     } catch (e) {
       setPhase({ kind: "choose", error: message(e) });
     }
@@ -116,12 +120,13 @@ export function GoogleImportView() {
     const ac = new AbortController();
     abort.current = ac;
     setPhase({ kind: "running", items });
+    const drive = google.drive(token.current!);
     const ops = {
       exists: storage.exists,
       upload: storage.upload,
-      download: (id: string, signal: AbortSignal) => google.download(token.current!, id, signal),
+      download: (id: string, signal: AbortSignal) => drive.download(id, signal),
     };
-    const final = await runQueue(items, (it, signal) => importFile(it, ops, signal), {
+    const final = await runQueue(items, (it, signal) => importItem(it, ops, signal), {
       concurrency: CONCURRENCY,
       signal: ac.signal,
       onChange: (next) => setPhase({ kind: "running", items: next }),
@@ -153,28 +158,32 @@ export function GoogleImportView() {
     case "preparing":
       return (
         <Frame footer={<Button onClick={onExit}>Back</Button>}>
-          <p>Checking what's already in {folderLabel}…</p>
+          <p>Looking through the picked folders and what's already in {folderLabel}…</p>
         </Frame>
       );
 
     case "ready": {
-      const toCopy = phase.items.filter((i) => i.status === "queued").length;
+      const { items, pickedFiles, pickedFolders } = phase.plan;
+      const toCopy = items.filter((i) => i.status === "queued" && i.kind === "file").length;
+      const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
       return (
         <Frame
           footer={
             <>
               <Button onClick={onExit}>Back</Button>
               <Button onClick={choose}>Choose again</Button>
-              <Button primary disabled={toCopy === 0} onClick={() => start(phase.items)}>
+              <Button primary disabled={!items.some((i) => i.status === "queued")} onClick={() => start(items)}>
                 Start
               </Button>
             </>
           }
         >
           <p>
-            {toCopy} {toCopy === 1 ? "file" : "files"} → into <strong>{folderLabel}</strong>
+            {plural(pickedFiles, "file")}, {plural(pickedFolders, "folder")} selected → into <strong>{folderLabel}</strong>
+            {" · "}
+            {plural(toCopy, "file")} to copy
           </p>
-          <ItemsTable items={phase.items} />
+          <ItemsTable items={items} />
         </Frame>
       );
     }

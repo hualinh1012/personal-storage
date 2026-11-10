@@ -6,7 +6,7 @@
  */
 import { getProperties, list, uploadData } from "aws-amplify/storage";
 import type { GoogleImportConfig } from "../config";
-import { createDriveClient } from "./driveClient";
+import { createDriveClient, type DriveClient } from "./driveClient";
 import { getDriveToken, loadGoogle, pickFiles } from "./google";
 import type { ExistingFile, PickedFile } from "./plan";
 
@@ -14,7 +14,8 @@ export interface GoogleSide {
   load(): Promise<void>;
   token(clientId: string): Promise<string>;
   pick(cfg: GoogleImportConfig, token: string): Promise<PickedFile[]>;
-  download(token: string, fileId: string, signal: AbortSignal): Promise<Blob>;
+  /** Drive API calls made with this token. */
+  drive(token: string): DriveClient;
 }
 
 export interface StorageSide {
@@ -71,7 +72,7 @@ export const googleApis: GoogleSide = {
   load: loadGoogle,
   token: getDriveToken,
   pick: pickFiles,
-  download: (token, fileId, signal) => createDriveClient(token).download(fileId, signal),
+  drive: (token) => createDriveClient(token),
 };
 
 export function realGoogleImportDeps(config: GoogleImportConfig | null): GoogleImportDeps {

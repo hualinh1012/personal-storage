@@ -1,6 +1,7 @@
 import { DriveError } from "./driveClient";
 import { withRetry, type RetryOptions } from "./retry";
 import type { Outcome } from "./queue";
+import { ALREADY_IMPORTED, type ImportItem } from "./plan";
 
 /** Storage and Drive operations, injected so the rules can be tested without either. */
 export interface ImportOps {
@@ -11,7 +12,7 @@ export interface ImportOps {
 
 export interface ImportTarget {
   /** Google file ID. */
-  id: string;
+  fileId: string;
   key: string;
   contentType: string;
 }
@@ -43,7 +44,7 @@ export async function importFile(
 
   let data: Blob;
   try {
-    data = await withRetry(() => ops.download(target.id, signal), { ...retry, signal });
+    data = await withRetry(() => ops.download(target.fileId, signal), { ...retry, signal });
   } catch (error) {
     return { status: "failed", reason: driveReason(error) };
   }
@@ -54,4 +55,16 @@ export async function importFile(
     return { status: "failed", reason: `Couldn't save it to Family Drive (${reason(error)}).` };
   }
   return { status: "done", bytes: data.size };
+}
+
+/** Runs one import row: a file copy, or an empty folder's placeholder (skipped if it's already there). */
+export async function importItem(item: ImportItem, ops: ImportOps, signal: AbortSignal, retry: RetryOptions = {}): Promise<Outcome> {
+  if (item.kind === "file") return importFile(item, ops, signal, retry);
+  try {
+    if (await ops.exists(item.key)) return { status: "skipped", reason: ALREADY_IMPORTED };
+    await ops.upload(item.key, new Blob([]), item.contentType, signal);
+    return { status: "done", bytes: 0 };
+  } catch (error) {
+    return { status: "failed", reason: `Couldn't create the folder (${reason(error)}).` };
+  }
 }
