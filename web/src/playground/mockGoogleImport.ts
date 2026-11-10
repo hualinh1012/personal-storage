@@ -18,6 +18,9 @@ const picked: PickedFile[] = [
   { id: "g4", name: "Budget 2026", mimeType: "application/vnd.google-apps.spreadsheet" },
   { id: "g5", name: "Wedding video.mp4", mimeType: "video/mp4", sizeBytes: 48_000_000 },
   { id: "g6", name: "Rate-limited.jpg", mimeType: "image/jpeg", sizeBytes: 1_000_000 },
+  { id: "g7", name: "Trip notes", mimeType: "application/vnd.google-apps.document" },
+  { id: "g8", name: "Huge sheet", mimeType: "application/vnd.google-apps.spreadsheet" },
+  { id: "g9", name: "RSVP form", mimeType: "application/vnd.google-apps.form" },
   { id: "f1", name: "Holiday 2025", mimeType: FOLDER },
 ];
 
@@ -61,6 +64,11 @@ const drive: DriveClient = {
     await wait(fileId === "g5" ? 4000 : 1200, signal);
     if (fileId === "g6") throw new DriveError(429, "rateLimitExceeded");
     return new Blob([new Uint8Array(sizes.get(fileId) ?? 0)]);
+  },
+  async exportFile(fileId, _mimeType, signal) {
+    await wait(1500, signal);
+    if (fileId === "g8") throw new DriveError(403, "exportSizeLimitExceeded");
+    return new Blob([new Uint8Array(150_000)]);
   },
 };
 

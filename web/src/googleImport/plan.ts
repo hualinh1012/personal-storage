@@ -1,3 +1,4 @@
+import { conversionFor, convertedName } from "./conversion";
 import { isSameOrSibling, sanitiseName, withSuffix } from "./names";
 import type { QueueItem } from "./queue";
 
@@ -27,7 +28,10 @@ export interface ImportItem extends QueueItem {
   /** S3 key; a folder placeholder's ends in "/". */
   key: string;
   contentType: string;
+  /** Size in Drive; absent for converted files (Drive doesn't report one). */
   size?: number;
+  /** Set for Google Docs, Sheets and Slides: what to export them as. */
+  exportMimeType?: string;
 }
 
 /** A file to place in one destination folder. `size` undefined means unknown (converted files). */
@@ -39,8 +43,7 @@ export interface Placement {
 export type Decision = { action: "copy"; name: string } | { action: "skip"; reason: string };
 
 export const ALREADY_IMPORTED = "Already imported.";
-const NOT_SUPPORTED_YET = "Google Docs, Sheets and Slides aren't supported yet.";
-const GOOGLE_NATIVE = "application/vnd.google-apps.";
+export const NOT_SUPPORTED = "This kind of Google file can't be imported (only Docs, Sheets and Slides).";
 
 /**
  * Decides, for files going into one folder, which are already there and what
@@ -75,15 +78,23 @@ export function decideNames(incoming: Placement[], existing: ExistingFile[]): De
  * the files already in that folder.
  */
 export function planFolder(files: PickedFile[], root: string, dir: string, existing: ExistingFile[]): ImportItem[] {
-  const copyable = files.filter((f) => !f.mimeType.startsWith(GOOGLE_NATIVE));
-  const decisions = decideNames(
-    copyable.map((f) => ({ name: sanitiseName(f.name), size: f.sizeBytes })),
-    existing,
-  );
-  const byFile = new Map(copyable.map((f, i) => [f, decisions[i]]));
+  // Where each file would land before collisions: converted files take the target
+  // extension and have no known size, so re-runs match them by name alone.
+  const targets = files.map((f) => {
+    const conversion = conversionFor(f.mimeType);
+    if (conversion === "unsupported") return null;
+    const name = sanitiseName(f.name);
+    return conversion
+      ? { file: f, name: convertedName(name, conversion.ext), size: undefined, contentType: conversion.exportMimeType, exportMimeType: conversion.exportMimeType }
+      : { file: f, name, size: f.sizeBytes, contentType: f.mimeType, exportMimeType: undefined };
+  });
+  const placed = targets.filter((t) => t !== null);
+  const decisions = decideNames(placed, existing);
+  const byFile = new Map(placed.map((t, i) => [t.file, { target: t, decision: decisions[i] }]));
   return files.map((f): ImportItem => {
-    const d = byFile.get(f);
-    const name = d?.action === "copy" ? d.name : sanitiseName(f.name);
+    const planned = byFile.get(f);
+    const d = planned?.decision;
+    const name = d?.action === "copy" ? d.name : (planned?.target.name ?? sanitiseName(f.name));
     const item = {
       id: `${root}${dir}${name}#${f.id}`,
       kind: "file" as const,
@@ -91,10 +102,11 @@ export function planFolder(files: PickedFile[], root: string, dir: string, exist
       name,
       path: dir + name,
       key: root + dir + name,
-      contentType: f.mimeType,
-      size: f.sizeBytes,
+      contentType: planned?.target.contentType ?? f.mimeType,
+      size: planned?.target.size,
+      exportMimeType: planned?.target.exportMimeType,
     };
-    if (!d) return { ...item, status: "skipped", reason: NOT_SUPPORTED_YET };
+    if (!d) return { ...item, status: "skipped", reason: NOT_SUPPORTED };
     if (d.action === "skip") return { ...item, status: "skipped", reason: d.reason };
     return { ...item, status: "queued" };
   });

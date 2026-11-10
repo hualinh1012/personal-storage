@@ -7,6 +7,7 @@ import { ALREADY_IMPORTED, type ImportItem } from "./plan";
 export interface ImportOps {
   exists(key: string): Promise<boolean>;
   download(fileId: string, signal: AbortSignal): Promise<Blob>;
+  exportFile(fileId: string, mimeType: string, signal: AbortSignal): Promise<Blob>;
   upload(key: string, data: Blob, contentType: string, signal: AbortSignal): Promise<void>;
 }
 
@@ -15,6 +16,8 @@ export interface ImportTarget {
   fileId: string;
   key: string;
   contentType: string;
+  /** Export (convert) instead of downloading. */
+  exportMimeType?: string;
 }
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -22,6 +25,7 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
 function driveReason(error: unknown): string {
   if (!(error instanceof DriveError)) return `Couldn't download it from Google Drive (${reason(error)}).`;
   if (error.status === 404) return "Not found in Google Drive (deleted, or no access).";
+  if (error.reason === "exportSizeLimitExceeded") return "Too large to convert; download it from Google.";
   if (error.status === 403 || error.status === 429) return "Google Drive is busy or refused access; try again later.";
   return `Couldn't download it from Google Drive (HTTP ${error.status}).`;
 }
@@ -44,7 +48,11 @@ export async function importFile(
 
   let data: Blob;
   try {
-    data = await withRetry(() => ops.download(target.fileId, signal), { ...retry, signal });
+    const { fileId, exportMimeType } = target;
+    data = await withRetry(
+      () => (exportMimeType ? ops.exportFile(fileId, exportMimeType, signal) : ops.download(fileId, signal)),
+      { ...retry, signal },
+    );
   } catch (error) {
     return { status: "failed", reason: driveReason(error) };
   }

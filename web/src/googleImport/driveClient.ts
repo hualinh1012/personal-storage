@@ -34,6 +34,8 @@ export interface DriveClient {
   listChildren(folderId: string, pageToken?: string, signal?: AbortSignal): Promise<DrivePage>;
   /** A non-Google-native file's bytes. */
   download(fileId: string, signal?: AbortSignal): Promise<Blob>;
+  /** A Google Doc, Sheet or Slides file converted to `mimeType`. */
+  exportFile(fileId: string, mimeType: string, signal?: AbortSignal): Promise<Blob>;
 }
 
 async function driveError(res: Response): Promise<DriveError> {
@@ -79,6 +81,10 @@ export function createDriveClient(token: string, fetchImpl: typeof fetch = (...a
     },
     async download(fileId, signal) {
       return (await get(`/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, signal)).blob();
+    },
+    async exportFile(fileId, mimeType, signal) {
+      const params = new URLSearchParams({ mimeType });
+      return (await get(`/files/${encodeURIComponent(fileId)}/export?${params}`, signal)).blob();
     },
   };
 }

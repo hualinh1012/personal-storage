@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { isSameOrSibling, sanitiseName, withSuffix } from "../src/googleImport/names";
-import { ALREADY_IMPORTED, decideNames, folderPlaceholder, planFolder, type ImportItem, type PickedFile } from "../src/googleImport/plan";
+import { conversionFor, convertedName } from "../src/googleImport/conversion";
+import { ALREADY_IMPORTED, NOT_SUPPORTED, decideNames, folderPlaceholder, planFolder, type ImportItem, type PickedFile } from "../src/googleImport/plan";
 import { listFolderTree } from "../src/googleImport/listing";
 import { prepareImport } from "../src/googleImport/prepare";
 import { isRetryable } from "../src/googleImport/retry";
@@ -105,6 +106,23 @@ const file = (over: Partial<PickedFile> = {}): PickedFile => ({
   ...over,
 });
 
+const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+describe("conversionFor / convertedName", () => {
+  it("maps each Google-native type to its export, and leaves other files alone", () => {
+    expect(conversionFor("application/vnd.google-apps.document")).toEqual({ exportMimeType: "application/pdf", ext: ".pdf" });
+    expect(conversionFor("application/vnd.google-apps.presentation")).toEqual({ exportMimeType: "application/pdf", ext: ".pdf" });
+    expect(conversionFor("application/vnd.google-apps.spreadsheet")).toEqual({ exportMimeType: XLSX, ext: ".xlsx" });
+    expect(conversionFor("application/vnd.google-apps.form")).toBe("unsupported");
+    expect(conversionFor("image/jpeg")).toBeNull();
+  });
+
+  it("adds the extension unless the name already has it", () => {
+    expect(convertedName("Budget", ".xlsx")).toBe("Budget.xlsx");
+    expect(convertedName("Report.PDF", ".pdf")).toBe("Report.PDF");
+  });
+});
+
 describe("planFolder", () => {
   it("puts files under the open folder with sanitised names", () => {
     const [item] = planFolder([file({ name: " a/b.jpg " })], "Global/linh/", "", []);
@@ -116,14 +134,32 @@ describe("planFolder", () => {
     expect(item).toMatchObject({ key: "Global/linh/Holiday/Day 1/photo.jpg", path: "Holiday/Day 1/photo.jpg" });
   });
 
-  it("skips Google-native files until conversion is supported", () => {
-    const [doc, shortcut] = planFolder(
-      [
-        file({ id: "d", mimeType: "application/vnd.google-apps.document" }),
-        file({ id: "s", mimeType: "application/vnd.google-apps.shortcut" }),
-      ], "Global/", "", []);
-    expect(doc).toMatchObject({ status: "skipped", reason: "Google Docs, Sheets and Slides aren't supported yet." });
-    expect(shortcut).toMatchObject({ status: "skipped" });
+  it("converts Docs and Slides to PDF and Sheets to .xlsx, with no size", () => {
+    const native = (id: string, kind: string) => file({ id, name: id, mimeType: `application/vnd.google-apps.${kind}`, sizeBytes: undefined });
+    const items = planFolder([native("Doc", "document"), native("Deck", "presentation"), native("Sheet", "spreadsheet")], "Global/", "", []);
+    expect(items.map((i) => [i.key, i.exportMimeType, i.contentType, i.size, i.status])).toEqual([
+      ["Global/Doc.pdf", "application/pdf", "application/pdf", undefined, "queued"],
+      ["Global/Deck.pdf", "application/pdf", "application/pdf", undefined, "queued"],
+      ["Global/Sheet.xlsx", XLSX, XLSX, undefined, "queued"],
+    ]);
+  });
+
+  it("skips other Google-native types as not supported", () => {
+    const items = planFolder(
+      ["form", "site", "map", "drawing", "shortcut"].map((k) => file({ id: k, mimeType: `application/vnd.google-apps.${k}` })),
+      "Global/",
+      "",
+      [],
+    );
+    expect(items.every((i) => i.status === "skipped" && i.reason === NOT_SUPPORTED)).toBe(true);
+  });
+
+  it("skips a converted file by name (or an (n) sibling) without needing its size", () => {
+    const doc = file({ id: "d", name: "Trip notes", mimeType: "application/vnd.google-apps.document", sizeBytes: undefined });
+    expect(planFolder([doc], "Global/", "", [{ name: "Trip notes (1).pdf", size: 123 }])[0]).toMatchObject({
+      status: "skipped",
+      reason: ALREADY_IMPORTED,
+    });
   });
 
   it("applies the re-run rules against what's in the folder", () => {
@@ -220,6 +256,7 @@ describe("prepareImport", () => {
     const ops: ImportOps = {
       exists: async (k) => stored.has(k),
       download: async (id) => new Blob([new Uint8Array({ top: 9, a: 1, b: 2, c: 3, d: 4 }[id] ?? 0)]),
+      exportFile: async () => new Blob(["pdf"]),
       upload: async (k, data) => void stored.set(k, data.size),
     };
     const signal = new AbortController().signal;
@@ -240,14 +277,14 @@ describe("importItem for an empty folder", () => {
 
   it("creates the zero-byte placeholder", async () => {
     const upload = vi.fn(async () => {});
-    const ops = { exists: async () => false, download: vi.fn(), upload };
+    const ops = { exists: async () => false, download: vi.fn(), exportFile: vi.fn(), upload };
     await expect(importItem(placeholder, ops, signal)).resolves.toEqual({ status: "done", bytes: 0 });
     expect(upload).toHaveBeenCalledWith("Global/Holiday/Empty/", expect.any(Blob), "application/x-directory", signal);
     expect((upload.mock.calls[0] as unknown[])[1]).toMatchObject({ size: 0 });
   });
 
   it("is skipped when the folder is already there", async () => {
-    const ops = { exists: async () => true, download: vi.fn(), upload: vi.fn() };
+    const ops = { exists: async () => true, download: vi.fn(), exportFile: vi.fn(), upload: vi.fn() };
     await expect(importItem(placeholder, ops, signal)).resolves.toEqual({ status: "skipped", reason: ALREADY_IMPORTED });
   });
 });
@@ -370,6 +407,7 @@ describe("importFile", () => {
   const ops = (over: Partial<ImportOps> = {}): ImportOps => ({
     exists: vi.fn(async () => false),
     download: vi.fn(async () => blob),
+    exportFile: vi.fn(async () => blob),
     upload: vi.fn(async () => {}),
     ...over,
   });
@@ -397,6 +435,22 @@ describe("importFile", () => {
     expect(download).toHaveBeenCalledTimes(3);
     expect(result).toMatchObject({ status: "failed" });
     expect((result as { reason: string }).reason).toMatch(/Google Drive is busy/);
+  });
+
+  it("exports a converted file instead of downloading it", async () => {
+    const o = ops();
+    await importFile({ ...target, exportMimeType: "application/pdf" }, o, signal, retry);
+    expect(o.exportFile).toHaveBeenCalledWith("g1", "application/pdf", signal);
+    expect(o.download).not.toHaveBeenCalled();
+  });
+
+  it("fails a file too large to convert without retrying", async () => {
+    const exportFile = vi.fn().mockRejectedValue(new DriveError(403, "exportSizeLimitExceeded"));
+    await expect(importFile({ ...target, exportMimeType: "application/pdf" }, ops({ exportFile }), signal, retry)).resolves.toEqual({
+      status: "failed",
+      reason: "Too large to convert; download it from Google.",
+    });
+    expect(exportFile).toHaveBeenCalledTimes(1);
   });
 
   it("explains an upload failure", async () => {

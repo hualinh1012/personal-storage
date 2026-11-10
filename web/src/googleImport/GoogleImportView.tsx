@@ -125,6 +125,7 @@ export function GoogleImportView() {
       exists: storage.exists,
       upload: storage.upload,
       download: (id: string, signal: AbortSignal) => drive.download(id, signal),
+      exportFile: (id: string, mimeType: string, signal: AbortSignal) => drive.exportFile(id, mimeType, signal),
     };
     const final = await runQueue(items, (it, signal) => importItem(it, ops, signal), {
       concurrency: CONCURRENCY,
