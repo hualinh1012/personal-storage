@@ -4,6 +4,7 @@ import { signOutSafely } from "../session";
 import {
   createAmplifyAuthAdapter,
   createStorageBrowser,
+  defaultHandlers,
   type CreateStorageBrowserInput,
   type StorageBrowserEventValue,
   type StorageBrowserValue,
@@ -18,6 +19,9 @@ import type { GoogleImportConfig } from "../config";
 import { realGoogleImportDeps, type GoogleImportDeps } from "../googleImport/deps";
 import { GOOGLE_IMPORT_ACTION, googleImportActionConfig } from "../googleImport/importAction";
 import { GoogleImportContext, GoogleImportView, type GoogleImportContextValue } from "../googleImport/GoogleImportView";
+import { createFolderTracker, type CountFolder } from "../pagination/folderTracker";
+import { countFolder } from "../pagination/countFolder";
+import { Pager, PagerContext, type PagerContextValue } from "../pagination/Pager";
 
 type LocationValue = NonNullable<StorageBrowserValue["location"]>;
 type StorageBrowserSetup =Pick<CreateStorageBrowserInput, "config" | "actions">;
@@ -32,6 +36,7 @@ export function DriveView({
   bucket,
   setup,
   googleImport,
+  countFolder,
 }: {
   email: string;
   /** Display only: IAM enforces the same access level. setup.config.listLocations must match it. */
@@ -39,12 +44,21 @@ export function DriveView({
   bucket: string;
   setup: StorageBrowserSetup;
   googleImport: GoogleImportDeps;
+  /** Counts a folder's rows for the pager's total (S3 in the app, sample data in the playground). */
+  countFolder: CountFolder<never>;
 }) {
-  const { StorageBrowser, views } = useMemo(() => {
+  const { StorageBrowser, views, tracker } = useMemo(() => {
+    // Watches the file list's listing so the pager can show the folder's total.
+    const tracker = createFolderTracker(countFolder);
+    const listLocationItems = setup.actions?.default?.listLocationItems ?? defaultHandlers.listLocationItems;
     const created = createStorageBrowser({
       ...setup,
       actions: {
         ...setup.actions,
+        default: {
+          ...setup.actions?.default,
+          listLocationItems: tracker.wrap(listLocationItems as never) as never,
+        },
         custom: {
           ...setup.actions?.custom,
           move: moveActionConfig as never,
@@ -52,14 +66,15 @@ export function DriveView({
         },
       },
       filePreview: filePreviewConfig,
+      components: { Pagination: Pager },
     });
     const MoveView = makeMoveView({
       CopyView: created.StorageBrowser.CopyView as unknown as MoveViewDeps["CopyView"],
       useView: created.useView as unknown as MoveViewDeps["useView"],
       useAction: created.useAction as unknown as MoveViewDeps["useAction"],
     });
-    return { StorageBrowser: created.StorageBrowser, views: { MoveView, GoogleImportView } };
-  }, [setup]);
+    return { StorageBrowser: created.StorageBrowser, views: { MoveView, GoogleImportView }, tracker };
+  }, [setup, countFolder]);
 
   // Storage Browser stays uncontrolled: in controlled mode it only reports
   // changes to its internal state, so an action opened from outside (our
@@ -99,6 +114,11 @@ export function DriveView({
     folderLabel: path ? path.replace(/\/$/, "") : isPersonalPrefix(location.prefix) ? "My files" : "Family Drive",
     onExit: exitToFolder,
   };
+  // The pager shows a folder total only in a folder's file list, not on Home or in an action's view.
+  const pagerContext: PagerContextValue = {
+    tracker,
+    listPrefix: current.location && !current.actionType ? location.prefix + path : null,
+  };
 
   return (
     <div className="drive">
@@ -127,13 +147,15 @@ export function DriveView({
       </header>
       <main className="browser">
         <GoogleImportContext.Provider value={importContext}>
-          <StorageBrowser
-            key={mount.key}
-            defaultValue={mount.defaultValue}
-            views={views as never}
-            onValueChange={onValueChange}
-            displayText={previewDisplayText}
-          />
+          <PagerContext.Provider value={pagerContext}>
+            <StorageBrowser
+              key={mount.key}
+              defaultValue={mount.defaultValue}
+              views={views as never}
+              onValueChange={onValueChange}
+              displayText={previewDisplayText}
+            />
+          </PagerContext.Provider>
         </GoogleImportContext.Provider>
       </main>
     </div>
@@ -158,5 +180,14 @@ export default function Drive({
     return { setup: { config }, bucket };
   }, [email, access]);
   const googleImport = useMemo(() => realGoogleImportDeps(google), [google]);
-  return <DriveView email={email} access={access} bucket={bucket} setup={setup} googleImport={googleImport} />;
+  return (
+    <DriveView
+      email={email}
+      access={access}
+      bucket={bucket}
+      setup={setup}
+      googleImport={googleImport}
+      countFolder={countFolder as CountFolder<never>}
+    />
+  );
 }
