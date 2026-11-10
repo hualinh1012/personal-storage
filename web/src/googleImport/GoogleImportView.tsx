@@ -22,6 +22,7 @@ const CONCURRENCY = 3;
 
 type Phase =
   | { kind: "choose"; error?: string }
+  | { kind: "preparing" }
   | { kind: "ready"; items: ImportItem[] }
   | { kind: "running"; items: ImportItem[] }
   | { kind: "finished"; items: ImportItem[] };
@@ -102,7 +103,10 @@ export function GoogleImportView() {
     try {
       token.current = await google.token(config.clientId);
       const files = await google.pick(config, token.current);
-      if (files.length > 0) setPhase({ kind: "ready", items: planPickedFiles(files, prefix) });
+      if (files.length === 0) return;
+      setPhase({ kind: "preparing" });
+      const existing = await storage.list(prefix);
+      setPhase({ kind: "ready", items: planPickedFiles(files, prefix, existing) });
     } catch (e) {
       setPhase({ kind: "choose", error: message(e) });
     }
@@ -143,6 +147,13 @@ export function GoogleImportView() {
             Drive, and files already here aren't overwritten.
           </p>
           {(loadError || phase.error) && <p className="google-import__error">{loadError ?? phase.error}</p>}
+        </Frame>
+      );
+
+    case "preparing":
+      return (
+        <Frame footer={<Button onClick={onExit}>Back</Button>}>
+          <p>Checking what's already in {folderLabel}…</p>
         </Frame>
       );
 

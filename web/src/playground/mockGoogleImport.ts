@@ -27,6 +27,14 @@ const wait = (ms: number, signal: AbortSignal) =>
     });
   });
 
+// What's "in S3" for the import: starts with a same-size copy of the plan (→ already
+// imported) and a different-size beach photo (→ imported as "(1)"). Uploads are added,
+// so running the same import twice shows the re-run skips.
+const stored = new Map<string, number>([
+  ["Global/linh/Tết 2026 plan.md", 2_100],
+  ["Global/linh/Beach day 2025.jpg", 1_234],
+]);
+
 export function mockGoogleImport(enabled: boolean): GoogleImportDeps {
   return {
     config: enabled ? { clientId: "playground", apiKey: "playground", projectNumber: "0" } : null,
@@ -38,13 +46,20 @@ export function mockGoogleImport(enabled: boolean): GoogleImportDeps {
         await wait(fileId === "g5" ? 4000 : 1200, signal);
         if (fileId === "g6") throw new DriveError(429);
         const size = picked.find((p) => p.id === fileId)?.sizeBytes ?? 0;
-        return new Blob([new Uint8Array(Math.min(size, 1_000_000))]);
+        return new Blob([new Uint8Array(size)]);
       },
     },
     storage: {
-      // Pretend the markdown plan is already in the open folder.
-      exists: async (key) => key.endsWith("/Tết 2026 plan.md"),
-      upload: (_key, _data, _type, signal) => wait(600, signal),
+      async list(prefix) {
+        return [...stored]
+          .filter(([key]) => key.startsWith(prefix) && !key.slice(prefix.length).includes("/"))
+          .map(([key, size]) => ({ name: key.slice(prefix.length), size }));
+      },
+      exists: async (key) => stored.has(key),
+      async upload(key, data, _type, signal) {
+        await wait(600, signal);
+        stored.set(key, data.size);
+      },
     },
   };
 }

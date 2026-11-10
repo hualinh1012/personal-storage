@@ -4,11 +4,11 @@
  * scripts and Drive API on one side, Amplify Storage (the signed-in person's
  * Identity Pool credentials, `Global/*` only) on the other.
  */
-import { getProperties, uploadData } from "aws-amplify/storage";
+import { getProperties, list, uploadData } from "aws-amplify/storage";
 import type { GoogleImportConfig } from "../config";
 import { createDriveClient } from "./driveClient";
 import { getDriveToken, loadGoogle, pickFiles } from "./google";
-import type { PickedFile } from "./plan";
+import type { ExistingFile, PickedFile } from "./plan";
 
 export interface GoogleSide {
   load(): Promise<void>;
@@ -18,6 +18,8 @@ export interface GoogleSide {
 }
 
 export interface StorageSide {
+  /** Files directly under `prefix` (not in subfolders), names relative to it. */
+  list(prefix: string): Promise<ExistingFile[]>;
   exists(key: string): Promise<boolean>;
   upload(key: string, data: Blob, contentType: string, signal: AbortSignal): Promise<void>;
 }
@@ -33,6 +35,15 @@ const isNotFound = (error: unknown) =>
   error instanceof Error && (error.name === "NotFound" || /not\s*found|404/i.test(error.message));
 
 export const amplifyStorage: StorageSide = {
+  async list(prefix) {
+    const { items } = await list({
+      path: prefix,
+      options: { listAll: true, subpathStrategy: { strategy: "exclude" } },
+    });
+    return items
+      .filter((i) => i.path !== prefix && !i.path.endsWith("/"))
+      .map((i) => ({ name: i.path.slice(prefix.length), size: i.size }));
+  },
   async exists(key) {
     try {
       await getProperties({ path: key });

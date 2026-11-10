@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { sanitiseName } from "../src/googleImport/names";
-import { planPickedFiles, type PickedFile } from "../src/googleImport/plan";
+import { isSameOrSibling, sanitiseName, withSuffix } from "../src/googleImport/names";
+import { ALREADY_IMPORTED, decideNames, planPickedFiles, type PickedFile } from "../src/googleImport/plan";
 import { withRetry } from "../src/googleImport/retry";
 import { runQueue, type Outcome, type QueueItem } from "../src/googleImport/queue";
 import { importFile, type ImportOps } from "../src/googleImport/importFile";
@@ -27,6 +27,73 @@ describe("sanitiseName", () => {
   });
 });
 
+describe("withSuffix / isSameOrSibling", () => {
+  it("puts the number before the extension", () => {
+    expect(withSuffix("photo.jpg", 2)).toBe("photo (2).jpg");
+    expect(withSuffix("notes", 1)).toBe("notes (1)");
+  });
+
+  it("recognises the name itself and its (n) siblings only", () => {
+    expect(isSameOrSibling("photo.jpg", "photo.jpg")).toBe(true);
+    expect(isSameOrSibling("photo.jpg", "photo (1).jpg")).toBe(true);
+    expect(isSameOrSibling("photo.jpg", "photo (12).jpg")).toBe(true);
+    expect(isSameOrSibling("photo.jpg", "photo (0).jpg")).toBe(false);
+    expect(isSameOrSibling("photo.jpg", "photo (a).jpg")).toBe(false);
+    expect(isSameOrSibling("photo.jpg", "photo (1).png")).toBe(false);
+    expect(isSameOrSibling("photo.jpg", "my photo.jpg")).toBe(false);
+  });
+});
+
+describe("decideNames", () => {
+  it("skips a file with the same name and size as already imported", () => {
+    expect(decideNames([{ name: "a.jpg", size: 5 }], [{ name: "a.jpg", size: 5 }])).toEqual([
+      { action: "skip", reason: ALREADY_IMPORTED },
+    ]);
+  });
+
+  it("matches a same-size (n) sibling too, so re-runs never create (2), (3)…", () => {
+    const existing = [
+      { name: "a.jpg", size: 5 },
+      { name: "a (1).jpg", size: 9 },
+    ];
+    expect(decideNames([{ name: "a.jpg", size: 9 }], existing)).toEqual([{ action: "skip", reason: ALREADY_IMPORTED }]);
+  });
+
+  it("imports a same-name, different-size file as the next free (n), never overwriting", () => {
+    const existing = [
+      { name: "a.jpg", size: 5 },
+      { name: "a (1).jpg", size: 6 },
+    ];
+    expect(decideNames([{ name: "a.jpg", size: 7 }], existing)).toEqual([{ action: "copy", name: "a (2).jpg" }]);
+  });
+
+  it("suffixes same-named files within one batch so neither is dropped", () => {
+    expect(decideNames([{ name: "a.jpg", size: 5 }, { name: "a.jpg", size: 5 }], [])).toEqual([
+      { action: "copy", name: "a.jpg" },
+      { action: "copy", name: "a (1).jpg" },
+    ]);
+  });
+
+  it("re-running that batch skips both: each existing file accounts for one incoming file", () => {
+    const existing = [
+      { name: "a.jpg", size: 5 },
+      { name: "a (1).jpg", size: 5 },
+    ];
+    expect(decideNames([{ name: "a.jpg", size: 5 }, { name: "a.jpg", size: 5 }, { name: "a.jpg", size: 5 }], existing)).toEqual([
+      { action: "skip", reason: ALREADY_IMPORTED },
+      { action: "skip", reason: ALREADY_IMPORTED },
+      { action: "copy", name: "a (2).jpg" },
+    ]);
+  });
+
+  it("with an unknown size (converted files), any same-name or sibling file counts as imported", () => {
+    expect(decideNames([{ name: "Doc.pdf" }], [{ name: "Doc (1).pdf", size: 1 }])).toEqual([
+      { action: "skip", reason: ALREADY_IMPORTED },
+    ]);
+    expect(decideNames([{ name: "Doc.pdf" }], [])).toEqual([{ action: "copy", name: "Doc.pdf" }]);
+  });
+});
+
 const file = (over: Partial<PickedFile> = {}): PickedFile => ({
   id: "id1",
   name: "photo.jpg",
@@ -37,7 +104,7 @@ const file = (over: Partial<PickedFile> = {}): PickedFile => ({
 
 describe("planPickedFiles", () => {
   it("puts files under the open folder with sanitised names", () => {
-    const [item] = planPickedFiles([file({ name: " a/b.jpg " })], "Global/linh/");
+    const [item] = planPickedFiles([file({ name: " a/b.jpg " })], "Global/linh/", []);
     expect(item).toMatchObject({ id: "id1", key: "Global/linh/a_b.jpg", status: "queued", size: 100 });
   });
 
@@ -48,15 +115,30 @@ describe("planPickedFiles", () => {
         file({ id: "s", mimeType: "application/vnd.google-apps.shortcut" }),
       ],
       "Global/",
+      [],
     );
     expect(doc).toMatchObject({ status: "skipped", reason: "Google Docs, Sheets and Slides aren't supported yet." });
     expect(shortcut).toMatchObject({ status: "skipped" });
   });
 
-  it("skips a second picked file that would land on the same key, so neither overwrites the other", () => {
-    const [a, b] = planPickedFiles([file({ id: "a" }), file({ id: "b", name: "photo.jpg " })], "Global/");
-    expect(a.status).toBe("queued");
-    expect(b).toMatchObject({ status: "skipped", reason: "Another picked file has the same name." });
+  it("applies the re-run rules against what's in the folder", () => {
+    const items = planPickedFiles(
+      [file({ id: "same" }), file({ id: "bigger", name: "photo.jpg", sizeBytes: 200 }), file({ id: "dup", name: "photo.jpg ", sizeBytes: 300 })],
+      "Global/",
+      [{ name: "photo.jpg", size: 100 }],
+    );
+    expect(items.map((i) => [i.status, i.key])).toEqual([
+      ["skipped", "Global/photo.jpg"],
+      ["queued", "Global/photo (1).jpg"],
+      ["queued", "Global/photo (2).jpg"],
+    ]);
+  });
+
+  it("re-running an import that finished shows everything as already imported", () => {
+    const picked = [file({ id: "a", name: "x.jpg" }), file({ id: "b", name: "x.jpg", sizeBytes: 7 })];
+    const first = planPickedFiles(picked, "Global/", []);
+    const nowThere = first.map((i) => ({ name: i.name, size: i.size }));
+    expect(planPickedFiles(picked, "Global/", nowThere).map((i) => i.reason)).toEqual([ALREADY_IMPORTED, ALREADY_IMPORTED]);
   });
 });
 
