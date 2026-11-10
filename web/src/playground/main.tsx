@@ -26,7 +26,7 @@ if (driveView) {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {driveView ? (
-      <DriveView email={MOCK_EMAIL} access={access} bucket={MOCK_BUCKET} setup={setup} googleImport={googleImport} countFolder={countFolder} trash={trash} />
+      <DriveView email={MOCK_EMAIL} access={access} bucket={MOCK_BUCKET} setup={setup} googleImport={googleImport} countFolder={countFolder} trash={trash} deletedRetentionDays={30} />
     ) : (
       <Playground />
     )}

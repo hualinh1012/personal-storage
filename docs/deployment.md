@@ -88,7 +88,7 @@ Click **Release change** (and approve, if you added an approval stage).
 - **First run:** the state bucket doesn't exist yet. The script applies with local state inside the build container, then migrates the state into `s3://family-drive-tfstate-<account>/foundation/terraform.tfstate`.
 - **Parameters that already exist** (for example, created by hand) are imported, and their values are kept.
 - **Re-runs after a failed first run** are safe. Buckets the failed run left behind are imported, not recreated.
-- **Re-runs in general** only apply changes. Terraform never overwrites SSM values.
+- **Re-runs in general** only apply changes. Terraform never overwrites the SSM values you set in step 2. It does own `/family-drive/deleted_retention_days` (ADR 0012), which it writes from `deleted_retention_days` in `infra/foundation/main.tf` (30).
 
 **Check the result:** the log ends with `Apply complete!` and outputs
 `files_bucket = "family-drive-files-084519186805"` and `tfstate_bucket = "family-drive-tfstate-084519186805"`.
@@ -135,6 +135,7 @@ aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/a
 | `/family-drive/access` | String | JSON access levels per email (above) |
 | `/family-drive/google_api_key` | String | Browser API key for Google Drive import (step 4b) |
 | `/family-drive/google_project_number` | String | Google Cloud project number for Google Drive import (step 4b) |
+| `/family-drive/deleted_retention_days` | String | Days before S3 removes files in `Deleted/`. **Set by Terraform; don't edit it** (Day-to-day) |
 
 The app plan **stops on purpose** while any of the first four still holds `CHANGE_ME`, if
 `allowed_emails` has no valid email addresses, or if `access` isn't valid (not JSON, an unknown key,
@@ -332,7 +333,9 @@ When adding someone, also give them an entry in `/family-drive/access` if they n
 
 **Change someone's access level:** edit `/family-drive/access` (step 2) and re-run the app pipeline. It takes effect at their next token refresh, within about 2 hours, or at once when they sign out and back in.
 
-**Recover a deleted file:** Delete in the app moves files to the **Deleted** folder. Someone with `trash` opens Home → `Deleted/`, selects the file and uses **Restore** in the ⋮ menu. Files there stay until someone deletes them permanently or empties Deleted.
+**Recover a deleted file:** Delete in the app moves files to the **Deleted** folder. Someone with `trash` opens Home → `Deleted/`, selects the file and uses **Restore** in the ⋮ menu. Files there stay until someone deletes them permanently or empties Deleted, or for **30 days**, after which S3 removes them with every version (ADR 0012).
+
+**Change how long Deleted keeps files:** edit `deleted_retention_days` in `infra/foundation/main.tf` and push. Once the foundation pipeline has run, run the app pipeline so the note in `Deleted/` shows the new number. A shorter value also applies to files already there.
 
 **Recover an overwritten file, or one deleted outside the app (within 30 days):**
 ```bash
@@ -352,6 +355,7 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 |---|---|---|
 | `Terraform initialized in an empty directory` | Commands run Terraform at the repo root | Use the commands above. The scripts run Terraform in the right folder. |
 | `S3 bucket "family-drive-tfstate-…" does not exist` | App pipeline ran before the foundation | Run the foundation pipeline first. |
+| App plan fails: `reading SSM Parameter (/family-drive/deleted_retention_days)` … not found | The foundation hasn't been applied since auto-empty was added (ADR 0012) | Run the foundation pipeline, then the app pipeline. |
 | `AccessDenied … ssm:GetParameter` / `s3:CreateBucket` / … | Policy not attached to the role the action runs as | Attach the matching file from `ci/iam/`. |
 | Plan stops: `…still the CHANGE_ME placeholder` / `must be an email address` | SSM values not set | Do step 2. |
 | Plan stops: `SSM /family-drive/access must be a JSON object…` / `Every entry in SSM /family-drive/access…` / `…same email more than once` / `…must also be in /family-drive/allowed_emails` | `access` not set, or not in the format of step 2 | Fix the value (step 2). Check the JSON with `jq . access.json`. |
@@ -422,6 +426,8 @@ Run after a deploy, ideally in a private window.
   - Delete permanently a file in `Deleted/`: `aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix "Deleted/"` no longer lists any version of it.
   - Empty Deleted: `Deleted/` is empty, and so is that listing.
   - Delete a file in your personal folder: it lands in `Deleted/Personal/<your email>/`.
+  - `Deleted/` shows "Files here are removed for good 30 days after they were deleted." above the list; `Global/` and your personal folder don't.
+  - `aws s3api get-bucket-lifecycle-configuration --bucket family-drive-files-084519186805` lists `expire-deleted-folder` (30 days, noncurrent 1 day) and `remove-deleted-folder-delete-markers`, both with prefix `Deleted/`.
 - [ ] Signed in as someone with write access but no `trash`: Delete still works, Home doesn't list `Deleted/`, and a direct list of `Deleted/` (e.g. `list` from `aws-amplify/storage` in the console) fails with AccessDenied.
 - [ ] **Home** lists `Global/` and `Personal/<your email>/` (and `Deleted/` with `trash`), nothing else. In your personal folder, upload, preview, download, move a file into a subfolder and delete it.
 - [ ] Signed in as A, a direct request for B's folder is denied: in the browser console on the drive, a list of `Personal/<B's email>/` (e.g. with the `list` API from `aws-amplify/storage`) fails with AccessDenied. Or check the role with the IAM policy simulator, setting the `aws:PrincipalTag/email` context key.

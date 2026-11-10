@@ -25,5 +25,5 @@ There is one shared `Deleted/`, including files deleted from personal folders (`
 - "Delete permanently" purges versions under `Deleted/` only. The move left a noncurrent version at the original key, which the bucket's 30-day noncurrent-version rule expires; purging it immediately would need `s3:DeleteObjectVersion` on `Global/*`, which isn't granted.
 - A trash manager can't restore into someone else's personal folder (no write there); Restore says so instead of failing with AccessDenied.
 - A move is a single-request S3 copy, so files over 5 GB can't be deleted from the app, as with Move.
-- `Deleted/` grows until someone empties it; auto-empty after 30 days is #25.
+- `Deleted/` grows until someone empties it. Superseded by [0012](0012-deleted-folder-auto-empties-after-30-days.md): S3 removes files there after 30 days.
 - Set `"trash": true` for at least one person, or nobody can see or empty `Deleted/`.

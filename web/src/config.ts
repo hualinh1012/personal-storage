@@ -13,6 +13,9 @@ export interface AppConfig {
   googleClientId?: string;
   googleApiKey?: string;
   googleProjectNumber?: string;
+  // Days files stay in Deleted/ (issue #25). Optional: absent from older
+  // config.json files. Read it through parseRetentionDays() in trash/retention.ts.
+  deletedRetentionDays?: string;
 }
 
 export interface GoogleImportConfig {

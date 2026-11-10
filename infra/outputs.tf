@@ -46,3 +46,8 @@ output "google_api_key" {
 output "google_project_number" {
   value = nonsensitive(data.aws_ssm_parameter.google_project_number.value)
 }
+
+# Shown in the Deleted folder ("removed automatically N days after ...").
+output "deleted_retention_days" {
+  value = nonsensitive(data.aws_ssm_parameter.deleted_retention_days.value)
+}

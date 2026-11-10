@@ -1,7 +1,7 @@
 # Foundation stack: long-lived resources that must outlive the app stack in infra/.
 #   - Terraform state bucket (holds this stack's state and the app stack's state)
 #   - Family files bucket (the actual data)
-#   - SSM parameters the deploy reads (Google client, allowed emails)
+#   - SSM parameters the deploy reads (Google client, allowed emails, Deleted retention)
 # Everything here has prevent_destroy. Apply it with ./bootstrap.sh from an admin
 # machine; the CodePipeline only deploys the app stack.
 
@@ -34,6 +34,19 @@ variable "project" {
 variable "region" {
   type    = string
   default = "ap-southeast-1"
+}
+
+# How long files stay in the Deleted folder before S3 removes them for good
+# (issue #25, ADR 0012). Counts from the deletion: a delete in the app copies
+# the file into Deleted/, which gives it a fresh creation date.
+variable "deleted_retention_days" {
+  type    = number
+  default = 30
+
+  validation {
+    condition     = var.deleted_retention_days >= 1 && floor(var.deleted_retention_days) == var.deleted_retention_days
+    error_message = "deleted_retention_days must be a whole number of days, at least 1."
+  }
 }
 
 provider "aws" {
