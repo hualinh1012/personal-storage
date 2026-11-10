@@ -5,15 +5,15 @@ describe("parseAccess", () => {
   it("parses entries keyed by lower-cased, trimmed email; missing flags are false", () => {
     const map = parseAccess(
       JSON.stringify({
-        "A@x.com ": { global: "write", personal: true },
+        "A@x.com ": { global: "write", personal: true, trash: true },
         "b@x.com": { global: "read" },
         "c@x.com": { global: "read", personal: true },
       }),
     );
     expect([...map.entries()]).toEqual([
-      ["a@x.com", { global: "write", personal: true }],
-      ["b@x.com", { global: "read", personal: false }],
-      ["c@x.com", { global: "read", personal: true }],
+      ["a@x.com", { global: "write", personal: true, trash: true }],
+      ["b@x.com", { global: "read", personal: false, trash: false }],
+      ["c@x.com", { global: "read", personal: true, trash: false }],
     ]);
   });
 
@@ -47,6 +47,7 @@ describe("parseAccess", () => {
     expect(() => parseAccess('{"a@x.com": {}}')).toThrow(/"global"/);
     expect(() => parseAccess('{"a@x.com": {"global": "admin"}}')).toThrow(/"global"/);
     expect(() => parseAccess('{"a@x.com": {"global": "read", "personal": "yes"}}')).toThrow(/true or false/);
+    expect(() => parseAccess('{"a@x.com": {"global": "read", "trash": 1}}')).toThrow(/"trash" must be true or false/);
     expect(() => parseAccess('{"a@x.com": {"global": "read", "admin": true}}')).toThrow(/unknown key "admin"/);
   });
 });
@@ -55,18 +56,26 @@ describe("accessFor", () => {
   const map = parseAccess('{"a@x.com": {"global": "write", "personal": true}}');
 
   it("finds an entry case-insensitively", () => {
-    expect(accessFor(" A@X.com", map)).toEqual({ global: "write", personal: true });
+    expect(accessFor(" A@X.com", map)).toEqual({ global: "write", personal: true, trash: false });
   });
 
-  it("defaults to read-only Global/ with no personal folder", () => {
-    expect(accessFor("b@x.com", map)).toEqual({ global: "read", personal: false });
-    expect(DEFAULT_ACCESS).toEqual({ global: "read", personal: false });
+  it("defaults to read-only Global/ with no personal folder and no Deleted folder", () => {
+    expect(accessFor("b@x.com", map)).toEqual({ global: "read", personal: false, trash: false });
+    expect(DEFAULT_ACCESS).toEqual({ global: "read", personal: false, trash: false });
   });
 });
 
 describe("accessClaims", () => {
   it("turns the access into string claims", () => {
-    expect(accessClaims({ global: "write", personal: true })).toEqual({ global_access: "write", personal: "yes" });
-    expect(accessClaims({ global: "read", personal: false })).toEqual({ global_access: "read", personal: "no" });
+    expect(accessClaims({ global: "write", personal: true, trash: true })).toEqual({
+      global_access: "write",
+      personal: "yes",
+      trash: "yes",
+    });
+    expect(accessClaims({ global: "read", personal: false, trash: false })).toEqual({
+      global_access: "read",
+      personal: "no",
+      trash: "no",
+    });
   });
 });

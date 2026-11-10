@@ -42,9 +42,10 @@ resource "aws_ssm_parameter" "allowed_emails" {
 }
 
 # Per-person access levels (issue #15): JSON keyed by email, e.g.
-# {"you@gmail.com": {"global": "write", "personal": true}, "mom@gmail.com": {"global": "read"}}
+# {"you@gmail.com": {"global": "write", "personal": true, "trash": true}, "mom@gmail.com": {"global": "read"}}
 # String, not StringList: a StringList is comma-separated and JSON has commas.
-# Allowlisted emails with no entry get read-only Global/ and no personal folder.
+# Allowlisted emails with no entry get read-only Global/, no personal folder and
+# no Deleted folder (`trash`, issue #24).
 resource "aws_ssm_parameter" "access" {
   name  = "/${var.project}/access"
   type  = "String"

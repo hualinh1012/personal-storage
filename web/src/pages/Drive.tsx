@@ -22,6 +22,16 @@ import { GoogleImportContext, GoogleImportView, type GoogleImportContextValue } 
 import { createFolderTracker, type CountFolder } from "../pagination/folderTracker";
 import { countFolder } from "../pagination/countFolder";
 import { Pager, PagerContext, type PagerContextValue } from "../pagination/Pager";
+import { canWriteFor, deleteViewDisplayText, makeTrashActions, type TrashDeps } from "../trash/actions";
+import { makeTrashViews, TrashContext, type TrashViewDeps } from "../trash/TrashViews";
+import { s3TrashOps } from "../trash/s3Ops";
+import type { TrashOps } from "../trash/trash";
+import { fetchAuthSession } from "aws-amplify/auth";
+
+const displayText = {
+  ...previewDisplayText,
+  DeleteView: deleteViewDisplayText,
+};
 
 type LocationValue = NonNullable<StorageBrowserValue["location"]>;
 type StorageBrowserSetup =Pick<CreateStorageBrowserInput, "config" | "actions">;
@@ -37,6 +47,7 @@ export function DriveView({
   setup,
   googleImport,
   countFolder,
+  trash,
 }: {
   email: string;
   /** Display only: IAM enforces the same access level. setup.config.listLocations must match it. */
@@ -46,11 +57,14 @@ export function DriveView({
   googleImport: GoogleImportDeps;
   /** Counts a folder's rows for the pager's total (S3 in the app, sample data in the playground). */
   countFolder: CountFolder<never>;
+  /** The Deleted folder's S3 operations (issue #24): Delete moves files there. */
+  trash: TrashDeps;
 }) {
   const { StorageBrowser, views, tracker } = useMemo(() => {
     // Watches the file list's listing so the pager can show the folder's total.
     const tracker = createFolderTracker(countFolder);
     const listLocationItems = setup.actions?.default?.listLocationItems ?? defaultHandlers.listLocationItems;
+    const trashActions = makeTrashActions(trash);
     const created = createStorageBrowser({
       ...setup,
       actions: {
@@ -58,11 +72,14 @@ export function DriveView({
         default: {
           ...setup.actions?.default,
           listLocationItems: tracker.wrap(listLocationItems as never) as never,
+          // Delete moves to Deleted/; there is no instant delete outside it.
+          delete: trashActions.delete as never,
         },
         custom: {
           ...setup.actions?.custom,
           move: moveActionConfig as never,
           [GOOGLE_IMPORT_ACTION]: googleImportActionConfig as never,
+          ...(trashActions.custom as unknown as Record<string, never>),
         },
       },
       filePreview: filePreviewConfig,
@@ -73,8 +90,13 @@ export function DriveView({
       useView: created.useView as unknown as MoveViewDeps["useView"],
       useAction: created.useAction as unknown as MoveViewDeps["useAction"],
     });
-    return { StorageBrowser: created.StorageBrowser, views: { MoveView, GoogleImportView }, tracker };
-  }, [setup, countFolder]);
+    const trashViews = makeTrashViews({
+      DeleteView: created.StorageBrowser.DeleteView as unknown as TrashViewDeps["DeleteView"],
+      useView: created.useView as unknown as TrashViewDeps["useView"],
+      useAction: created.useAction as unknown as TrashViewDeps["useAction"],
+    });
+    return { StorageBrowser: created.StorageBrowser, views: { MoveView, GoogleImportView, ...trashViews }, tracker };
+  }, [setup, countFolder, trash]);
 
   // Storage Browser stays uncontrolled: in controlled mode it only reports
   // changes to its internal state, so an action opened from outside (our
@@ -147,15 +169,17 @@ export function DriveView({
       </header>
       <main className="browser">
         <GoogleImportContext.Provider value={importContext}>
-          <PagerContext.Provider value={pagerContext}>
-            <StorageBrowser
-              key={mount.key}
-              defaultValue={mount.defaultValue}
-              views={views as never}
-              onValueChange={onValueChange}
-              displayText={previewDisplayText}
-            />
-          </PagerContext.Provider>
+          <TrashContext.Provider value={{ deps: trash, onExit: exitToFolder }}>
+            <PagerContext.Provider value={pagerContext}>
+              <StorageBrowser
+                key={mount.key}
+                defaultValue={mount.defaultValue}
+                views={views as never}
+                onValueChange={onValueChange}
+                displayText={displayText as never}
+              />
+            </PagerContext.Provider>
+          </TrashContext.Provider>
         </GoogleImportContext.Provider>
       </main>
     </div>
@@ -180,6 +204,26 @@ export default function Drive({
     return { setup: { config }, bucket };
   }, [email, access]);
   const googleImport = useMemo(() => realGoogleImportDeps(google), [google]);
+  const trash = useMemo<TrashDeps>(() => {
+    let ops: Promise<TrashOps> | undefined;
+    return {
+      // One S3 client, created on first use; it asks Amplify for fresh credentials per request.
+      ops: () =>
+        (ops ??= s3TrashOps({
+          bucket,
+          region: Amplify.getConfig().Storage?.S3?.region ?? "",
+          credentials: async () => {
+            const { credentials } = await fetchAuthSession();
+            if (!credentials) throw new Error("Not signed in.");
+            return credentials;
+          },
+        }).catch((error) => {
+          ops = undefined;
+          throw error;
+        })),
+      canWriteTo: canWriteFor(access, email),
+    };
+  }, [bucket, access, email]);
   return (
     <DriveView
       email={email}
@@ -188,6 +232,7 @@ export default function Drive({
       setup={setup}
       googleImport={googleImport}
       countFolder={countFolder as CountFolder<never>}
+      trash={trash}
     />
   );
 }

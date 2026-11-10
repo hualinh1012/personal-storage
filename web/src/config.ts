@@ -83,14 +83,37 @@ export function isPersonalPrefix(prefix: string): boolean {
 }
 
 /**
- * What Home lists: the shared drive and, if the person has one, their own
- * folder. Nobody else's folder: listing them would need the allowlist in the
- * browser, and IAM denies opening them anyway. Replaces the Amplify adapter's
- * listLocations, which can only derive paths from the identity ID.
+ * The Deleted folder (issue #24, ADR 0011). Delete in the app moves files here,
+ * under their original path; only people with the `trash` access flag can see it.
+ */
+export const DELETED_PREFIX = "Deleted/";
+
+// Deleted/ has "delete" (Delete permanently, Restore, Empty) but no "write", so
+// Storage Browser hides Upload, Create folder, Copy and Move there, and our
+// move-to-Deleted Delete (which needs "write") too. See web/src/trash/.
+const DELETED_ACCESS: Permission[] = ["delete", "get", "list"];
+
+/** Storage Browser location for the Deleted folder. */
+export function deletedLocation(bucket: string) {
+  return { bucket, prefix: DELETED_PREFIX, type: "PREFIX" as const, permissions: [...DELETED_ACCESS] };
+}
+
+/** True for a location prefix inside the Deleted folder. */
+export function isDeletedPrefix(prefix: string): boolean {
+  return prefix.startsWith(DELETED_PREFIX);
+}
+
+/**
+ * What Home lists: the shared drive, the person's own folder if they have one,
+ * and the Deleted folder if they manage it. Nobody else's folder: listing them
+ * would need the allowlist in the browser, and IAM denies opening them anyway.
+ * Replaces the Amplify adapter's listLocations, which can only derive paths
+ * from the identity ID.
  */
 export function listDriveLocations(bucket: string, email: string, access: Access) {
   const items = [{ id: "Global", ...driveLocation(bucket, access) }];
   if (access.personal && email.trim()) items.push({ id: "Personal", ...personalLocation(bucket, email) });
+  if (access.trash) items.push({ id: "Deleted", ...deletedLocation(bucket) });
   return async () => ({ items, nextToken: undefined });
 }
 

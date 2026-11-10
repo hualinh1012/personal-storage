@@ -1,4 +1,5 @@
-import { useMemo, type ComponentType, type ReactNode } from "react";
+import { type ComponentType, type ReactNode } from "react";
+import { useStableItems } from "../stableItems";
 
 /*
  * The Move screen. Storage Browser's Copy view is hard-wired to its copy
@@ -70,7 +71,7 @@ export function makeMoveView({ CopyView, useView, useAction }: MoveViewDeps) {
   return function MoveView() {
     const copy = useView("Copy");
     // Copy's tasks already carry each selected file with its key at the chosen destination.
-    const items = useMemo(() => copy.tasks.map((t) => t.data), [copy.tasks]);
+    const items = useStableItems(copy.tasks);
     const [state, move] = useAction("move", { items });
     const busy = state.isProcessing || state.isProcessingComplete;
 

@@ -2,7 +2,7 @@
  * Per-person access levels (issue #15). The SSM parameter /family-drive/access
  * holds JSON keyed by email:
  *
- *   { "a@x.com": { "global": "write", "personal": true }, "b@x.com": { "global": "read" } }
+ *   { "a@x.com": { "global": "write", "personal": true, "trash": true }, "b@x.com": { "global": "read" } }
  *
  * `global` is required. Other flags are booleans and default to false.
  * Terraform validates the same rules before deploying (infra/foundation_inputs.tf).
@@ -12,14 +12,16 @@ export type GlobalAccess = "read" | "write";
 export interface Access {
   global: GlobalAccess;
   personal: boolean;
+  /** Manages the Deleted folder: sees it, restores, deletes permanently, empties it (issue #24). */
+  trash: boolean;
 }
 
 export type AccessMap = Map<string, Access>;
 
-/** An allowlisted email with no entry: read-only Global/, no personal folder. */
-export const DEFAULT_ACCESS: Access = { global: "read", personal: false };
+/** An allowlisted email with no entry: read-only Global/, no personal folder, no Deleted folder. */
+export const DEFAULT_ACCESS: Access = { global: "read", personal: false, trash: false };
 
-const FLAGS = ["personal"] as const;
+const FLAGS = ["personal", "trash"] as const;
 const KNOWN_KEYS = new Set<string>(["global", ...FLAGS]);
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -61,7 +63,7 @@ export function parseAccess(raw: string | undefined): AccessMap {
         throw new Error(`access for ${email}: "${flag}" must be true or false`);
       }
     }
-    map.set(email, { global: entry.global, personal: entry.personal === true });
+    map.set(email, { global: entry.global, personal: entry.personal === true, trash: entry.trash === true });
   }
   return map;
 }
@@ -75,5 +77,9 @@ export function accessFor(email: string, map: AccessMap): Access {
  * the Identity Pool maps them to) are strings, so booleans become "yes"/"no".
  */
 export function accessClaims(access: Access): Record<string, string> {
-  return { global_access: access.global, personal: access.personal ? "yes" : "no" };
+  return {
+    global_access: access.global,
+    personal: access.personal ? "yes" : "no",
+    trash: access.trash ? "yes" : "no",
+  };
 }

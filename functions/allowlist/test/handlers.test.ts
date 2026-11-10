@@ -72,17 +72,17 @@ describe("preTokenGeneration access claims", () => {
   });
 
   it("adds the person's access level as ID-token claims", async () => {
-    process.env.ACCESS_LEVELS = JSON.stringify({ "mom@gmail.com": { global: "write", personal: true } });
-    expect(await claims("Mom@gmail.com")).toEqual({ global_access: "write", personal: "yes" });
+    process.env.ACCESS_LEVELS = JSON.stringify({ "mom@gmail.com": { global: "write", personal: true, trash: true } });
+    expect(await claims("Mom@gmail.com")).toEqual({ global_access: "write", personal: "yes", trash: "yes" });
   });
 
-  it("gives an allowlisted email with no entry read-only Global/ and no personal folder", async () => {
+  it("gives an allowlisted email with no entry read-only Global/, no personal folder, no Deleted folder", async () => {
     process.env.ACCESS_LEVELS = JSON.stringify({ "dad@gmail.com": { global: "write" } });
-    expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no" });
+    expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no", trash: "no" });
   });
 
   it("uses the default when ACCESS_LEVELS is not set", async () => {
-    expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no" });
+    expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no", trash: "no" });
   });
 
   it("still denies people who aren't allowlisted, even with an access entry", async () => {

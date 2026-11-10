@@ -48,7 +48,7 @@ locals {
   # instead of failing here on CHANGE_ME or malformed JSON.
   access_decoded = try(jsondecode(nonsensitive(data.aws_ssm_parameter.access.value)), null)
   access_entries = try({ for k, v in local.access_decoded : k => v }, {})
-  access_flags   = ["personal"]
+  access_flags   = ["personal", "trash"]
   access_emails  = [for k in keys(local.access_entries) : lower(trimspace(k))]
 
   # Normalized for the pre token generation Lambda (env ACCESS_LEVELS): emails
@@ -59,6 +59,7 @@ locals {
       for k, v in local.access_entries : lower(trimspace(k)) => {
         global   = try(tostring(v.global), "read")
         personal = try(v.personal == true, false)
+        trash    = try(v.trash == true, false)
       }...
     } : email => entries[0]
   }
@@ -90,7 +91,7 @@ resource "terraform_data" "foundation_inputs_check" {
         length(setsubtract(try(keys(v), []), concat(["global"], local.access_flags))) == 0 &&
         alltrue([for f in local.access_flags : try(v[f] == true || v[f] == false, true)])
       ])
-      error_message = "Every entry in SSM /${var.project}/access must look like {\"global\": \"read\" or \"write\", \"personal\": true or false}. \"personal\" is optional; no other keys are allowed."
+      error_message = "Every entry in SSM /${var.project}/access must look like {\"global\": \"read\" or \"write\", \"personal\": true or false, \"trash\": true or false}. \"personal\" and \"trash\" are optional; no other keys are allowed."
     }
 
     precondition {

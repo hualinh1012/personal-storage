@@ -66,6 +66,8 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 .move-summary { flex: 1; font-size: 0.9rem; }
 .move-summary p { margin: 0; font-weight: 600; }
 .move-summary ul { margin: 0.25rem 0 0; padding-left: 1.2rem; color: #b42318; }
+/* Restore reuses Delete's table, whose Progress column hard-codes "Deleted"; Status says enough. */
+.trash-view--restore .amplify-storage-browser__table tr > :nth-child(6) { display: none; }
 
 /* Import from Google Drive (googleImport/GoogleImportView.tsx) */
 .google-import { display: flex; flex-direction: column; min-height: 0; height: 100%; }
