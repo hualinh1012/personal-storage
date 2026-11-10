@@ -2,7 +2,7 @@
  * What the import view needs from the outside world, so the playground can
  * swap in fakes. `realGoogleImportDeps` is the production wiring: Google's
  * scripts and Drive API on one side, Amplify Storage (the signed-in person's
- * Identity Pool credentials, `Global/*` only) on the other.
+ * Identity Pool credentials: `Global/*` and their own `Personal/<email>/*`) on the other.
  */
 import { getProperties, list, uploadData } from "aws-amplify/storage";
 import type { GoogleImportConfig } from "../config";

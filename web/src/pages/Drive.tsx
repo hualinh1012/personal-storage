@@ -9,7 +9,7 @@ import {
   type StorageBrowserValue,
 } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
-import { driveLocation } from "../config";
+import { driveLocation, isPersonalPrefix, listDriveLocations } from "../config";
 import { filePreviewConfig, previewDisplayText } from "../preview/registry";
 import { moveActionConfig } from "../move/moveAction";
 import { makeMoveView, type MoveViewDeps } from "../move/MoveView";
@@ -88,7 +88,7 @@ export function DriveView({
   const importContext: GoogleImportContextValue = {
     deps: googleImport,
     prefix: location.prefix + path,
-    folderLabel: path ? path.replace(/\/$/, "") : "Family Drive",
+    folderLabel: path ? path.replace(/\/$/, "") : isPersonalPrefix(location.prefix) ? "My files" : "Family Drive",
     onExit: exitToFolder,
   };
 
@@ -131,13 +131,12 @@ export function DriveView({
 export default function Drive({ email, google }: { email: string; google: GoogleImportConfig | null }) {
   // Created after App has run Amplify.configure: the adapter reads the storage
   // config when it's built, so this can't live at module level.
-  const { setup, bucket } = useMemo(
-    () => ({
-      setup: { config: createAmplifyAuthAdapter() },
-      bucket: Amplify.getConfig().Storage?.S3?.bucket ?? "",
-    }),
-    [],
-  );
+  const { setup, bucket } = useMemo(() => {
+    const bucket = Amplify.getConfig().Storage?.S3?.bucket ?? "";
+    // Home lists the shared drive and this person's folder (see listDriveLocations).
+    const config = { ...createAmplifyAuthAdapter(), listLocations: listDriveLocations(bucket, email) };
+    return { setup: { config }, bucket };
+  }, [email]);
   const googleImport = useMemo(() => realGoogleImportDeps(google), [google]);
   return <DriveView email={email} bucket={bucket} setup={setup} googleImport={googleImport} />;
 }

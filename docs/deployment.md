@@ -322,6 +322,8 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | `AccessDenied … ssm:GetParameter` / `s3:CreateBucket` / … | Policy not attached to the role the action runs as | Attach the matching file from `ci/iam/`. |
 | Plan stops: `…still the CHANGE_ME placeholder` / `must be an email address` | SSM values not set | Do step 2. |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
+| `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
+| AccessDenied opening your own personal folder | The Identity Pool's principal tag mapping is missing (stack not re-applied), or the account's email has capitals in its claim | Re-run the app pipeline; check the `email` claim in the ID token is lower case (ADR 0009). |
 | `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | `Node >= 22.12 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
 | Google shows `redirect_uri_mismatch` | Step 4 not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse` (step 4). Google's error details page shows the exact URI it received. |
@@ -332,7 +334,8 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 ## Using the drive
 
-- The drive shows only what's under the **`Global/`** prefix of `family-drive-files-084519186805`. That is the only place signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `Global/`.
+- The drive shows only what's under the **`Global/`** prefix of `family-drive-files-084519186805` (the shared drive, opened by default) and the signed-in person's own **`Personal/<email>/`** folder. Click **Home** in the path to switch between them. Those are the only places signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `Global/`.
+- **Personal folders** are private in the app: only their owner can open them, enforced by IAM (ADR 0009). The account owner still sees them in the S3 console. The folder name is the email in lower case; to give someone files privately, upload them to `Personal/<their email>/` in the console. When someone leaves the allowlist their folder stays in S3, unreachable from the app; delete it in the console if it's no longer needed (versioning keeps deleted files for 30 days).
 - The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files and can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
 - Click a file name to preview it in a panel beside the list: photos, videos (streamed), text files, Markdown (`.md`, shown formatted, including tables and checklists; raw HTML in the file is ignored and images appear as links) and PDFs (page by page, with Previous/Next; the PDF viewer loads the first time a PDF is opened). Other types show a download button. Files over **50 MB** aren't previewed (any type): the panel says "File is too big to preview" and offers the download.
 - **Move** (in the ⋮ menu, with files selected) moves files to another folder: pick the destination like Copy (click `Global` in the destination path to go up), then Move. A file is never overwritten: if the destination already has a file with that name, that file isn't moved. The original is deleted only after the copy succeeds. Failed files are listed with the reason. Folders can't be moved yet.
@@ -372,6 +375,9 @@ Run after a deploy, ideally in a private window.
 - [ ] Copy a file, then delete the copy.
 - [ ] Move two files into another folder; they disappear from the old folder and appear in the new one. Move one back onto a same-named file: it's refused with "already exists" and both stay.
 - [ ] Delete a file, then confirm a previous version still exists: `aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix Global/`.
+- [ ] **Home** lists `Global/` and `Personal/<your email>/`, nothing else. In your personal folder, upload, preview, download, move a file into a subfolder and delete it.
+- [ ] Signed in as A, a direct request for B's folder is denied: in the browser console on the drive, a list of `Personal/<B's email>/` (e.g. with the `list` API from `aws-amplify/storage`) fails with AccessDenied. Or check the role with the IAM policy simulator, setting the `aws:PrincipalTag/email` context key.
+- [ ] Import from Google Drive while your personal folder is open: the files land there.
 - [ ] Sign out returns to the landing page.
 - [ ] On an Android phone and an iPhone, add the drive to the home screen: the icon is the blue folder, it opens without the browser bar, and Google sign-in comes back into the app (not a browser tab) and lands in the drive.
 - [ ] Remove an email from SSM, re-run the app pipeline, and confirm that account is refused within about 2 hours (or at once after deleting its Cognito user).
