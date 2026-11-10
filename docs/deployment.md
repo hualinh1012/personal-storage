@@ -112,7 +112,7 @@ Access levels (ADR 0010) are JSON. Write them to a file, e.g. `access.json`:
 
 ```json
 {
-  "you@gmail.com": { "global": "write", "personal": true },
+  "you@gmail.com": { "global": "write", "personal": true, "trash": true },
   "mom@gmail.com": { "global": "read", "personal": true },
   "kid@gmail.com": { "global": "read" }
 }
@@ -124,7 +124,8 @@ aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/a
 
 - `global` (required): `"write"` can upload, overwrite, delete, move, create folders and import in the shared drive; `"read"` can only browse, preview and download it.
 - `personal` (optional, default `false`): `true` gives the person their own private folder.
-- Emails are matched case-insensitively and must also be in `allowed_emails`. Anyone on the allowlist with no entry gets read-only shared drive and no personal folder.
+- `trash` (optional, default `false`): `true` lets the person see the **Deleted** folder (ADR 0011) and restore, delete permanently or empty it. Give it to at least one person, or nobody can. They can see files deleted from anyone's personal folder.
+- Emails are matched case-insensitively and must also be in `allowed_emails`. Anyone on the allowlist with no entry gets read-only shared drive, no personal folder and no Deleted folder.
 
 | Parameter | Type | Value |
 |---|---|---|
@@ -331,12 +332,15 @@ When adding someone, also give them an entry in `/family-drive/access` if they n
 
 **Change someone's access level:** edit `/family-drive/access` (step 2) and re-run the app pipeline. It takes effect at their next token refresh, within about 2 hours, or at once when they sign out and back in.
 
-**Recover a deleted or overwritten file (within 30 days):**
+**Recover a deleted file:** Delete in the app moves files to the **Deleted** folder. Someone with `trash` opens Home → `Deleted/`, selects the file and uses **Restore** in the ⋮ menu. Files there stay until someone deletes them permanently or empties Deleted.
+
+**Recover an overwritten file, or one deleted outside the app (within 30 days):**
 ```bash
 aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix "Global/<path>"
 ```
 - **Deleted file:** delete its *delete marker* (the newest version, marked `IsLatest` in the `DeleteMarkers` list).
 - **Overwritten file:** copy the older version back over it.
+- **Deleted permanently or emptied from Deleted:** every version under `Deleted/` is gone and can't be recovered.
 
 **Change the foundation:** edit `infra/foundation/` and push. The foundation pipeline picks it up.
 
@@ -353,6 +357,9 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | Plan stops: `SSM /family-drive/access must be a JSON object…` / `Every entry in SSM /family-drive/access…` / `…same email more than once` / `…must also be in /family-drive/allowed_emails` | `access` not set, or not in the format of step 2 | Fix the value (step 2). Check the JSON with `jq . access.json`. |
 | Everyone suddenly read-only, no personal folders | `access` is `{}` or misses them, or the app was deployed before it was set | Set `access` (step 2), re-run the app pipeline, then sign out and back in. |
 | A person can't upload or delete in the shared drive, or has no personal folder on Home | That's their access level in `access` | Change it (Day-to-day). |
+| Nobody sees `Deleted/` on Home | No one has `"trash": true` in `access`, or they haven't signed in again since | Set it (step 2), re-run the app pipeline, sign out and back in. |
+| Delete fails with "Couldn't move it to Deleted (AccessDenied…)" | The app stack wasn't re-applied after this change (no `Deleted/` statements or `trash` tag mapping) | Re-run the app pipeline. |
+| Restore says the file "was in <email>'s personal folder, which only they can write to" | Trash managers can't write into other people's personal folders | Give that person `trash` for a moment, or move it back in the console (strip ` (deleted …)` from the name). |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
 | `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | AccessDenied opening your own personal folder | The Identity Pool's principal tag mapping is missing (stack not re-applied), or the account's email has capitals in its claim | Re-run the app pipeline; check the `email` claim in the ID token is lower case (ADR 0009). |
@@ -366,10 +373,11 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 ## Using the drive
 
-- The drive shows only what's under the **`Global/`** prefix of `family-drive-files-084519186805` (the shared drive, opened by default) and, for people who have one, their own **`Personal/<email>/`** folder. Click **Home** in the path to switch between them. Those are the only places signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `Global/`.
+- The drive shows only what's under the **`Global/`** prefix of `family-drive-files-084519186805` (the shared drive, opened by default), for people who have one their own **`Personal/<email>/`** folder, and for trash managers the **`Deleted/`** folder. Click **Home** in the path to switch between them. Those are the only places signed-in users can read or write. Files uploaded elsewhere in the bucket (for example the root) won't appear: move them under `Global/`.
 - **Access levels** (SSM `/family-drive/access`, ADR 0010): with read-only access to the shared drive, Upload, Import, Create folder, Delete and Move are hidden there, and S3 refuses them anyway. A personal folder is always fully writable by its owner.
 - **Personal folders** are private in the app: only their owner can open them, enforced by IAM (ADR 0009). The account owner still sees them in the S3 console. The folder name is the email in lower case; to give someone files privately, upload them to `Personal/<their email>/` in the console. When someone leaves the allowlist their folder stays in S3, unreachable from the app; delete it in the console if it's no longer needed (versioning keeps deleted files for 30 days).
-- The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files; those with write access can delete them; deleted or overwritten files can be recovered for 30 days (see Day-to-day).
+- The file browser (Storage Browser) lists, uploads (including large files and folders), creates folders, downloads, copies and deletes. Everyone on the allowlist shares the same files; those with write access can delete them; overwritten files can be recovered for 30 days (see Day-to-day).
+- **Delete** never removes a file straight away: it moves it (or every file in a folder) to the **Deleted** folder, keeping its path and adding ` (deleted <date time> <code>)` to the name (ADR 0011). Only people with `trash` see `Deleted/` on Home; there the ⋮ menu offers **Restore** (back where it was, never over a file that's there now), **Delete permanently** (gone with every version, can't be undone) and **Empty Deleted**. Each asks to confirm. Files over 5 GB can't be deleted from the app (S3's single-copy limit, as for Move).
 - Click a file name to preview it in a panel beside the list: photos, videos (streamed), text files, Markdown (`.md`, shown formatted, including tables and checklists; raw HTML in the file is ignored and images appear as links) and PDFs (page by page, with Previous/Next; the PDF viewer loads the first time a PDF is opened). Other types show a download button. Files over **50 MB** aren't previewed (any type): the panel says "File is too big to preview" and offers the download.
 - **Move** (in the ⋮ menu, with files selected) moves files to another folder: pick the destination like Copy (click `Global` in the destination path to go up), then Move. A file is never overwritten: if the destination already has a file with that name, that file isn't moved. The original is deleted only after the copy succeeds. Failed files are listed with the reason. Folders can't be moved yet.
 - **On a phone**, the drive can be added to the home screen and then opens full-screen like an app. Android (Chrome): ⋮ → **Add to Home screen** / **Install app**. iPhone (Safari): Share → **Add to Home Screen**. It still needs the internet; nothing is stored offline.
@@ -392,7 +400,7 @@ Run the web app on your machine against the deployed AWS backend. `http://localh
 
 Tests: `npm test --prefix functions/allowlist` and `npm test --prefix web`.
 
-**Preview playground (no AWS needed):** with `npm run dev --prefix web` running, open `http://localhost:5173/playground.html`. It renders this app's own preview viewers (Markdown, PDF) and the too-big message with sample files. It's dev-only and not in the production build. `playground.html?view=drive` shows the real drive screen with sample folders and files, for checking layout; previews there show an error because there is no real S3. Add `&access=read`, `&access=read%2Bpersonal` or `&access=write` to preview another access level (default: write with a personal folder).
+**Preview playground (no AWS needed):** with `npm run dev --prefix web` running, open `http://localhost:5173/playground.html`. It renders this app's own preview viewers (Markdown, PDF) and the too-big message with sample files. It's dev-only and not in the production build. `playground.html?view=drive` shows the real drive screen with sample folders and files, for checking layout; previews there show an error because there is no real S3. Add `&access=read`, `&access=read%2Bpersonal`, `&access=write` or `&access=write%2Bpersonal%2Btrash` to preview another access level (default: everything, including the Deleted folder). Delete, Restore, Delete permanently and Empty Deleted work there on the sample files; a reload resets them.
 
 ## End-to-end test checklist
 
@@ -407,8 +415,15 @@ Run after a deploy, ideally in a private window.
 - [ ] Click a file over 50 MB (e.g. a video): the panel says "File is too big to preview" and the download button works.
 - [ ] Copy a file, then delete the copy.
 - [ ] Move two files into another folder; they disappear from the old folder and appear in the new one. Move one back onto a same-named file: it's refused with "already exists" and both stay.
-- [ ] Delete a file, then confirm a previous version still exists: `aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix Global/`.
-- [ ] **Home** lists `Global/` and `Personal/<your email>/`, nothing else. In your personal folder, upload, preview, download, move a file into a subfolder and delete it.
+- [ ] **Deleted folder**, signed in as someone with `trash`:
+  - Delete a file and a folder in `Global/`: they disappear, and appear under Home → `Deleted/Global/…` with ` (deleted …)` in each file's name. The ⋮ menu in `Global/` has no other delete.
+  - In `Deleted/` the ⋮ menu offers only Download, Restore, Delete permanently and Empty Deleted.
+  - Restore the file: it's back where it was and gone from `Deleted/`. Delete it again, put a file with the same name in its place, and Restore: it's refused with "already at".
+  - Delete permanently a file in `Deleted/`: `aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix "Deleted/"` no longer lists any version of it.
+  - Empty Deleted: `Deleted/` is empty, and so is that listing.
+  - Delete a file in your personal folder: it lands in `Deleted/Personal/<your email>/`.
+- [ ] Signed in as someone with write access but no `trash`: Delete still works, Home doesn't list `Deleted/`, and a direct list of `Deleted/` (e.g. `list` from `aws-amplify/storage` in the console) fails with AccessDenied.
+- [ ] **Home** lists `Global/` and `Personal/<your email>/` (and `Deleted/` with `trash`), nothing else. In your personal folder, upload, preview, download, move a file into a subfolder and delete it.
 - [ ] Signed in as A, a direct request for B's folder is denied: in the browser console on the drive, a list of `Personal/<B's email>/` (e.g. with the `list` API from `aws-amplify/storage`) fails with AccessDenied. Or check the role with the IAM policy simulator, setting the `aws:PrincipalTag/email` context key.
 - [ ] Import from Google Drive while your personal folder is open: the files land there.
 - [ ] **Access levels**, with `access` set to A = `write` + personal, B = `read`, C = `read` + personal:

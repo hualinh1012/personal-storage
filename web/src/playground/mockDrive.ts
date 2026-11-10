@@ -9,6 +9,8 @@ import { sampleMarkdown } from "./samples";
 import type { ListLocationItemsHandlerOutput } from "@aws-amplify/ui-react-storage/browser";
 import { listDriveLocations, personalPrefix } from "../config";
 import type { Access } from "../access";
+import type { TrashOps } from "../trash/trash";
+import { canWriteFor, type TrashDeps } from "../trash/actions";
 
 type Items = ListLocationItemsHandlerOutput["items"];
 
@@ -43,13 +45,25 @@ const files: MockFile[] = [
   // The signed-in person's own folder (Home lists it next to Global/).
   { key: `${personalPrefix(MOCK_EMAIL)}tax return 2025.pdf`, size: 525_100, contentType: "application/pdf", body: () => fetch(samplePdfUrl).then((r) => r.blob()) },
   { key: `${personalPrefix(MOCK_EMAIL)}passport scan.jpg`, size: 1_800_000, contentType: "image/jpeg" },
+  // Already in the Deleted folder (issue #24), as Delete leaves them.
+  { key: "Deleted/Global/linh/old photo (deleted 2026-11-08 10-15-00 a1b2).jpg", size: 2_100_000, contentType: "image/jpeg" },
+  { key: "Deleted/Global/Tết 2026/draft plan (deleted 2026-11-09 21-40-07 9xk3).md", size: sampleMarkdown.length, contentType: "text/markdown", body: async () => sampleMarkdown },
 ];
 const folders = ["Global/linh/", "Global/photos/", "Global/Tết 2026/", "Global/documents/", `${personalPrefix(MOCK_EMAIL)}receipts/`];
 const modified = new Date("2026-11-05T08:32:00Z");
 
+/** Every folder: the explicit (possibly empty) ones, plus every folder a file is in, like S3's listing. */
+function allFolders(): string[] {
+  const set = new Set(folders);
+  for (const f of files) {
+    for (let i = f.key.indexOf("/"); i !== -1; i = f.key.indexOf("/", i + 1)) set.add(f.key.slice(0, i + 1));
+  }
+  return [...set];
+}
+
 function listUnder(prefix: string): Items {
   const items: Items = [];
-  for (const f of folders) {
+  for (const f of allFolders()) {
     const rest = f.slice(prefix.length);
     if (f.startsWith(prefix) && rest && rest.indexOf("/") === rest.length - 1) {
       items.push({ id: f, key: f, type: "FOLDER" });
@@ -66,13 +80,59 @@ function listUnder(prefix: string): Items {
 
 /**
  * The playground's access level from `?access=`: `read` (read-only Global/, no
- * personal folder), `read+personal`, `write` (no personal folder), or
- * `write+personal` (the default when absent).
+ * personal folder), `read+personal`, `write` (no personal folder),
+ * `write+personal`, with `+trash` for the Deleted folder. Absent: everything.
  */
 export function mockAccess(param: string | null): Access {
-  if (param === null) return { globalWrite: true, personal: true };
+  if (param === null) return { globalWrite: true, personal: true, trash: true };
   const [global, ...flags] = param.split(/[+ ]/);
-  return { globalWrite: global === "write", personal: flags.includes("personal") };
+  return { globalWrite: global === "write", personal: flags.includes("personal"), trash: flags.includes("trash") };
+}
+
+/**
+ * The Deleted folder's S3 operations over the sample files (one version each),
+ * so Delete, Restore, Delete permanently and Empty Deleted work in the playground.
+ */
+export function mockTrashOps(): TrashOps {
+  const delay = () => new Promise((r) => setTimeout(r, 150));
+  const index = (key: string) => files.findIndex((f) => f.key === key);
+  return {
+    async exists(key) {
+      await delay();
+      return index(key) !== -1;
+    },
+    async copy(sourceKey, destinationKey) {
+      await delay();
+      const source = files[index(sourceKey)];
+      if (!source) throw new Error("NoSuchKey");
+      files.push({ ...source, key: destinationKey });
+    },
+    async remove(key) {
+      await delay();
+      const i = index(key);
+      if (i !== -1) files.splice(i, 1);
+      const folder = folders.indexOf(key);
+      if (folder !== -1) folders.splice(folder, 1);
+    },
+    async listKeys(prefix) {
+      await delay();
+      return [...folders.filter((f) => f.startsWith(prefix)), ...files.filter((f) => f.key.startsWith(prefix)).map((f) => f.key)];
+    },
+    async listVersions(prefix) {
+      await delay();
+      return files.filter((f) => f.key.startsWith(prefix)).map((f) => ({ key: f.key, versionId: "v1" }));
+    },
+    async removeVersion({ key }) {
+      await delay();
+      const i = index(key);
+      if (i !== -1) files.splice(i, 1);
+    },
+  };
+}
+
+export function mockTrash(access: Access): TrashDeps {
+  const ops = mockTrashOps();
+  return { ops: async () => ops, canWriteTo: canWriteFor(access, MOCK_EMAIL) };
 }
 
 /**

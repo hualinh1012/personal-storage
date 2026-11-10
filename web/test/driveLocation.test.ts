@@ -3,7 +3,9 @@ import { READ_ONLY } from "../src/access";
 import {
   DRIVE_PREFIX,
   canWrite,
+  deletedLocation,
   driveLocation,
+  isDeletedPrefix,
   isPersonalPrefix,
   listDriveLocations,
   personalLocation,
@@ -27,9 +29,25 @@ describe("personal folder", () => {
   });
 });
 
-const FULL = { globalWrite: true, personal: true };
+const FULL = { globalWrite: true, personal: true, trash: false };
+
+describe("deleted folder", () => {
+  it("is a location that can delete but not write, so only trash actions show there", () => {
+    expect(deletedLocation("b")).toEqual({ bucket: "b", prefix: "Deleted/", type: "PREFIX", permissions: ["delete", "get", "list"] });
+    expect(canWrite(deletedLocation("b"))).toBe(false);
+    expect(isDeletedPrefix("Deleted/Global/photos/")).toBe(true);
+    expect(isDeletedPrefix(DRIVE_PREFIX)).toBe(false);
+  });
+});
 
 describe("listDriveLocations", () => {
+  it("lists the Deleted folder last, only for people who manage it", async () => {
+    const { items } = await listDriveLocations("b", "a@x.com", { ...FULL, trash: true })();
+    expect(items.map((i) => i.prefix)).toEqual(["Global/", "Personal/a@x.com/", "Deleted/"]);
+    const without = await listDriveLocations("b", "a@x.com", FULL)();
+    expect(without.items.map((i) => i.prefix)).not.toContain("Deleted/");
+  });
+
   it("lists the shared drive and only the signed-in person's folder", async () => {
     const { items, nextToken } = await listDriveLocations("b", "a@x.com", FULL)();
     expect(items.map((i) => [i.id, i.prefix])).toEqual([
@@ -45,12 +63,12 @@ describe("listDriveLocations", () => {
   });
 
   it("lists no personal folder for someone without one", async () => {
-    const { items } = await listDriveLocations("b", "a@x.com", { globalWrite: true, personal: false })();
+    const { items } = await listDriveLocations("b", "a@x.com", { globalWrite: true, personal: false, trash: false })();
     expect(items.map((i) => i.prefix)).toEqual(["Global/"]);
   });
 
   it("lists a writable personal folder next to a read-only Global/", async () => {
-    const { items } = await listDriveLocations("b", "c@x.com", { globalWrite: false, personal: true })();
+    const { items } = await listDriveLocations("b", "c@x.com", { globalWrite: false, personal: true, trash: false })();
     expect(items.map((i) => [i.prefix, i.permissions])).toEqual([
       ["Global/", ["get", "list"]],
       ["Personal/c@x.com/", ["delete", "get", "list", "write"]],

@@ -1,6 +1,6 @@
 # Per-person access levels live in SSM and are enforced by IAM session tags
 
-Supersedes [0006](0006-everyone-can-delete-versioning-is-the-safety-net.md).
+Supersedes [0006](0006-everyone-can-delete-versioning-is-the-safety-net.md). Amended by [0011](0011-delete-moves-to-a-deleted-folder.md), which adds the `trash` flag.
 
 Each person has two settings: write or read-only on the shared drive (`Global/`), and whether they have a personal folder. They live in SSM `/family-drive/access` next to the allowlist, as JSON keyed by email:
 

@@ -118,12 +118,76 @@ data "aws_iam_policy_document" "authenticated" {
       values   = ["yes"]
     }
   }
+
+  # Deleted folder (issue #24, ADR 0011). Delete in the app moves a file to
+  # Deleted/<its original path>, so anyone who can delete somewhere may *write*
+  # the matching part of Deleted/, but not list or read it.
+  statement {
+    sid       = "MoveSharedFilesToDeleted"
+    actions   = ["s3:PutObject"]
+    resources = ["${data.aws_s3_bucket.files.arn}/Deleted/Global/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/global_access"
+      values   = ["write"]
+    }
+  }
+
+  statement {
+    sid       = "MoveOwnPersonalFilesToDeleted"
+    actions   = ["s3:PutObject"]
+    resources = ["${data.aws_s3_bucket.files.arn}/Deleted/Personal/$${aws:PrincipalTag/email}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/personal"
+      values   = ["yes"]
+    }
+  }
+
+  # Only people whose `trash` tag is "yes" see Deleted/: they restore, delete
+  # permanently (every version) and empty it. That includes files deleted from
+  # other people's personal folders (accepted by the owner).
+  statement {
+    sid       = "ListDeletedFolder"
+    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
+    resources = [data.aws_s3_bucket.files.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["Deleted/", "Deleted/*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/trash"
+      values   = ["yes"]
+    }
+  }
+
+  statement {
+    sid = "ManageDeletedObjects"
+    actions = [
+      "s3:GetObject",
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]
+    resources = ["${data.aws_s3_bucket.files.arn}/Deleted/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/trash"
+      values   = ["yes"]
+    }
+  }
 }
 
 # Passes ID-token claims to STS as session tags, which the statements above
 # match on. `email` keys the personal folder (by email rather than identity ID,
-# so folders survive recreating this stack); `global_access` and `personal` are
-# the access level added by the pre token generation trigger.
+# so folders survive recreating this stack); `global_access`, `personal` and
+# `trash` are the access level added by the pre token generation trigger.
 resource "aws_cognito_identity_pool_provider_principal_tag" "email" {
   identity_pool_id       = aws_cognito_identity_pool.main.id
   identity_provider_name = aws_cognito_user_pool.main.endpoint
@@ -132,6 +196,7 @@ resource "aws_cognito_identity_pool_provider_principal_tag" "email" {
     email         = "email"
     global_access = "global_access"
     personal      = "personal"
+    trash         = "trash"
   }
 }
 

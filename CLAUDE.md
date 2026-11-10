@@ -27,7 +27,8 @@ npm run dev                    # Vite on http://localhost:5173 (needs web/public
                                # /playground.html: preview viewers with sample files, no AWS (dev only)
                                # /playground.html?view=drive: the real drive screen (DriveView) with mock data,
                                #   including Import from Google Drive with fake Google/S3 (&google=off: not set up)
-                               #   &access=read | read%2Bpersonal | write: preview another access level
+                               #   &access=read | read%2Bpersonal | write | write%2Bpersonal%2Btrash: preview another
+                               #   access level (default: everything, including the Deleted folder)
                                #   &count=fail: the pager's folder count fails (fallback pager); Global/photos has 250 files
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
@@ -75,6 +76,11 @@ only to hide what IAM would refuse: a read-only `Global/` location gets Storage 
 permissions `["get", "list"]`, Move and Google import hide without `write`, and Home lists the
 personal folder only when `personal` is `yes`.
 
+The Deleted folder ([ADR 0011](docs/adr/0011-delete-moves-to-a-deleted-folder.md)) adds a
+third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
+(`Deleted/Global/*`, `Deleted/Personal/<own email>/*`) but not list or read it; only
+`trash` = `yes` lists, reads and deletes there, including every version.
+
 ### Allowlist enforcement spans three places
 - `functions/allowlist/src/allowlist.ts` holds the pure logic: case-insensitive matching, ignores surrounding whitespace, requires `email_verified`, and an empty list denies everyone.
 - Two Cognito triggers use it:
@@ -82,10 +88,10 @@ personal folder only when `personal` is `yes`.
   - **Pre token generation** runs on every sign-in and token refresh, so removing an email takes effect.
 - Both triggers deny by throwing `Error("ACCESS_DENIED")`. Cognito puts that text in the redirect's `error_description`, and `web/src/authErrors.ts` matches the same string to show the access-denied page. **Keep the string identical in both places.**
 - The allowlist reaches the Lambdas as env `ALLOWED_EMAILS`. It's built in Terraform from the SSM parameter `/family-drive/allowed_emails` (StringList).
-- Access levels: SSM `/family-drive/access` is a **JSON `String`** (not StringList: JSON has commas), e.g. `{"a@x.com": {"global": "write", "personal": true}}`. Unlisted allowlisted emails get read-only `Global/` and no personal folder.
-  - `functions/allowlist/src/access.ts` parses it (lower-cased keys; rejects bad JSON, unknown keys, bad values and the same email twice in different case) and turns it into string claims `global_access` (`read`/`write`) and `personal` (`yes`/`no`).
+- Access levels: SSM `/family-drive/access` is a **JSON `String`** (not StringList: JSON has commas), e.g. `{"a@x.com": {"global": "write", "personal": true, "trash": true}}`. Unlisted allowlisted emails get read-only `Global/`, no personal folder and no Deleted folder.
+  - `functions/allowlist/src/access.ts` parses it (lower-cased keys; rejects bad JSON, unknown keys, bad values and the same email twice in different case) and turns it into string claims `global_access` (`read`/`write`), `personal` and `trash` (`yes`/`no`).
   - Terraform (`infra/foundation_inputs.tf`) checks the same rules in preconditions, plus that every email is allowlisted, and passes a normalized `jsonencode` to pre token generation as env `ACCESS_LEVELS`.
-  - Adding a flag (e.g. `trash`, #24) means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping and an IAM condition.
+  - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping, an IAM condition, and `web/src/access.ts`.
 
 ### Two Terraform stacks
 - **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules) and the SSM parameters. Every resource has `prevent_destroy`.
@@ -117,6 +123,10 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - Drive layout (`web/src/styles.css`): the page never scrolls; the file list and preview panel each scroll vertically, nothing scrolls sideways; phones hide Type/Last modified and show the preview full-width. These rules target Storage Browser's `amplify-storage-browser__*` classes, so re-check `?view=drive` in the playground after upgrading `@aws-amplify/ui-react-storage`.
 - Upload is both in Storage Browser's ⋮ menu and a top-bar button (owner's choice). Keep `StorageBrowser` **uncontrolled**: with `value`/`onValueChange` it only reports changes to its internal state, so a view opened from outside never reports its Exit. The button remounts the browser (`key`) with `defaultValue` `{ location, actionType: "upload" }` instead.
 - **Move** is a custom Storage Browser action (`web/src/move/`): `moveFile.ts` holds the rules (no overwrite, delete the original only after a successful copy, reasons for failures) with injected S3 ops; `moveAction.ts` wires them to Storage Browser's own copy/delete handlers and `@aws-amplify/storage/internals` `getProperties`; `MoveView.tsx` reuses `CopyView`'s parts (Storage Browser's Copy view is hard-wired to the copy action). Copy's destination label is overridden to the neutral "Destination" for that reason.
+- A view that runs a custom action over another view's selection (Move over Copy's, Restore and Delete permanently over Delete's) must pass `useStableItems(tasks)` (`web/src/stableItems.ts`) to `useAction`, never `tasks.map(...)`: the tasks array is new every render and `useAction` resets on new items, so it loops ("Maximum update depth exceeded").
+- **Delete never deletes outside `Deleted/`** (`web/src/trash/`, ADR 0011). `makeTrashActions` replaces the built-in Delete's handler with "move to Deleted" (shown where the location has `write` + `delete`) and adds Restore, Delete permanently and Empty Deleted (shown where it has `delete` without `write`, i.e. only `Deleted/`).
+  - `paths.ts` maps keys to `Deleted/<path>/<name> (deleted <local time> <4 random>)<ext>` and back; `trash.ts` holds the rules (copy before delete, never restore over a file, purge every version) with injected `TrashOps`; `s3Ops.ts` implements them with `@aws-sdk/client-s3`, loaded lazily, because Amplify Storage has no version APIs.
+  - `TrashViews.tsx`: Restore and Delete permanently reuse `DeleteView`'s parts (like Move), always confirm, and list reasons for failures; Empty Deleted is its own screen, getting its ops and exit through `TrashContext`. Storage Browser's Delete table hard-codes "Deleted" in its Progress column, so the Restore view hides that column in CSS.
 - **Import from Google Drive** (`web/src/googleImport/`) runs entirely in the browser (no backend, ADR 0001). It's a custom Storage Browser action plus a top-bar button (same remount trick as Upload); `GoogleImportView` gets the open folder and its exit through `GoogleImportContext` from `DriveView`, and exiting remounts the browser, which re-lists the folder.
   - Google sign-in (GIS token client) and Picker load lazily when the view opens. The token asks for `drive.readonly` ([ADR 0008](docs/adr/0008-google-drive-import-scope.md): `drive.file` can't see inside picked folders), lives only in `google.ts` memory and is sent only to Google; `driveClient.ts` is the only code calling the Drive API.
   - Pure, tested modules hold the rules: `plan.ts` (keys, `(n)` names, re-run skips, conversion targets, 500 MB cut-off; never overwrites), `listing.ts`/`prepare.ts` (recursive folder walk), `queue.ts` (3 at a time, cancel), `retry.ts`, `importFile.ts`. Google and S3 are injected through `deps.ts`, which is how the playground fakes them.
