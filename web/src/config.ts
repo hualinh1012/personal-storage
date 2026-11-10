@@ -32,17 +32,52 @@ export function googleImportConfig(c: AppConfig): GoogleImportConfig | null {
   return { clientId, apiKey, projectNumber };
 }
 
-/** Every family file lives under this prefix; the Identity Pool role only allows it. */
+/** The shared drive: everyone signed in can use it. */
 export const DRIVE_PREFIX = "Global/";
+
+/**
+ * Personal folders live at `Personal/<email>/`. The Identity Pool role allows
+ * only the folder whose name is the caller's `email` principal tag (ADR 0009).
+ */
+export const PERSONAL_PREFIX = "Personal/";
+
+type Permission = "delete" | "get" | "list" | "write";
+const FULL_ACCESS: Permission[] = ["delete", "get", "list", "write"];
 
 /** Storage Browser location for the shared drive, so it opens there instead of a location picker. */
 export function driveLocation(bucket: string) {
-  return {
-    bucket,
-    prefix: DRIVE_PREFIX,
-    type: "PREFIX" as const,
-    permissions: ["delete", "get", "list", "write"] as ("delete" | "get" | "list" | "write")[],
-  };
+  return { bucket, prefix: DRIVE_PREFIX, type: "PREFIX" as const, permissions: [...FULL_ACCESS] };
+}
+
+/**
+ * The signed-in person's folder prefix. Lower-cased because IAM compares it,
+ * case-sensitively, with the raw `email` claim, and Google sends emails in
+ * lower case. An email with capitals in its claim would get AccessDenied.
+ */
+export function personalPrefix(email: string): string {
+  return `${PERSONAL_PREFIX}${email.trim().toLowerCase()}/`;
+}
+
+/** Storage Browser location for the signed-in person's own folder. */
+export function personalLocation(bucket: string, email: string) {
+  return { bucket, prefix: personalPrefix(email), type: "PREFIX" as const, permissions: [...FULL_ACCESS] };
+}
+
+/** True for a location prefix inside someone's personal folder. */
+export function isPersonalPrefix(prefix: string): boolean {
+  return prefix.startsWith(PERSONAL_PREFIX);
+}
+
+/**
+ * What Home lists: the shared drive and the signed-in person's own folder.
+ * Nobody else's folder: listing them would need the allowlist in the browser,
+ * and IAM denies opening them anyway. Replaces the Amplify adapter's
+ * listLocations, which can only derive paths from the identity ID.
+ */
+export function listDriveLocations(bucket: string, email: string) {
+  const items = [{ id: "Global", ...driveLocation(bucket) }];
+  if (email.trim()) items.push({ id: "Personal", ...personalLocation(bucket, email) });
+  return async () => ({ items, nextToken: undefined });
 }
 
 const CONFIG_KEYS: (keyof AppConfig)[] = [

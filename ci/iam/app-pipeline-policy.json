@@ -159,7 +159,9 @@
         "cognito-identity:GetIdentityPoolRoles",
         "cognito-identity:TagResource",
         "cognito-identity:UntagResource",
-        "cognito-identity:ListTagsForResource"
+        "cognito-identity:ListTagsForResource",
+        "cognito-identity:SetPrincipalTagAttributeMap",
+        "cognito-identity:GetPrincipalTagAttributeMap"
       ],
       "Resource": "*"
     },

@@ -62,6 +62,45 @@ data "aws_iam_policy_document" "authenticated" {
     ]
     resources = ["${data.aws_s3_bucket.files.arn}/Global/*"]
   }
+
+  # Personal folders (ADR 0009): Personal/<email>/, where <email> is the
+  # caller's `email` session tag (see the principal tag mapping below). "$$"
+  # keeps the IAM variable literal instead of Terraform interpolation.
+  statement {
+    sid       = "ListOwnPersonalFolder"
+    actions   = ["s3:ListBucket"]
+    resources = [data.aws_s3_bucket.files.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["Personal/$${aws:PrincipalTag/email}/", "Personal/$${aws:PrincipalTag/email}/*"]
+    }
+  }
+
+  statement {
+    sid = "ManageOwnPersonalObjects"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:AbortMultipartUpload",
+      "s3:ListMultipartUploadParts",
+    ]
+    resources = ["${data.aws_s3_bucket.files.arn}/Personal/$${aws:PrincipalTag/email}/*"]
+  }
+}
+
+# Passes the ID token's `email` claim to STS as the `email` session tag, which
+# the personal-folder statements above match on. Keyed by email rather than
+# identity ID so folders survive recreating this stack.
+resource "aws_cognito_identity_pool_provider_principal_tag" "email" {
+  identity_pool_id       = aws_cognito_identity_pool.main.id
+  identity_provider_name = aws_cognito_user_pool.main.endpoint
+  use_defaults           = false
+  principal_tags = {
+    email = "email"
+  }
 }
 
 resource "aws_iam_role_policy" "authenticated" {

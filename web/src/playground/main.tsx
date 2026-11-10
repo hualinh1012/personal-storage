@@ -4,7 +4,7 @@ import { Amplify } from "aws-amplify";
 import "../styles.css";
 import Playground from "./Playground";
 import { DriveView } from "../pages/Drive";
-import { MOCK_BUCKET, installS3FetchStub, mockSetup } from "./mockDrive";
+import { MOCK_BUCKET, MOCK_EMAIL, installS3FetchStub, mockSetup } from "./mockDrive";
 import { mockGoogleImport } from "./mockGoogleImport";
 
 // Dev-only playground entry. ?view=drive renders the real drive screen with sample data.
@@ -20,7 +20,7 @@ if (driveView) {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {driveView ? (
-      <DriveView email="you@example.com" bucket={MOCK_BUCKET} setup={mockSetup} googleImport={googleImport} />
+      <DriveView email={MOCK_EMAIL} bucket={MOCK_BUCKET} setup={mockSetup} googleImport={googleImport} />
     ) : (
       <Playground />
     )}

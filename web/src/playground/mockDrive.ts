@@ -7,10 +7,13 @@
 import samplePdfUrl from "./sample.pdf?url";
 import { sampleMarkdown } from "./samples";
 import type { ListLocationItemsHandlerOutput } from "@aws-amplify/ui-react-storage/browser";
+import { listDriveLocations, personalPrefix } from "../config";
 
 type Items = ListLocationItemsHandlerOutput["items"];
 
 export const MOCK_BUCKET = "family-drive-files-demo";
+/** Who the playground is "signed in" as. */
+export const MOCK_EMAIL = "you@example.com";
 const REGION = "ap-southeast-1";
 
 interface MockFile {
@@ -30,8 +33,11 @@ const files: MockFile[] = [
     size: 2_400_000 + i * 1000,
     contentType: "image/jpeg",
   })),
+  // The signed-in person's own folder (Home lists it next to Global/).
+  { key: `${personalPrefix(MOCK_EMAIL)}tax return 2025.pdf`, size: 525_100, contentType: "application/pdf", body: () => fetch(samplePdfUrl).then((r) => r.blob()) },
+  { key: `${personalPrefix(MOCK_EMAIL)}passport scan.jpg`, size: 1_800_000, contentType: "image/jpeg" },
 ];
-const folders = ["Global/linh/", "Global/Tết 2026/", "Global/documents/"];
+const folders = ["Global/linh/", "Global/Tết 2026/", "Global/documents/", `${personalPrefix(MOCK_EMAIL)}receipts/`];
 const modified = new Date("2026-11-05T08:32:00Z");
 
 function listUnder(prefix: string): Items {
@@ -54,10 +60,7 @@ function listUnder(prefix: string): Items {
 export const mockSetup = {
   config: {
     region: REGION,
-    listLocations: async () => ({
-      items: [{ id: "Global", bucket: MOCK_BUCKET, prefix: "Global/", type: "PREFIX" as const, permissions: ["delete", "get", "list", "write"] as ("delete" | "get" | "list" | "write")[] }],
-      nextToken: undefined,
-    }),
+    listLocations: listDriveLocations(MOCK_BUCKET, MOCK_EMAIL),
     getLocationCredentials: async () => ({
       credentials: {
         accessKeyId: "AKIAPLAYGROUND",
