@@ -23,4 +23,4 @@ The files bucket's lifecycle configuration (`infra/foundation/files.tf`) gets tw
 - Other prefixes are unaffected; `Global/` and personal folders keep the bucket-wide 30-day noncurrent rule.
 - Changing the retention means: change `deleted_retention_days`, run the foundation pipeline, then the app pipeline (which rewrites `config.json`). A shorter value applies to files already in `Deleted/`.
 - The app stack needs the parameter, so the foundation must be applied with this change before the app pipeline runs, or the app plan fails on a missing parameter.
-- #18 (Intelligent-Tiering) must not transition `Deleted/`: those files are short-lived, and its monitoring fee would buy nothing.
+- Intelligent-Tiering ([0013](0013-files-in-intelligent-tiering-without-archive-tiers.md)) must not transition `Deleted/`: those files are short-lived, and its monitoring fee would buy nothing.

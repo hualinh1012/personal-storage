@@ -345,6 +345,8 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 - **Overwritten file:** copy the older version back over it.
 - **Deleted permanently or emptied from Deleted:** every version under `Deleted/` is gone and can't be recovered.
 
+**Storage cost:** files under `Global/` and `Personal/` move to S3 Intelligent-Tiering within a day or two of being uploaded, and to cheaper tiers when nobody opens them for 30 days. Only the tiers that open instantly are used (ADR 0013). Don't turn on Intelligent-Tiering's archive tiers or switch to a Glacier class: downloads, previews, Move and Delete would fail on archived files.
+
 **Change the foundation:** edit `infra/foundation/` and push. The foundation pipeline picks it up.
 
 **When a policy in `ci/iam/` changes:** re-run its `aws iam put-role-policy` command (steps 1 and 3) **before** pushing the change that needs it. The pipelines don't update their own roles.
@@ -428,6 +430,10 @@ Run after a deploy, ideally in a private window.
   - Delete a file in your personal folder: it lands in `Deleted/Personal/<your email>/`.
   - `Deleted/` shows "Files here are removed for good 30 days after they were deleted." above the list; `Global/` and your personal folder don't.
   - `aws s3api get-bucket-lifecycle-configuration --bucket family-drive-files-084519186805` lists `expire-deleted-folder` (30 days, noncurrent 1 day) and `remove-deleted-folder-delete-markers`, both with prefix `Deleted/`.
+- [ ] **Intelligent-Tiering** (ADR 0013):
+  - The same lifecycle listing has `intelligent-tiering-global` and `intelligent-tiering-personal` (transition to `INTELLIGENT_TIERING` at 0 days, prefixes `Global/` and `Personal/`), and nothing transitions `Deleted/`.
+  - `aws s3api list-bucket-intelligent-tiering-configurations --bucket family-drive-files-084519186805` lists none: no archive tiers.
+  - A day or two after the foundation apply, `aws s3api head-object --bucket family-drive-files-084519186805 --key "Global/<a file over 128 KB>"` shows `"StorageClass": "INTELLIGENT_TIERING"`. Download, preview, Move and Copy that file; all work as before.
 - [ ] Signed in as someone with write access but no `trash`: Delete still works, Home doesn't list `Deleted/`, and a direct list of `Deleted/` (e.g. `list` from `aws-amplify/storage` in the console) fails with AccessDenied.
 - [ ] **Home** lists `Global/` and `Personal/<your email>/` (and `Deleted/` with `trash`), nothing else. In your personal folder, upload, preview, download, move a file into a subfolder and delete it.
 - [ ] Signed in as A, a direct request for B's folder is denied: in the browser console on the drive, a list of `Personal/<B's email>/` (e.g. with the `list` API from `aws-amplify/storage`) fails with AccessDenied. Or check the role with the IAM policy simulator, setting the `aws:PrincipalTag/email` context key.

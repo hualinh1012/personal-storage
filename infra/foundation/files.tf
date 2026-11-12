@@ -1,4 +1,5 @@
-# The family's files. Private, encrypted, versioned (30-day recovery window).
+# The family's files. Private, encrypted, versioned (30-day recovery window),
+# stored in Intelligent-Tiering without archive tiers (ADR 0013).
 # CORS lives in the app stack because it depends on the CloudFront URL.
 
 resource "aws_s3_bucket" "files" {
@@ -84,6 +85,33 @@ resource "aws_s3_bucket_lifecycle_configuration" "files" {
 
     expiration {
       expired_object_delete_marker = true
+    }
+  }
+
+  # Cheaper storage for the drive's files (issue #18, ADR 0013): current
+  # versions move to Intelligent-Tiering, whose frequent, infrequent and
+  # archive-instant tiers all serve reads at once. There is deliberately no
+  # aws_s3_bucket_intelligent_tiering_configuration: that is what turns on the
+  # Archive / Deep Archive Access tiers, where downloads, previews and Move
+  # fail until a restore. Deleted/ is left out: its files are gone within
+  # deleted_retention_days, before monitoring could pay for itself. Uploads and
+  # copies land in STANDARD and move over on the next lifecycle run. S3 skips
+  # objects under 128 KB, which Intelligent-Tiering would bill as frequent anyway.
+  dynamic "rule" {
+    for_each = toset(["Global/", "Personal/"])
+
+    content {
+      id     = "intelligent-tiering-${lower(trimsuffix(rule.value, "/"))}"
+      status = "Enabled"
+
+      filter {
+        prefix = rule.value
+      }
+
+      transition {
+        days          = 0
+        storage_class = "INTELLIGENT_TIERING"
+      }
     }
   }
 
