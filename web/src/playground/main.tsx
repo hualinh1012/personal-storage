@@ -4,7 +4,7 @@ import { Amplify } from "aws-amplify";
 import "../styles.css";
 import Playground from "./Playground";
 import { DriveView } from "../pages/Drive";
-import { MOCK_BUCKET, MOCK_EMAIL, installS3FetchStub, mockAccess, mockCountFolder, mockSetup, mockTrash } from "./mockDrive";
+import { MOCK_BUCKET, MOCK_EMAIL, installS3FetchStub, mockAccess, mockCountFolder, mockSetup, mockTextFiles, mockTrash } from "./mockDrive";
 import { mockGoogleImport } from "./mockGoogleImport";
 
 // Dev-only playground entry. ?view=drive renders the real drive screen with
@@ -17,6 +17,7 @@ const setup = mockSetup(access);
 const googleImport = mockGoogleImport(params.get("google") !== "off");
 const countFolder = mockCountFolder(params.get("count"));
 const trash = mockTrash(access);
+const textFiles = mockTextFiles();
 if (driveView) {
   installS3FetchStub();
   // Previews call Amplify Storage (HeadObject, presigned URLs), which needs a bucket and region.
@@ -26,7 +27,7 @@ if (driveView) {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {driveView ? (
-      <DriveView email={MOCK_EMAIL} access={access} bucket={MOCK_BUCKET} setup={setup} googleImport={googleImport} countFolder={countFolder} trash={trash} deletedRetentionDays={30} />
+      <DriveView email={MOCK_EMAIL} access={access} bucket={MOCK_BUCKET} setup={setup} googleImport={googleImport} countFolder={countFolder} trash={trash} deletedRetentionDays={30} textFiles={textFiles} />
     ) : (
       <Playground />
     )}

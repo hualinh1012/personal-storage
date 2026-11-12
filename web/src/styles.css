@@ -85,3 +85,15 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 .google-import__row--done td:nth-child(3) { color: #067647; }
 .topbar button:not(.primary):not(.link) { padding: 0.4rem 1rem; border: 1px solid #c7ccd1; border-radius: 6px; background: #fff; }
 .topbar button:disabled { opacity: 0.5; cursor: default; }
+
+/* Text editor (issue #45): fills the browser area; the textarea scrolls, the page doesn't. */
+.edit-text { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.edit-text__title { overflow-wrap: anywhere; }
+.edit-text__body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.edit-text__area {
+  flex: 1; min-height: 12rem; width: 100%; box-sizing: border-box; resize: none;
+  padding: 0.6rem 0.75rem; border: 1px solid #cbd2d9; border-radius: 0.4rem;
+  font: 0.95rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.edit-text__error { color: #b42318; }
+.edit-text__saved { color: #067647; }

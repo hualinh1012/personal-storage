@@ -30,6 +30,7 @@ npm run dev                    # Vite on http://localhost:5173 (needs web/public
                                #   &access=read | read%2Bpersonal | write | write%2Bpersonal%2Btrash: preview another
                                #   access level (default: everything, including the Deleted folder)
                                #   &count=fail: the pager's folder count fails (fallback pager); Global/photos has 250 files
+                               #   Global/linh/shopping list.txt (BOM + CRLF) is editable with Edit in the ⋮ menu
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
 
@@ -133,6 +134,9 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
   - Google sign-in (GIS token client) and Picker load lazily when the view opens. The token asks for `drive.readonly` ([ADR 0008](docs/adr/0008-google-drive-import-scope.md): `drive.file` can't see inside picked folders), lives only in `google.ts` memory and is sent only to Google; `driveClient.ts` is the only code calling the Drive API.
   - Pure, tested modules hold the rules: `plan.ts` (keys, `(n)` names, re-run skips, conversion targets, 500 MB cut-off; never overwrites), `listing.ts`/`prepare.ts` (recursive folder walk), `queue.ts` (3 at a time, cancel), `retry.ts`, `importFile.ts`. Google and S3 are injected through `deps.ts`, which is how the playground fakes them.
   - Gated by config: `googleImportConfig()` in `web/src/config.ts` returns null while the SSM values (`/family-drive/google_api_key`, `/family-drive/google_project_number`) are `CHANGE_ME`, and the view says it isn't set up. They're deliberately not in the deploy precondition. A CSP, if ever added, must allow `accounts.google.com`, `apis.google.com`, `docs.google.com` and `www.googleapis.com`.
+- **Edit text files** (`web/src/edit/`, issue #45): a custom ⋮ action for exactly one `.txt` file up to 1 MB, hidden without `write`. `EditTextView` finds the selection through `useView("Delete")` (like Restore) and gets its ops and exit through `EditTextContext`; exiting remounts the browser, which re-lists the folder.
+  - `text.ts` holds the rules (UTF-8 only, refuses invalid bytes; keeps a BOM and CRLF/LF on save); `textFile.ts` opens/saves over injected `TextFileOps`; `s3Ops.ts` uses the lazily loaded SDK (`GetObject`/`PutObject`). Saving is last-write-wins on purpose (owner's choice: family app); versioning is the undo.
+  - More types (Markdown, CSV) are extensions in `EDITABLE_EXTENSIONS` plus whatever the view needs.
 - **Pager** (`web/src/pagination/`) replaces Storage Browser's (`components.Pagination`) to show `Page X of N · M items`, since S3 never reports a prefix's size.
   - `folderTracker.ts` wraps the `listLocationItems` handler. A first-page listing (open folder, Refresh, back from any action) triggers a recount (`countFolder.ts`: one `listAll` LIST); stale counts are dropped. It tells search (page size ≠ 100) and Copy's destination listings (`exclude`) apart from the file list by their options.
   - `rows.ts` holds the pure rules: `countRows` mirrors Storage Browser's `parseResult` (subfolders + files, minus the folder's own placeholder and dot keys). Jumping forward re-paginates until enough rows are loaded (Storage Browser fetches one page per call). Repeated tokens get an empty page, and "done fetching" is reported on a later task so the pager never paginates with a stale token.

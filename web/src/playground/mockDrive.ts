@@ -11,6 +11,10 @@ import { listDriveLocations, personalPrefix } from "../config";
 import type { Access } from "../access";
 import type { TrashOps } from "../trash/trash";
 import { canWriteFor, type TrashDeps } from "../trash/actions";
+import type { TextFileOps } from "../edit/textFile";
+
+const utf8 = (s: string) => new TextEncoder().encode(s);
+const sampleTextFile = "﻿Đi chợ Tết\r\n- gạo nếp\r\n- lá dong\r\n- đậu xanh\r\n";
 
 type Items = ListLocationItemsHandlerOutput["items"];
 
@@ -29,6 +33,8 @@ interface MockFile {
 const files: MockFile[] = [
   { key: "Global/linh/Quang Vu-UIUX Designer.pdf", size: 525_100, contentType: "application/pdf", body: () => fetch(samplePdfUrl).then((r) => r.blob()) },
   { key: "Global/linh/Tết 2026 plan.md", size: sampleMarkdown.length, contentType: "text/markdown", body: async () => sampleMarkdown },
+  // A UTF-8 text file with a BOM and Windows line endings, for Edit (issue #45).
+  { key: "Global/linh/shopping list.txt", size: utf8(sampleTextFile).byteLength, contentType: "text/plain", body: async () => new Blob([utf8(sampleTextFile)]) },
   { key: "Global/linh/a very long file name that keeps going to test the table width - final v3.docx", size: 48_000, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
   { key: "Global/linh/holiday-video.mp4", size: 120 * 1024 * 1024, contentType: "video/mp4" },
   ...Array.from({ length: 25 }, (_, i) => ({
@@ -199,4 +205,25 @@ export function installS3FetchStub() {
     const body = file.body ? await file.body() : new Blob([new Uint8Array(1)]);
     return new Response(body, { status: 200, headers: { "content-type": file.contentType } });
   };
+}
+
+/** The text editor's ops over the sample files: a save replaces the file's body and size. */
+export function mockTextFiles(): () => Promise<TextFileOps> {
+  const ops: TextFileOps = {
+    async read(key) {
+      await new Promise((r) => setTimeout(r, 150));
+      const file = files.find((f) => f.key === key);
+      if (!file?.body) throw new Error("NoSuchKey (playground)");
+      return new Uint8Array(await new Response(await file.body()).arrayBuffer());
+    },
+    async write(key, body, contentType) {
+      await new Promise((r) => setTimeout(r, 300));
+      const saved = body.slice();
+      const file = files.find((f) => f.key === key);
+      const next = { key, size: saved.byteLength, contentType, body: async () => new Blob([saved]) };
+      if (file) Object.assign(file, next);
+      else files.push(next);
+    },
+  };
+  return async () => ops;
 }
