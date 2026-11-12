@@ -95,6 +95,7 @@ third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
 
 ### Two Terraform stacks
 - **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules) and the SSM parameters. Every resource has `prevent_destroy`.
+  - Files under `Global/` and `Personal/` move to Intelligent-Tiering via lifecycle; `Deleted/` stays Standard. Never add an `aws_s3_bucket_intelligent_tiering_configuration` or a Glacier class: archived objects break download, preview, Move and Delete ([ADR 0013](docs/adr/0013-files-in-intelligent-tiering-without-archive-tiers.md)).
   - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters and buckets.
   - The SSM parameters are created with a `CHANGE_ME` placeholder and `ignore_changes` on their value, so Terraform never overwrites real values.
 - **`infra/` is the app stack and is disposable:** Cognito, the Lambdas, the Identity Pool, CloudFront, the web bucket, and the files bucket's CORS rule.
