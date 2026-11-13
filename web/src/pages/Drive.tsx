@@ -25,9 +25,12 @@ import { countFolder } from "../pagination/countFolder";
 import { Pager, PagerContext, type PagerContextValue } from "../pagination/Pager";
 import { canWriteFor, deleteViewDisplayText, makeTrashActions, type TrashDeps } from "../trash/actions";
 import { makeTrashViews, TrashContext, type TrashViewDeps } from "../trash/TrashViews";
-import { s3TrashOps } from "../trash/s3Ops";
-import type { TrashOps } from "../trash/trash";
+import { s3TrashOps, type S3Target } from "../trash/s3Ops";
 import { fetchAuthSession } from "aws-amplify/auth";
+import { EDIT_TEXT_ACTION, editTextActionConfig } from "../edit/editAction";
+import { EditTextContext, makeEditTextView, type EditTextContextValue, type EditTextViewDeps } from "../edit/EditTextView";
+import { s3TextOps } from "../edit/s3Ops";
+import type { TextFileOps } from "../edit/textFile";
 
 const displayText = {
   ...previewDisplayText,
@@ -50,6 +53,7 @@ export function DriveView({
   countFolder,
   trash,
   deletedRetentionDays = null,
+  textFiles,
 }: {
   email: string;
   /** Display only: IAM enforces the same access level. setup.config.listLocations must match it. */
@@ -63,6 +67,8 @@ export function DriveView({
   trash: TrashDeps;
   /** Days before S3 removes files in Deleted/ (issue #25); null hides the note. */
   deletedRetentionDays?: number | null;
+  /** S3 operations for the text editor (issue #45). */
+  textFiles: () => Promise<TextFileOps>;
 }) {
   const { StorageBrowser, views, tracker } = useMemo(() => {
     // Watches the file list's listing so the pager can show the folder's total.
@@ -83,6 +89,7 @@ export function DriveView({
           ...setup.actions?.custom,
           move: moveActionConfig as never,
           [GOOGLE_IMPORT_ACTION]: googleImportActionConfig as never,
+          [EDIT_TEXT_ACTION]: editTextActionConfig as never,
           ...(trashActions.custom as unknown as Record<string, never>),
         },
       },
@@ -99,7 +106,8 @@ export function DriveView({
       useView: created.useView as unknown as TrashViewDeps["useView"],
       useAction: created.useAction as unknown as TrashViewDeps["useAction"],
     });
-    return { StorageBrowser: created.StorageBrowser, views: { MoveView, GoogleImportView, ...trashViews }, tracker };
+    const EditTextView = makeEditTextView({ useView: created.useView as unknown as EditTextViewDeps["useView"] });
+    return { StorageBrowser: created.StorageBrowser, views: { MoveView, GoogleImportView, EditTextView, ...trashViews }, tracker };
   }, [setup, countFolder, trash]);
 
   // Storage Browser stays uncontrolled: in controlled mode it only reports
@@ -145,6 +153,8 @@ export function DriveView({
     tracker,
     listPrefix: current.location && !current.actionType ? location.prefix + path : null,
   };
+  // Leaving the editor remounts the browser, so the list shows the saved size and time.
+  const editContext: EditTextContextValue = { ops: textFiles, onExit: exitToFolder };
   // In the Deleted folder's file list, say when S3 removes its files.
   const note =
     current.location && !current.actionType && isDeletedPrefix(location.prefix) ? retentionNote(deletedRetentionDays) : null;
@@ -182,15 +192,17 @@ export function DriveView({
         )}
         <GoogleImportContext.Provider value={importContext}>
           <TrashContext.Provider value={{ deps: trash, onExit: exitToFolder }}>
-            <PagerContext.Provider value={pagerContext}>
-              <StorageBrowser
-                key={mount.key}
-                defaultValue={mount.defaultValue}
-                views={views as never}
-                onValueChange={onValueChange}
-                displayText={displayText as never}
-              />
-            </PagerContext.Provider>
+            <EditTextContext.Provider value={editContext}>
+              <PagerContext.Provider value={pagerContext}>
+                <StorageBrowser
+                  key={mount.key}
+                  defaultValue={mount.defaultValue}
+                  views={views as never}
+                  onValueChange={onValueChange}
+                  displayText={displayText as never}
+                />
+              </PagerContext.Provider>
+            </EditTextContext.Provider>
           </TrashContext.Provider>
         </GoogleImportContext.Provider>
       </main>
@@ -218,26 +230,24 @@ export default function Drive({
     return { setup: { config }, bucket };
   }, [email, access]);
   const googleImport = useMemo(() => realGoogleImportDeps(google), [google]);
-  const trash = useMemo<TrashDeps>(() => {
-    let ops: Promise<TrashOps> | undefined;
-    return {
-      // One S3 client, created on first use; it asks Amplify for fresh credentials per request.
-      ops: () =>
-        (ops ??= s3TrashOps({
-          bucket,
-          region: Amplify.getConfig().Storage?.S3?.region ?? "",
-          credentials: async () => {
-            const { credentials } = await fetchAuthSession();
-            if (!credentials) throw new Error("Not signed in.");
-            return credentials;
-          },
-        }).catch((error) => {
-          ops = undefined;
-          throw error;
-        })),
-      canWriteTo: canWriteFor(access, email),
-    };
-  }, [bucket, access, email]);
+  const target = useMemo<S3Target>(
+    () => ({
+      bucket,
+      region: Amplify.getConfig().Storage?.S3?.region ?? "",
+      // The S3 clients ask Amplify for fresh credentials per request.
+      credentials: async () => {
+        const { credentials } = await fetchAuthSession();
+        if (!credentials) throw new Error("Not signed in.");
+        return credentials;
+      },
+    }),
+    [bucket],
+  );
+  const trash = useMemo<TrashDeps>(
+    () => ({ ops: once(() => s3TrashOps(target)), canWriteTo: canWriteFor(access, email) }),
+    [target, access, email],
+  );
+  const textFiles = useMemo(() => once(() => s3TextOps(target)), [target]);
   return (
     <DriveView
       email={email}
@@ -248,6 +258,17 @@ export default function Drive({
       countFolder={countFolder as CountFolder<never>}
       trash={trash}
       deletedRetentionDays={deletedRetentionDays}
+      textFiles={textFiles}
     />
   );
+}
+
+/** Creates something on first use and reuses it; a failed attempt is retried next time. */
+function once<T>(create: () => Promise<T>): () => Promise<T> {
+  let value: Promise<T> | undefined;
+  return () =>
+    (value ??= create().catch((error) => {
+      value = undefined;
+      throw error;
+    }));
 }
