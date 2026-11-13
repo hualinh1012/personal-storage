@@ -156,6 +156,8 @@ the deployment steps change.
 
 The project uses Matt Pocock's skills (`mattpocock-skills`), not superpowers (turned off in
 `.claude/settings.json`). Docs follow their layout:
+- **`docs/features/`**: one technical doc per feature (e.g. `auth-and-access.md`), with the same
+  sections each. Update a feature's doc in the same PR as any change to that feature.
 - **`docs/adr/`**: architecture decisions (`NNNN-slug.md`). Read the ones touching an area
   before changing it, and say so explicitly if a change contradicts one.
 - **`GLOSSARY.md`** at the root: the project's terms. Created when the first term is settled.
