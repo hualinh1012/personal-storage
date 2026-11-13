@@ -6,4 +6,5 @@ A private, Google Drive-style file store for family members, on S3 + Cognito + C
 - Deploying on AWS: [docs/deployment.md](docs/deployment.md)
 - Feature docs (technical reference per feature):
   - [Sign-in, allowlist and access levels](docs/features/auth-and-access.md)
+  - [Shared drive (Global)](docs/features/global-drive.md)
 - Design: [docs/superpowers/specs/2026-11-04-family-drive-design.md](docs/superpowers/specs/2026-11-04-family-drive-design.md)
