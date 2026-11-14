@@ -18,4 +18,5 @@ terraform -chdir="$ROOT/infra" plan -out=tfplan
 terraform -chdir="$ROOT/infra" apply tfplan
 rm -f "$ROOT/infra/tfplan"
 
-bash "$ROOT/scripts/deploy.sh"
+# The web dependencies are installed above; deploy.sh skips its own npm ci.
+WEB_DEPS_INSTALLED=1 bash "$ROOT/scripts/deploy.sh"
