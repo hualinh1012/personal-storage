@@ -3,7 +3,10 @@ Personal storage build 100% with AWS
 
 A private, Google Drive-style file store for family members, on S3 + Cognito + CloudFront.
 
-- Deploying on AWS: [docs/deployment.md](docs/deployment.md)
+- **Start here:** [set up Family Drive from scratch, step by step](docs/guides/setup-from-scratch.md)
+- Operating it (day-to-day, troubleshooting, test checklist): [docs/deployment.md](docs/deployment.md)
+- Architecture (TOGAF): [definition](docs/architecture/architecture-definition.md), [requirements](docs/architecture/architecture-requirements.md), [contract](docs/architecture/architecture-contract.md)
+- System design (components, request path, security, data, deployment): [docs/architecture/system-design.md](docs/architecture/system-design.md)
 - Feature docs (technical reference per feature):
   - [Sign-in, allowlist and access levels](docs/features/auth-and-access.md)
   - [Shared drive (Global)](docs/features/global-drive.md)
@@ -11,4 +14,5 @@ A private, Google Drive-style file store for family members, on S3 + Cognito + C
   - [Import from Google Drive](docs/features/google-import.md)
   - [File preview](docs/features/file-preview.md)
   - [Deleted folder (trash)](docs/features/deleted-folder.md)
+  - [Storage, retention and cost](docs/features/storage-and-retention.md)
 - Security assessment (November 2026): [docs/security/assessment-2026-11.md](docs/security/assessment-2026-11.md)
