@@ -10,5 +10,5 @@ A private, Google Drive-style file store for family members, on S3 + Cognito + C
   - [Personal folders](docs/features/personal-folders.md)
   - [Import from Google Drive](docs/features/google-import.md)
   - [File preview](docs/features/file-preview.md)
+  - [Deleted folder (trash)](docs/features/deleted-folder.md)
 - Security assessment (November 2026): [docs/security/assessment-2026-11.md](docs/security/assessment-2026-11.md)
-- Design: [docs/superpowers/specs/2026-11-04-family-drive-design.md](docs/superpowers/specs/2026-11-04-family-drive-design.md)
