@@ -123,9 +123,9 @@ says how changes are checked against this document.
 
 | ID | System | Requirement | Where |
 |---|---|---|---|
-| I-1 | Google OAuth (through Cognito) | Web-application OAuth client with the Cognito `/oauth2/idpresponse` redirect URI; scopes `openid email profile` | `infra/auth.tf`, [deployment.md step 4](../deployment.md#4-finish-google-sign-in) |
+| I-1 | Google OAuth (through Cognito) | Web-application OAuth client with the Cognito `/oauth2/idpresponse` redirect URI; scopes `openid email profile` | `infra/auth.tf`, [setup guide step 8](../guides/setup-from-scratch.md#step-8-finish-google-sign-in) |
 | I-2 | Google Identity Services | Token client for `drive.readonly`; the site as an Authorized JavaScript origin | `web/src/googleImport/google.ts` |
-| I-3 | Google Picker | API key restricted to the site and the Picker API; project number as the app ID | same, [deployment.md step 4b](../deployment.md#4b-google-drive-import-setup-optional) |
+| I-3 | Google Picker | API key restricted to the site and the Picker API; project number as the app ID | same, [setup guide step 10](../guides/setup-from-scratch.md#step-10-optional-google-drive-import) |
 | I-4 | Google Drive API v3 | `files.list`, `files.get?alt=media`, `files.export`; retry on 429, 5xx and rate-limit 403s | `web/src/googleImport/driveClient.ts`, `retry.ts` |
 | I-5 | AWS Storage Browser | CORS on the files bucket as Storage Browser requires; re-check custom parts after upgrades | `infra/storage.tf`, CLAUDE.md |
 

@@ -3,7 +3,7 @@
 Copies files and folders from a family member's Google Drive into the folder open in Family
 Drive. It runs entirely in the browser tab, with no backend ([ADR 0001](../adr/0001-no-backend-browser-talks-to-s3.md)).
 This is the technical reference for someone changing this code or infrastructure. Setting it up
-on a deployment is [deployment.md step 4b](../deployment.md#4b-google-drive-import-setup-optional).
+on a deployment is [setup guide step 10](../guides/setup-from-scratch.md#step-10-optional-google-drive-import).
 
 Keep this file in step with the code: change it in the same PR as any change to the import.
 
@@ -200,7 +200,7 @@ remounts Storage Browser into the view, and `onExit` remounts it on the folder, 
 - `googleImportConfig()` returns `null` unless all three are present and not `CHANGE_ME`; the view
   then says it isn't set up. The API key and project number are deliberately **not** in the deploy
   precondition, so the app deploys without them.
-- **Google Cloud** (same project as sign-in, [deployment.md 4b](../deployment.md#4b-google-drive-import-setup-optional)):
+- **Google Cloud** (same project as sign-in, [setup guide step 10](../guides/setup-from-scratch.md#step-10-optional-google-drive-import)):
   Google Drive API and Google Picker API enabled; the site and `http://localhost:5173` as
   Authorized JavaScript origins; the API key restricted to those websites and the Picker API;
   `drive.readonly` on the consent screen; every family member a test user.
