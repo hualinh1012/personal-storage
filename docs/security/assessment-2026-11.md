@@ -19,9 +19,9 @@ A one-off review of Family Drive across code, infrastructure, pipelines and supp
 |---|---|---|---|---|
 | S1 | `main` has no branch protection, and every push to it deploys to AWS | High | Low | #52 |
 | S2 | The app pipeline's IAM policy allows escalation to account admin | High | Low | #53 |
-| S3 | The family's files have no backup outside the bucket, and the foundation pipeline can expose or wipe them | High | Low | #54 |
+| S3 | The family's files have no backup outside the bucket, and the foundation pipeline can expose or wipe them | High | Low | #54, **accepted** (won't fix: cost) |
 | S4 | No Content Security Policy, while tokens and AWS credentials sit in `localStorage` | Medium | Low | #55 |
-| S5 | No detection or response: no trail, alarms or budget alert in code, and no runbook for a compromised account | Medium | Medium | #56 |
+| S5 | No detection or response: no trail, alarms or budget alert in code, and no runbook for a compromised account | Medium | Medium | #56, **accepted** (won't fix: cost) |
 | S6 | Production trusts `http://localhost:5173` (Cognito callbacks, S3 CORS, Google origins) | Low | Low | #57 |
 | S7 | Small hardening gaps: app client `write_attributes`, bucket object ownership, Cognito/CloudFront `Resource: "*"` | Low | Low | #58 |
 
@@ -411,4 +411,6 @@ Terraform state versioning; the app stack can be rebuilt from the repo. No indep
 | A leaked presigned URL works until it expires (15 min to 1 h) | Short lifetime |
 | SSE-S3 rather than KMS; client secret in Terraform state | Bucket access is already limited to admins and the pipeline roles |
 | TLS policy of the default CloudFront certificate | Needs a custom domain (known gap) |
-| Family members can run up storage costs | Family trust; S5 adds a budget alert |
+| Family members can run up storage costs | Family trust |
+| No backup outside the files bucket (S3) | Owner's decision, 14 November 2026 (#54): a family app on a small budget; a second copy would roughly double storage cost. Versioning (30 days) is the only recovery, so #52 and #53 matter more. |
+| No trail, alarms or budget alert (S5) | Owner's decision, 14 November 2026 (#56): small budget. The incident steps in S5 still apply by hand. |
