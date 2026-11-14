@@ -160,6 +160,7 @@ the deployment steps change.
 
 The project uses Matt Pocock's skills (`mattpocock-skills`), not superpowers (turned off in
 `.claude/settings.json`). Docs follow their layout:
+- **`docs/architecture/`**: the TOGAF-style architecture (`architecture-definition.md`, `architecture-requirements.md`) and the **Architecture Contract** (`architecture-contract.md`): the rules every change follows and the conformance checklist to copy into each PR description.
 - **`docs/architecture/system-design.md`**: the cross-cutting design (components and which file implements each, request path, trust boundaries, config flow, deployment). Update it when a component, the config flow or the pipelines change.
 - **`docs/features/`**: one technical doc per feature (e.g. `auth-and-access.md`), with the same
   sections each. Update a feature's doc in the same PR as any change to that feature.
