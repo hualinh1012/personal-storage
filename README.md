@@ -4,6 +4,7 @@ Personal storage build 100% with AWS
 A private, Google Drive-style file store for family members, on S3 + Cognito + CloudFront.
 
 - Deploying on AWS: [docs/deployment.md](docs/deployment.md)
+- System design (components, request path, security, data, deployment): [docs/architecture/system-design.md](docs/architecture/system-design.md)
 - Feature docs (technical reference per feature):
   - [Sign-in, allowlist and access levels](docs/features/auth-and-access.md)
   - [Shared drive (Global)](docs/features/global-drive.md)
