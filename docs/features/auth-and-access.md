@@ -2,8 +2,8 @@
 
 How a family member gets into Family Drive, who is let in, and what each person may do once
 inside. This is the technical reference for someone changing this code or infrastructure. For
-setting the values on a real deployment, see [deployment.md](../deployment.md) (steps 2 and 4,
-Day-to-day, Troubleshooting).
+setting the values on a real deployment, see the [setup guide](../guides/setup-from-scratch.md) (steps 5, 6 and 8) and
+[deployment.md](../deployment.md) (Day-to-day, Troubleshooting).
 
 Keep this file in step with the code: change it in the same PR as any change to sign-in, the
 allowlist or access levels.
@@ -250,7 +250,7 @@ granting it would also let people change their own email attribute.
 ### SSM parameters (retained foundation, `infra/foundation/ssm.tf`)
 
 All are created with `CHANGE_ME` and `ignore_changes` on the value: set them by hand
-([deployment.md step 2](../deployment.md#2-set-the-ssm-values)).
+([setup guide step 6](../guides/setup-from-scratch.md#step-6-set-the-settings-in-ssm)).
 
 | Parameter | Type | Used for |
 |---|---|---|
@@ -292,7 +292,7 @@ turns them into Amplify's `auth` block with `identity_providers: ["GOOGLE"]`, sc
 ### Google Cloud
 
 The OAuth client must list `https://family-drive-<account>.auth.ap-southeast-1.amazoncognito.com/oauth2/idpresponse`
-as an authorised redirect URI ([deployment.md step 4](../deployment.md#4-finish-google-sign-in)). The
+as an authorised redirect URI ([setup guide step 8](../guides/setup-from-scratch.md#step-8-finish-google-sign-in)). The
 domain is fixed per account so this survives rebuilding the app stack
 ([ADR 0005](../adr/0005-fixed-cognito-domain.md)). While the consent screen is in Testing, each
 person must also be a Google **test user**.

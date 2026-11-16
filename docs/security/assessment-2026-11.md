@@ -74,7 +74,7 @@ account, which today means the owner's GitHub or AWS account being compromised.
 **Evidence:** the GitHub API reports `main` as `protected=false` and the repository is public.
 The app pipeline runs `ci/pipeline.sh` on every push to `main`, and the foundation pipeline
 runs `infra/foundation/bootstrap.sh` with `AUTO_APPROVE=1` on pushes touching `infra/foundation/**`
-([deployment.md](../deployment.md) §1 and §3). Neither has an approval stage (the foundation one is
+([setup guide](../guides/setup-from-scratch.md) steps 4 and 7). Neither has an approval stage (the foundation one is
 "optional but recommended").
 
 **Risk:** whoever can push to `main` (the owner, any collaborator, a leaked token, or automation
@@ -88,7 +88,7 @@ let anyone read the pipeline and IAM design.
   made by automation.
 - Add a manual approval stage to the foundation pipeline (it can change the files bucket).
 - Restrict the AWS Connector GitHub App installation to this one repository.
-- Keep Destroy out of the deploy pipeline (deployment.md §5).
+- Keep Destroy out of the deploy pipeline (setup guide step 12).
 
 ### S2. The app pipeline's IAM policy allows escalation to account admin (High / Low)
 
@@ -197,7 +197,7 @@ session also needs a specific step: Identity Pool credentials can't be invalidat
 ### S6. Production trusts `http://localhost:5173` (Low / Low)
 
 **Evidence:** `infra/variables.tf` `dev_origin` is used in `infra/auth.tf` (`callback_urls`,
-`logout_urls`) and `infra/storage.tf` (CORS origins). [deployment.md](../deployment.md) step 4b adds
+`logout_urls`) and `infra/storage.tf` (CORS origins). The [setup guide](../guides/setup-from-scratch.md) step 10 adds
 `http://localhost:5173` as a Google Authorized JavaScript origin and to the API key's website
 restriction.
 
@@ -316,8 +316,8 @@ entries from the Google OAuth client and API key in production.
 - **Scope:** `drive.readonly`, a restricted scope, accepted in ADR 0008. The token stays in
   memory and goes only to Google (`driveClient.ts` is the only caller). **Accepted.**
 - **API key:** public by design; protection depends on website and API restrictions set in the
-  console (**not verified**; deployment.md step 4b describes them). Localhost entries: S6.
-- **Redirect URIs:** only Cognito's `/oauth2/idpresponse` (deployment.md step 4); fixed domain
+  console (**not verified**; setup guide step 10 describes them). Localhost entries: S6.
+- **Redirect URIs:** only Cognito's `/oauth2/idpresponse` (setup guide step 8); fixed domain
   (ADR 0005). **Nothing found.**
 - **Consent screen:** Testing mode with test users (ADR 0008). **Accepted.**
 
@@ -354,7 +354,7 @@ entries from the Google OAuth client and API key in production.
   `AUTO_APPROVE`) come from the pipeline definition, not from the repo's content.
   **Nothing found.**
 - **Who can trigger:** any push to `main` deploys (S1). Destroy must be its own pipeline, manual
-  with an approval stage (deployment.md §5). The app pipeline seen in the console on 13 November
+  with an approval stage (setup guide step 12). The app pipeline seen in the console on 13 November
   still had a Destroy stage behind a disabled transition, one click from running; moving it out is
   part of S1.
 - **Install scripts:** `npm ci` runs dependencies' install scripts with the pipeline role's
