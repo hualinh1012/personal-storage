@@ -5,6 +5,16 @@ resource "aws_s3_bucket" "web" {
   force_destroy = true
 }
 
+# ACLs off: the bucket owner owns every object (issue #58). The default for new
+# buckets, made explicit.
+resource "aws_s3_bucket_ownership_controls" "web" {
+  bucket = aws_s3_bucket.web.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "web" {
   bucket                  = aws_s3_bucket.web.id
   block_public_acls       = true

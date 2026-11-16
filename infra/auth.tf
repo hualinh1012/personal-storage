@@ -178,6 +178,14 @@ resource "aws_cognito_user_pool_client" "web" {
 
   explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
 
+  # Explicit instead of the default (every attribute; issue #58). Write: only
+  # what the Google attribute mapping sets on each sign-in (Cognito needs write
+  # access to mapped attributes). Read: only what the ID token needs; `email`
+  # keys personal folders. The access claims come from the pre token
+  # generation trigger, not from attributes.
+  write_attributes = ["email", "email_verified"]
+  read_attributes  = ["email", "email_verified"]
+
   # Bounds how long a removed person keeps access: an ID token lives 1 hour and
   # the Identity Pool credentials obtained with it up to 1 more hour. Every
   # refresh re-runs the allowlist check (pre token generation trigger).

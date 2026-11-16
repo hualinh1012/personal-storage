@@ -315,7 +315,10 @@ There are no shared-drive-specific SSM parameters or Google Cloud settings.
 ### IAM for the pipeline
 
 App pipeline (`ci/iam/app-pipeline-policy.json`): `FilesBucketCorsOnly` (the app stack only
-reads the files bucket and manages its CORS), `WebBucket`, `CloudFront`, and `AppRoles` /
+reads the files bucket's settings and manages its CORS; its `s3:ListBucket`, which
+`data.aws_s3_bucket` needs, also lets the pipeline list file names, including personal folder
+names, but not read or write the files: accepted, #58), `WebBucket`, the `CloudFront*` statements
+(the distribution only when tagged `Project = family-drive`, #58), and `AppRoles` /
 `PassIdentityPoolRole` for the authenticated role. Foundation pipeline
 (`ci/iam/foundation-pipeline-policy.json`): `FoundationBuckets` (bucket settings, versioning,
 lifecycle).
@@ -327,8 +330,9 @@ lifecycle).
   checksum and `If-None-Match` headers); exposes `ETag` (multipart completion needs it),
   `x-amz-server-side-encryption`, `x-amz-request-id`, `x-amz-id-2`, `x-amz-version-id`;
   `max_age_seconds = 3000`. These follow Storage Browser's CORS requirements.
-- **Files bucket:** versioning `Enabled`, SSE-S3, all public access blocked, lifecycle as in §2.
-- **Web hosting:** private web bucket readable only by CloudFront through OAC (`sigv4`, always
+- **Files bucket:** versioning `Enabled`, SSE-S3, all public access blocked, ACLs off
+  (`BucketOwnerEnforced`, as on the state and web buckets), lifecycle as in §2.
+- **Web hosting:** private web bucket (ACLs off) readable only by CloudFront through OAC (`sigv4`, always
   sign; bucket policy conditioned on the distribution ARN). Default behaviour: HTTPS redirect,
   `GET`/`HEAD`, compression, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`
   (HSTS, `X-Frame-Options SAMEORIGIN`, `nosniff`, referrer policy). 403 and 404 from the origin

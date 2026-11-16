@@ -277,7 +277,7 @@ exploitable by an outsider; the widest boundary is the pipelines.
 | Business | All capabilities in place | Same, Drive-style experience | #13 |
 | Data | Access levels validated in TS and HCL separately; config key lists differ | One validator; one config contract | #41; #42 (undecided) |
 | Application | Hand wiring in `Drive.tsx`; four storage ports; scattered permission rules | Location policy, storage seam, feature seam | #38, #39 (needs a decision), #40 |
-| Technology | Production trusts localhost; broad pipeline `Resource: "*"` | Dev origin only in dev; scoped pipeline policies | #57, #58 |
+| Technology | Closed: production trusted localhost; broad pipeline `Resource: "*"` | Dev origin only in dev; scoped pipeline policies | #57, #58 |
 | Security | Unprotected `main`; pipeline escalation; no CSP | Protected and gated; boundary; CSP | #52, #53, #55 |
 | Documentation | Setup spread through `deployment.md` | Step-by-step setup guide | #19 |
 

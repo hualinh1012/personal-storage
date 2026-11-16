@@ -10,6 +10,16 @@ resource "aws_s3_bucket" "files" {
   }
 }
 
+# ACLs off: the bucket owner owns every object (issue #58). The default for new
+# buckets, made explicit so an imported bucket can't differ.
+resource "aws_s3_bucket_ownership_controls" "files" {
+  bucket = aws_s3_bucket.files.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "files" {
   bucket                  = aws_s3_bucket.files.id
   block_public_acls       = true

@@ -335,8 +335,9 @@ Identity Pool (new identity IDs), which is why personal folders are keyed by ema
 ### IAM for the pipeline
 
 Statements in `ci/iam/app-pipeline-policy.json` this feature needs: `ReadFoundationParams`,
-`Cognito` (including `cognito-identity:SetPrincipalTagAttributeMap`/`GetPrincipalTagAttributeMap`
-for the tag mapping), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRoles`,
+the `Cognito*` statements (including `cognito-identity:SetPrincipalTagAttributeMap`/`GetPrincipalTagAttributeMap`
+for the tag mapping; #58 scopes them to this account's pools, creates need the request tag
+`Project = family-drive` and changes need the pool to carry it, which the provider's `default_tags` set), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRoles`,
 `AttachOnlyLambdaBasicExecution`, `PassLambdaRoles` and `PassIdentityPoolRole` (not limited by
 `iam:PassedToService`: Cognito Identity doesn't send it). The foundation pipeline's
 `FoundationParameters` creates the SSM parameters.
@@ -348,7 +349,8 @@ for the tag mapping), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRol
 - **App client:** no secret, `code` flow only, scopes `openid email profile`, Google only,
   `explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]`. Callback and logout URLs
   `https://<cloudfront domain>/` only (plus `<dev_origin>/` while `dev_origin` is set for local
-  development), matching `toAmplifyOutputs()`.
+  development), matching `toAmplifyOutputs()`. `read_attributes` and `write_attributes` are both
+  just `email` and `email_verified` (what the Google mapping writes and the ID token needs; #58).
 - **Token lifetimes:** ID and access 60 minutes, refresh 30 days.
 - **Triggers:** pre sign-up; pre token generation with `lambda_version = "V1_0"`.
 - **Lambdas:** `nodejs22.x`, handlers `preSignUp.handler` / `preTokenGeneration.handler`,
