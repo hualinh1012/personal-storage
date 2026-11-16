@@ -78,8 +78,11 @@ holds AWS credentials for the drive. So the viewers never run content from a fil
   form fields) are off.
 - **Text:** shown as text by React, never as HTML.
 - **Images:** an `<img>` element, so an SVG's scripts don't run.
-- The pages are served with `Managed-SecurityHeadersPolicy` (`X-Content-Type-Options: nosniff`,
-  `X-Frame-Options: SAMEORIGIN`, HSTS). There is no Content Security Policy yet.
+- The pages are served with the `family-drive-security-headers` policy (`infra/web.tf`):
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, HSTS, and a Content Security
+  Policy (#55) whose `img-src`, `media-src` and `connect-src` allow the files bucket's host, so the
+  viewers load presigned URLs only from there; scripts only from the app and Google, no `eval`,
+  `object-src 'none'`. It's report-only until `csp_enforce` is turned on.
 
 ## 4. Flows
 
@@ -178,7 +181,8 @@ showing it. So PDF.js fetches the bytes over CORS and draws the pages itself.
    test like the registry's "doesn't load the PDF library" one.
 5. If it needs a new kind of static file (as PDF.js needs `.mjs`), make sure `scripts/deploy.sh`
    uploads it with the right `Content-Type`.
-6. If it fetches from anywhere but the files bucket, that origin will matter for a future CSP.
+6. If it fetches from anywhere but the files bucket, add that origin to the CSP (`local.csp` in
+   `infra/web.tf`), and check the console for CSP reports on the deployed site.
 7. Add tests in `web/test/`, a sample to the playground, and a line to deployment.md's checklist.
 
 ## 6. Configuration

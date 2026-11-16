@@ -318,7 +318,8 @@ App pipeline (`ci/iam/app-pipeline-policy.json`): `FilesBucketCorsOnly` (the app
 reads the files bucket's settings and manages its CORS; its `s3:ListBucket`, which
 `data.aws_s3_bucket` needs, also lets the pipeline list file names, including personal folder
 names, but not read or write the files: accepted, #58), `WebBucket`, the `CloudFront*` statements
-(the distribution only when tagged `Project = family-drive`, #58), and `AppRoles` /
+(the distribution only when tagged `Project = family-drive`, #58; `CloudFrontResponseHeadersPolicy`
+for the security headers, #55), and `AppRoles` /
 `PassIdentityPoolRole` for the authenticated role. Foundation pipeline
 (`ci/iam/foundation-pipeline-policy.json`): `FoundationBuckets` (bucket settings, versioning,
 lifecycle).
@@ -334,8 +335,11 @@ lifecycle).
   (`BucketOwnerEnforced`, as on the state and web buckets), lifecycle as in §2.
 - **Web hosting:** private web bucket (ACLs off) readable only by CloudFront through OAC (`sigv4`, always
   sign; bucket policy conditioned on the distribution ARN). Default behaviour: HTTPS redirect,
-  `GET`/`HEAD`, compression, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`
-  (HSTS, `X-Frame-Options SAMEORIGIN`, `nosniff`, referrer policy). 403 and 404 from the origin
+  `GET`/`HEAD`, compression, `Managed-CachingOptimized`, and the custom response headers policy
+  `family-drive-security-headers` (#55): the managed policy's headers (HSTS, `X-Frame-Options SAMEORIGIN`,
+  `nosniff`, referrer policy, `X-XSS-Protection`) plus a Content Security Policy (report-only while
+  `csp_enforce` is `false`) and a `Permissions-Policy` turning off camera, microphone, geolocation
+  and similar. 403 and 404 from the origin
   become `/index.html` with 200 (SPA routing). `PriceClass_200`, default certificate.
 - **Cache headers** (`scripts/deploy.sh`):
   - hashed assets `public,max-age=31536000,immutable` (`.mjs` uploaded as `text/javascript`);

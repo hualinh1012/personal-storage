@@ -67,6 +67,13 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 **Storage cost:** files under `Global/` and `Personal/` move to S3 Intelligent-Tiering within a day or two of being uploaded, and to cheaper tiers when nobody opens them for 30 days. Only the tiers that open instantly are used (ADR 0013). Don't turn on Intelligent-Tiering's archive tiers or switch to a Glacier class: downloads, previews, Move and Delete would fail on archived files.
 
+**Turn on the Content Security Policy (#55):** it ships as `Content-Security-Policy-Report-Only`, so
+browsers only log what it would block. Go through the end-to-end checklist below with the browser's
+console open (desktop Chrome, and once on a phone), on the deployed site. Messages starting with
+`[Report Only] Refused to …` name the blocked URL and directive. Add any legitimate host to `local.csp`
+in `infra/web.tf`; when a full run shows none, set `csp_enforce` to `true` in `infra/variables.tf` and
+push. If something breaks after that, set it back to `false` and push.
+
 **Change the foundation:** edit `infra/foundation/` and push. The foundation pipeline picks it up.
 
 **When a policy in `ci/iam/` changes:** re-run its `aws iam put-role-policy` command ([setup steps 4.2 and 7.2](guides/setup-from-scratch.md#42-give-the-pipeline-its-permissions)) **before** pushing the change that needs it. The pipelines don't update their own roles.
@@ -131,6 +138,7 @@ Run after a deploy, ideally in a private window.
 - [ ] Create folder `Tết 2026`, upload `ảnh gia đình.jpg` into it, then download it and check it opens.
 - [ ] Preview a photo, a video, a `.txt` file, a `.md` file (formatted headings/lists) and a multi-page PDF (Previous/Next work); a `.docx` shows no preview but can be downloaded.
 - [ ] Click a file over 50 MB (e.g. a video): the panel says "File is too big to preview" and the download button works.
+- [ ] With the browser console open: no `Refused to …` CSP messages (`[Report Only]` while `csp_enforce` is off) during sign-in, browsing, upload, download, every preview type (including a PDF), Edit, and Import from Google Drive (sign-in popup and Picker). The response headers include `Content-Security-Policy` (or `-Report-Only`) and `Permissions-Policy`.
 - [ ] Copy a file, then delete the copy.
 - [ ] Move two files into another folder; they disappear from the old folder and appear in the new one. Move one back onto a same-named file: it's refused with "already exists" and both stay.
 - [ ] Select one `.txt` file and choose **Edit** in the ⋮ menu: it opens with its text (Vietnamese characters intact). Change a line and **Save**: "Saved." shows, **Back** returns to the folder with the new size, and the preview shows the change. Edit is disabled with two files or a non-`.txt` file selected, and missing in a read-only `Global/` and in `Deleted/`.

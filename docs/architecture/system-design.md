@@ -188,7 +188,8 @@ flowchart TB
 - **Deleted folder:** writers may write into their part of `Deleted/`; only `trash` reads or purges it
   ([ADR 0011](../adr/0011-delete-moves-to-a-deleted-folder.md)).
 - **Transport and hosting:** HTTPS everywhere; the foundation buckets deny non-TLS requests; the web
-  bucket is private behind CloudFront OAC; CloudFront adds the managed security headers.
+  bucket is private behind CloudFront OAC; CloudFront adds the security headers, a Content Security
+  Policy with exact hosts (report-only until `csp_enforce`, #55) and a `Permissions-Policy`.
 - **CORS** on the files bucket allows only the site's origin; `dev_origin` (e.g.
   `http://localhost:5173`) is added only while someone develops locally (#57).
 - **Untrusted file content:** previews never run it (Markdown without HTML, PDF.js without scripts,

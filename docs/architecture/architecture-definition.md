@@ -252,7 +252,7 @@ flowchart TB
 | Authorisation | Role policy with `s3:prefix` and `aws:PrincipalTag/{email,global_access,personal,trash}`; fails closed | `infra/identity.tf` |
 | Session | 60-minute tokens, 1-hour credentials, 30-day refresh, server-side token check | `infra/auth.tf`, `infra/identity.tf` |
 | Data | SSE-S3, TLS-only bucket policies, public access blocked, versioning | `infra/foundation/` |
-| Application | No rendering of file content as code (Markdown without HTML, PDF.js without scripts); React escaping; managed security headers | `web/src/preview/`, `infra/web.tf` |
+| Application | No rendering of file content as code (Markdown without HTML, PDF.js without scripts); React escaping; security headers and a Content Security Policy (#55) | `web/src/preview/`, `infra/web.tf` |
 | Third party | Google token in memory only, sent only to Google; API key restricted | `web/src/googleImport/` |
 | Delivery | Least-privilege pipeline policies; lockfiles and `npm ci`; pinned Terraform | `ci/iam/`, `ci/` |
 
@@ -306,7 +306,7 @@ exploitable by an outsider; the widest boundary is the pipelines.
 | A push to `main` (or a compromised GitHub account) changes AWS | Account takeover, data loss | Branch protection, pipeline approval, permissions boundary | #52, #53 open |
 | Files lost with no second copy | Family photos gone | Versioning (30 days), `Deleted/`, `prevent_destroy` | Accepted (#54) |
 | Unnoticed misuse or cost spike | Late discovery | Manual checks; incident steps in the security assessment | Accepted (#56) |
-| XSS steals the 30-day refresh token | Ongoing access to files | Careful viewers; CSP | #55 open |
+| XSS steals the 30-day refresh token | Ongoing access to files | Careful viewers; CSP | #55: shipped report-only, enforce after checking |
 | A Storage Browser upgrade breaks custom parts | Broken layout or actions | Pinned behaviour notes, playground re-check, feature seam | CLAUDE.md, #40 |
 | Google changes the import scope rules or Testing limits | Import stops | ADR 0008 notes the switch-back path | Watch |
 | Lambda runtime or dependency end of life | Deploys or sign-in break | Track deprecation dates and CVEs | Manual (#22 won't fix) |

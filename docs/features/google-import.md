@@ -80,6 +80,10 @@ ordinary upload can. From `aws_iam_role_policy.authenticated` in `infra/identity
   The import needs the site as an **Authorized JavaScript origin** on it.
 - **API key:** public (it's in `config.json`); protected by its restrictions (Websites: the site
   only; APIs: Google Picker API only). Production lists no `localhost` entries (#57).
+- **Content Security Policy** (`infra/web.tf`, #55): scripts from `accounts.google.com` (GIS) and
+  `apis.google.com` (Picker loader), styles from `accounts.google.com`, calls to
+  `www.googleapis.com` and `accounts.google.com`, frames from `docs.google.com` (Picker) and
+  `accounts.google.com`. A new Google host shows up as a `Refused to …` console message.
 
 ## 4. Flows
 

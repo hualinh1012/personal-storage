@@ -161,6 +161,16 @@
       "Resource": "arn:aws:cloudfront::084519186805:origin-access-control/*"
     },
     {
+      "Sid": "CloudFrontResponseHeadersPolicy",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateResponseHeadersPolicy",
+        "cloudfront:UpdateResponseHeadersPolicy",
+        "cloudfront:DeleteResponseHeadersPolicy"
+      ],
+      "Resource": "arn:aws:cloudfront::084519186805:response-headers-policy/*"
+    },
+    {
       "Sid": "CloudFrontList",
       "Effect": "Allow",
       "Action": [

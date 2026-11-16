@@ -23,3 +23,12 @@ variable "dev_origin" {
     error_message = "dev_origin must be empty or an origin like http://localhost:5173 (scheme and host, no path or trailing slash)."
   }
 }
+
+# Content Security Policy (issue #55): false sends it as
+# Content-Security-Policy-Report-Only (logged, nothing blocked); set true once
+# every check in docs/deployment.md shows no violation in the browser console.
+variable "csp_enforce" {
+  description = "Enforce the Content Security Policy instead of sending it report-only."
+  type        = bool
+  default     = false
+}
