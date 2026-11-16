@@ -75,10 +75,10 @@ app: versioning stays the backstop against raw-credential misuse.
 
 | UI | Source | Enforced by |
 |---|---|---|
-| `Global/` location has permissions `["get", "list"]` without write, `["delete", "get", "list", "write"]` with it | `driveLocation()` in `web/src/config.ts` | `WriteDriveObjects` |
+| `Global/` location has permissions `["get", "list"]` without write, `["delete", "get", "list", "write"]` with it | `driveLocation()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` |
 | Storage Browser hides Upload, Create folder, Copy and Delete for a location without `write`/`delete` | Storage Browser's own action configs | same |
 | Move, Edit and Delete hide without `write` (Move and Delete also need `delete`) | `hide` in `moveAction.ts`, `editAction.ts`, `trash/actions.ts` | same |
-| Top-bar Upload/Import shown only where the open location has `write` | `canWrite()`, `showWriteButtons` in `Drive.tsx` | same |
+| Top-bar Upload/Import shown only where the open location has `write` | `locationPolicy().write`, `canWriteSomewhere()`, `showWriteButtons` in `Drive.tsx` | same |
 | Home lists only `Global/` (plus own folder/`Deleted/`) | `listDriveLocations()` | `ListDriveFolder` only matches `Global/`; listing the bucket root is denied |
 
 ## 4. Flows
@@ -228,7 +228,7 @@ sequenceDiagram
 | Area | Files | Tests |
 |---|---|---|
 | Drive screen, Storage Browser setup | `web/src/pages/Drive.tsx` (`Drive` builds the adapter and S3 targets; `DriveView` creates the browser and the top bar) | via the playground |
-| Locations and permissions | `web/src/config.ts` (`driveLocation`, `canWrite`, `listDriveLocations`, `toAmplifyOutputs`) | `web/test/driveLocation.test.ts`, `web/test/config.test.ts` |
+| Locations and permissions | `web/src/locationPolicy.ts` (`driveLocation`, `locationPolicy`, `listDriveLocations`), `web/src/config.ts` (`toAmplifyOutputs`) | `web/test/locationPolicy.test.ts`, `web/test/config.test.ts` |
 | App start and `Amplify.configure` | `web/src/App.tsx`, `web/src/main.tsx` | |
 | Move | `web/src/move/moveFile.ts` (rules), `moveAction.ts` (wiring), `MoveView.tsx` (view) | `web/test/moveFile.test.ts`, `web/test/moveView.test.ts` |
 | Delete → `Deleted/` | `web/src/trash/actions.ts`, `trash.ts`, `paths.ts`, `s3Ops.ts`, `TrashViews.tsx` | `web/test/trash.test.ts` |
@@ -447,7 +447,7 @@ app` distribution → Invalidations.
 ## 8. Testing
 
 - **Unit tests:** `npm test --prefix web`: `moveFile`, `moveView`, `trash`, `editText`,
-  `pagination` (`countRows`, page links, jumps, the folder tracker), `driveLocation`, `config`.
+  `pagination` (`countRows`, page links, jumps, the folder tracker), `locationPolicy`, `config`.
 - **Playground (no AWS):** `npm run dev --prefix web`, then
   `http://localhost:5173/playground.html?view=drive`. It's the real `DriveView` with sample data:
   - `&access=read` / `read%2Bpersonal` / `write` / `write%2Bpersonal%2Btrash`;

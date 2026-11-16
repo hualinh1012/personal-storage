@@ -10,7 +10,7 @@ import {
   type StorageBrowserValue,
 } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
-import { canWrite, driveLocation, isDeletedPrefix, isPersonalPrefix, listDriveLocations } from "../config";
+import { canWriteAt, canWriteSomewhere, driveLocation, listDriveLocations, locationPolicy } from "../locationPolicy";
 import { retentionNote } from "../trash/retention";
 import type { Access } from "../access";
 import { filePreviewConfig, previewDisplayText } from "../preview/registry";
@@ -23,7 +23,7 @@ import { GoogleImportContext, GoogleImportView, type GoogleImportContextValue } 
 import { createFolderTracker, type CountFolder } from "../pagination/folderTracker";
 import { countFolder } from "../pagination/countFolder";
 import { Pager, PagerContext, type PagerContextValue } from "../pagination/Pager";
-import { canWriteFor, deleteViewDisplayText, makeTrashActions, type TrashDeps } from "../trash/actions";
+import { deleteViewDisplayText, makeTrashActions, type TrashDeps } from "../trash/actions";
 import { makeTrashViews, TrashContext, type TrashViewDeps } from "../trash/TrashViews";
 import { s3TrashOps, type S3Target } from "../trash/s3Ops";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -137,15 +137,16 @@ export function DriveView({
   };
 
   const location: LocationValue = current.location ?? driveLocation(bucket, access);
+  const policy = locationPolicy(access, email, location.prefix);
   // Upload and Import only where the open location allows writing; Home (no
   // location) shows them disabled when the person can write somewhere.
-  const writable = canWrite(current.location);
-  const showWriteButtons = current.location ? writable : access.globalWrite || access.personal;
+  const writable = !!current.location && policy.write;
+  const showWriteButtons = current.location ? writable : canWriteSomewhere(email, access);
   const path = location.path ?? "";
   const importContext: GoogleImportContextValue = {
     deps: googleImport,
     prefix: location.prefix + path,
-    folderLabel: path ? path.replace(/\/$/, "") : isPersonalPrefix(location.prefix) ? "My files" : "Family Drive",
+    folderLabel: path ? path.replace(/\/$/, "") : policy.kind === "personal" ? "My files" : "Family Drive",
     onExit: exitToFolder,
   };
   // The pager shows a folder total only in a folder's file list, not on Home or in an action's view.
@@ -157,7 +158,7 @@ export function DriveView({
   const editContext: EditTextContextValue = { ops: textFiles, onExit: exitToFolder };
   // In the Deleted folder's file list, say when S3 removes its files.
   const note =
-    current.location && !current.actionType && isDeletedPrefix(location.prefix) ? retentionNote(deletedRetentionDays) : null;
+    current.location && !current.actionType && policy.kind === "deleted" ? retentionNote(deletedRetentionDays) : null;
 
   return (
     <div className="drive">
@@ -244,7 +245,7 @@ export default function Drive({
     [bucket],
   );
   const trash = useMemo<TrashDeps>(
-    () => ({ ops: once(() => s3TrashOps(target)), canWriteTo: canWriteFor(access, email) }),
+    () => ({ ops: once(() => s3TrashOps(target)), canWriteTo: canWriteAt(access, email) }),
     [target, access, email],
   );
   const textFiles = useMemo(() => once(() => s3TextOps(target)), [target]);

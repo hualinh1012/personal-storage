@@ -7,10 +7,10 @@
 import samplePdfUrl from "./sample.pdf?url";
 import { sampleMarkdown } from "./samples";
 import type { ListLocationItemsHandlerOutput } from "@aws-amplify/ui-react-storage/browser";
-import { listDriveLocations, personalPrefix } from "../config";
+import { canWriteAt, listDriveLocations, personalPrefix } from "../locationPolicy";
 import type { Access } from "../access";
 import type { TrashOps } from "../trash/trash";
-import { canWriteFor, type TrashDeps } from "../trash/actions";
+import type { TrashDeps } from "../trash/actions";
 import type { TextFileOps } from "../edit/textFile";
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
@@ -138,7 +138,7 @@ export function mockTrashOps(): TrashOps {
 
 export function mockTrash(access: Access): TrashDeps {
   const ops = mockTrashOps();
-  return { ops: async () => ops, canWriteTo: canWriteFor(access, MOCK_EMAIL) };
+  return { ops: async () => ops, canWriteTo: canWriteAt(access, MOCK_EMAIL) };
 }
 
 /**

@@ -4,6 +4,7 @@
  * (read-only Global/, Deleted/). The work happens in EditTextView, so the
  * handler is the no-op Storage Browser requires.
  */
+import { hideUnless } from "../locationPolicy";
 import { canEditSelection } from "./text";
 
 export const EDIT_TEXT_ACTION = "editText";
@@ -14,7 +15,7 @@ export const editTextActionConfig = {
     icon: "file-text" as const,
     label: "Edit",
     disable: (selected?: { key: string; type?: string; size?: number }[]) => !canEditSelection(selected),
-    hide: (permissions: string[]) => !permissions.includes("write"),
+    hide: hideUnless("write"),
   },
   handler: () => ({ result: Promise.resolve({ status: "COMPLETE" as const }) }),
 };

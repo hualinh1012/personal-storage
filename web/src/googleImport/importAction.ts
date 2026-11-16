@@ -1,3 +1,5 @@
+import { hideUnless } from "../locationPolicy";
+
 /**
  * Custom Storage Browser action: "Import from Google Drive" in the ⋮ menu.
  * The work happens in GoogleImportView (its own queue, not Storage Browser's
@@ -12,7 +14,7 @@ export const googleImportActionConfig = {
     label: "Import from Google Drive",
     // Doesn't depend on a selection; hidden where uploads aren't allowed.
     disable: () => false,
-    hide: (permissions: string[]) => !permissions.includes("write"),
+    hide: hideUnless("write"),
   },
   handler: () => ({ result: Promise.resolve({ status: "COMPLETE" as const }) }),
 };

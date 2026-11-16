@@ -1,4 +1,4 @@
-import type { Access } from "./access";
+import { DRIVE_PREFIX } from "./locationPolicy";
 
 export interface AppConfig {
   region: string;
@@ -35,89 +35,6 @@ export function googleImportConfig(c: AppConfig): GoogleImportConfig | null {
   const { googleClientId: clientId, googleApiKey: apiKey, googleProjectNumber: projectNumber } = c;
   if (!usable(clientId) || !usable(apiKey) || !usable(projectNumber)) return null;
   return { clientId, apiKey, projectNumber };
-}
-
-/** The shared drive: everyone signed in can read it; writing depends on their access level. */
-export const DRIVE_PREFIX = "Global/";
-
-/**
- * Personal folders live at `Personal/<email>/`. The Identity Pool role allows
- * only the folder whose name is the caller's `email` principal tag (ADR 0009).
- */
-export const PERSONAL_PREFIX = "Personal/";
-
-type Permission = "delete" | "get" | "list" | "write";
-const FULL_ACCESS: Permission[] = ["delete", "get", "list", "write"];
-// Storage Browser hides Upload, Delete, Create folder (and our Move and
-// Google import) for a location without "write"/"delete".
-const READ_ACCESS: Permission[] = ["get", "list"];
-
-/**
- * Storage Browser location for the shared drive, so it opens there instead of
- * a location picker. Read-only unless the person has write access to Global/.
- */
-export function driveLocation(bucket: string, access: Access) {
-  const permissions = access.globalWrite ? FULL_ACCESS : READ_ACCESS;
-  return { bucket, prefix: DRIVE_PREFIX, type: "PREFIX" as const, permissions: [...permissions] };
-}
-
-/** True when the location allows uploads (and so imports). */
-export function canWrite(location: { permissions: readonly string[] } | undefined): boolean {
-  return !!location?.permissions.includes("write");
-}
-
-/**
- * The signed-in person's folder prefix. Lower-cased because IAM compares it,
- * case-sensitively, with the raw `email` claim, and Google sends emails in
- * lower case. An email with capitals in its claim would get AccessDenied.
- */
-export function personalPrefix(email: string): string {
-  return `${PERSONAL_PREFIX}${email.trim().toLowerCase()}/`;
-}
-
-/** Storage Browser location for the signed-in person's own folder. */
-export function personalLocation(bucket: string, email: string) {
-  return { bucket, prefix: personalPrefix(email), type: "PREFIX" as const, permissions: [...FULL_ACCESS] };
-}
-
-/** True for a location prefix inside someone's personal folder. */
-export function isPersonalPrefix(prefix: string): boolean {
-  return prefix.startsWith(PERSONAL_PREFIX);
-}
-
-/**
- * The Deleted folder (issue #24, ADR 0011). Delete in the app moves files here,
- * under their original path; only people with the `trash` access flag can see it.
- */
-export const DELETED_PREFIX = "Deleted/";
-
-// Deleted/ has "delete" (Delete permanently, Restore, Empty) but no "write", so
-// Storage Browser hides Upload, Create folder, Copy and Move there, and our
-// move-to-Deleted Delete (which needs "write") too. See web/src/trash/.
-const DELETED_ACCESS: Permission[] = ["delete", "get", "list"];
-
-/** Storage Browser location for the Deleted folder. */
-export function deletedLocation(bucket: string) {
-  return { bucket, prefix: DELETED_PREFIX, type: "PREFIX" as const, permissions: [...DELETED_ACCESS] };
-}
-
-/** True for a location prefix inside the Deleted folder. */
-export function isDeletedPrefix(prefix: string): boolean {
-  return prefix.startsWith(DELETED_PREFIX);
-}
-
-/**
- * What Home lists: the shared drive, the person's own folder if they have one,
- * and the Deleted folder if they manage it. Nobody else's folder: listing them
- * would need the allowlist in the browser, and IAM denies opening them anyway.
- * Replaces the Amplify adapter's listLocations, which can only derive paths
- * from the identity ID.
- */
-export function listDriveLocations(bucket: string, email: string, access: Access) {
-  const items = [{ id: "Global", ...driveLocation(bucket, access) }];
-  if (access.personal && email.trim()) items.push({ id: "Personal", ...personalLocation(bucket, email) });
-  if (access.trash) items.push({ id: "Deleted", ...deletedLocation(bucket) });
-  return async () => ({ items, nextToken: undefined });
 }
 
 const CONFIG_KEYS: (keyof AppConfig)[] = [

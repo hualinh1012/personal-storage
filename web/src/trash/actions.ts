@@ -1,30 +1,22 @@
 /**
  * Storage Browser actions for the Deleted folder (issue #24).
  *
- * Which ones show where comes from the location's permissions (web/src/config.ts):
- * - Global/ and personal folders have "write" + "delete": the built-in Delete,
- *   whose handler we replace with "move to Deleted". There is no instant delete
- *   anywhere else in the app.
- * - Deleted/ has "delete" but not "write": Restore, Delete permanently and
- *   Empty Deleted, and nothing that writes (Upload, Create folder, Copy, Move).
+ * Which ones show where comes from the Location policy (web/src/locationPolicy.ts):
+ * - where the person can `move` (Global/ for writers, their own folder): the
+ *   built-in Delete, whose handler we replace with "move to Deleted". There is
+ *   no instant delete anywhere else in the app.
+ * - where they can `manageDeleted` (only Deleted/): Restore, Delete permanently
+ *   and Empty Deleted, and nothing that writes (Upload, Create folder, Copy, Move).
  */
 import { defaultActionConfigs } from "@aws-amplify/ui-react-storage/browser";
-import { DRIVE_PREFIX, personalPrefix } from "../config";
-import type { Access } from "../access";
+import { hideUnless } from "../locationPolicy";
 import { deletePermanently, moveToDeleted, restore, type Outcome, type TrashOps } from "./trash";
 
 export interface TrashDeps {
   /** S3 operations as the signed-in person (the real bucket, or sample data in the playground). */
   ops(): Promise<TrashOps>;
-  /** Whether the signed-in person may write at a key; Restore checks it to explain a refusal. */
+  /** Whether the signed-in person may write at a key (`canWriteAt` in locationPolicy); Restore checks it to explain a refusal. */
   canWriteTo(key: string): boolean;
-}
-
-/** Restore's write check from the person's access level: IAM allows the same. */
-export function canWriteFor(access: Access, email: string) {
-  const own = personalPrefix(email);
-  return (key: string) =>
-    (key.startsWith(DRIVE_PREFIX) && access.globalWrite) || (access.personal && !!email.trim() && key.startsWith(own));
 }
 
 export const RESTORE_ACTION = "restore";
@@ -40,7 +32,6 @@ const run = (work: Promise<Outcome>) => ({
   ),
 });
 
-const inDeleted = (permissions: string[]) => permissions.includes("delete") && !permissions.includes("write");
 const noSelection = (selected?: unknown[]) => !selected || selected.length === 0;
 
 export function makeTrashActions(deps: TrashDeps) {
@@ -50,7 +41,7 @@ export function makeTrashActions(deps: TrashDeps) {
       ...defaultActionConfigs.delete,
       actionListItem: {
         ...defaultActionConfigs.delete.actionListItem,
-        hide: (permissions: string[]) => !permissions.includes("write") || !permissions.includes("delete"),
+        hide: hideUnless("move"),
       },
       handler: ({ data }: HandlerInput) => run(deps.ops().then((ops) => moveToDeleted(data.key, ops))),
     },
@@ -61,7 +52,7 @@ export function makeTrashActions(deps: TrashDeps) {
           icon: "folder" as const,
           label: "Restore",
           disable: noSelection,
-          hide: (permissions: string[]) => !inDeleted(permissions),
+          hide: hideUnless("manageDeleted"),
         },
         handler: ({ data }: HandlerInput) => run(deps.ops().then((ops) => restore(data.key, ops, deps.canWriteTo))),
       },
@@ -71,7 +62,7 @@ export function makeTrashActions(deps: TrashDeps) {
           icon: "delete-file" as const,
           label: "Delete permanently",
           disable: noSelection,
-          hide: (permissions: string[]) => !inDeleted(permissions),
+          hide: hideUnless("manageDeleted"),
         },
         handler: ({ data }: HandlerInput) => run(deps.ops().then((ops) => deletePermanently(data.key, ops))),
       },
@@ -83,7 +74,7 @@ export function makeTrashActions(deps: TrashDeps) {
           icon: "cancel" as const,
           label: "Empty Deleted",
           disable: () => false,
-          hide: (permissions: string[]) => !inDeleted(permissions),
+          hide: hideUnless("manageDeleted"),
         },
         handler: () => ({ result: Promise.resolve({ status: "COMPLETE" as const }) }),
       },

@@ -8,7 +8,7 @@
  * without the `trash` flag can write into Deleted/ but not read it, so they
  * couldn't check for a clash. Restore strips the stamp to get the original key.
  */
-import { DELETED_PREFIX } from "../config";
+import { DELETED_PREFIX } from "../locationPolicy";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
