@@ -2,6 +2,7 @@
 #   - Terraform state bucket (holds this stack's state and the app stack's state)
 #   - Family files bucket (the actual data)
 #   - SSM parameters the deploy reads (Google client, allowed emails, Deleted retention)
+#   - Permissions boundary for the app stack's IAM roles (boundary.tf)
 # Everything here has prevent_destroy. Apply it with ./bootstrap.sh from an admin
 # machine; the CodePipeline only deploys the app stack.
 

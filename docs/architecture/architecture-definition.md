@@ -229,7 +229,7 @@ flowchart LR
 | CodePipeline V2, Commands action | Deploy | Terraform 1.16.6 installed per run |
 | Google Identity Services, Picker, Drive API v3 | Sign-in, import | `drive.readonly` |
 
-**Baseline = target**, except: the pipeline roles need tightening (#52, #53, #58).
+**Baseline = target**, except: `main` isn't protected and pipelines aren't gated yet (#52).
 
 ## 7. Security architecture
 
@@ -303,7 +303,7 @@ exploitable by an outsider; the widest boundary is the pipelines.
 
 | Risk | Impact | Mitigation | Status |
 |---|---|---|---|
-| A push to `main` (or a compromised GitHub account) changes AWS | Account takeover, data loss | Branch protection, pipeline approval, permissions boundary | #52, #53 open |
+| A push to `main` (or a compromised GitHub account) changes AWS | Account takeover, data loss | Branch protection, pipeline approval, permissions boundary | #52 open; boundary in place (#53) |
 | Files lost with no second copy | Family photos gone | Versioning (30 days), `Deleted/`, `prevent_destroy` | Accepted (#54) |
 | Unnoticed misuse or cost spike | Late discovery | Manual checks; incident steps in the security assessment | Accepted (#56) |
 | XSS steals the 30-day refresh token | Ongoing access to files | Careful viewers; CSP | #55: shipped report-only, enforce after checking |

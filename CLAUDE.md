@@ -82,6 +82,12 @@ third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
 (`Deleted/Global/*`, `Deleted/Personal/<own email>/*`) but not list or read it; only
 `trash` = `yes` lists, reads and deletes there, including every version.
 
+Every IAM role the app stack creates sets `permissions_boundary = local.permissions_boundary`
+([#53](https://github.com/hualinh1012/personal-storage/issues/53)): the managed policy `family-drive-boundary`
+(`infra/foundation/boundary.tf`, retained) allows only S3 on the files bucket's `Global/`, `Personal/` and
+`Deleted/` and the trigger Lambdas' logs, and the app pipeline policy only creates or changes a
+`family-drive-*` role that has it. A new permission outside that needs the boundary widened first (foundation).
+
 ### Allowlist enforcement spans three places
 - `functions/allowlist/src/allowlist.ts` holds the pure logic: case-insensitive matching, ignores surrounding whitespace, requires `email_verified`, and an empty list denies everyone.
 - Two Cognito triggers use it:
@@ -95,9 +101,9 @@ third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
   - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping, an IAM condition, and `web/src/access.ts`.
 
 ### Two Terraform stacks
-- **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules) and the SSM parameters. Every resource has `prevent_destroy`.
+- **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules), the SSM parameters and the app roles' permissions boundary. Every resource has `prevent_destroy`.
   - Files under `Global/` and `Personal/` move to Intelligent-Tiering via lifecycle; `Deleted/` stays Standard. Never add an `aws_s3_bucket_intelligent_tiering_configuration` or a Glacier class: archived objects break download, preview, Move and Delete ([ADR 0013](docs/adr/0013-files-in-intelligent-tiering-without-archive-tiers.md)).
-  - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters and buckets.
+  - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters, buckets and the boundary policy.
   - The SSM parameters are created with a `CHANGE_ME` placeholder and `ignore_changes` on their value, so Terraform never overwrites real values.
 - **`infra/` is the app stack and is disposable:** Cognito, the Lambdas, the Identity Pool, CloudFront, the web bucket, and the files bucket's CORS rule.
   - It finds foundation resources **by naming convention through data sources** (`infra/foundation_inputs.tf`), not through remote state.

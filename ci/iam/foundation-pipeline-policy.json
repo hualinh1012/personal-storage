@@ -48,6 +48,16 @@
       "Resource": "arn:aws:ssm:ap-southeast-1:084519186805:parameter/family-drive/*"
     },
     {
+      "Sid": "AppRoleBoundary",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreatePolicy", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:ListPolicyVersions",
+        "iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
+        "iam:TagPolicy", "iam:UntagPolicy", "iam:ListPolicyTags"
+      ],
+      "Resource": "arn:aws:iam::084519186805:policy/family-drive-boundary"
+    },
+    {
       "Sid": "DescribeParameters",
       "Effect": "Allow",
       "Action": "ssm:DescribeParameters",

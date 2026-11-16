@@ -2,6 +2,10 @@ output "tfstate_bucket" {
   value = aws_s3_bucket.tfstate.id
 }
 
+output "boundary_policy_arn" {
+  value = aws_iam_policy.boundary.arn
+}
+
 output "files_bucket" {
   value = aws_s3_bucket.files.id
 }

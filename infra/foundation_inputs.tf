@@ -46,6 +46,11 @@ data "aws_ssm_parameter" "deleted_retention_days" {
 }
 
 locals {
+  # Permissions boundary from the foundation (infra/foundation/boundary.tf,
+  # issue #53). Every IAM role in this stack sets it; the app pipeline can't
+  # create or change a role without it.
+  permissions_boundary = "arn:aws:iam::${local.account_id}:policy/${var.project}-boundary"
+
   allowed_emails_raw = [for e in split(",", nonsensitive(data.aws_ssm_parameter.allowed_emails.value)) : trimspace(e) if trimspace(e) != ""]
 
   # Lower-cased and de-duplicated; empty entries from stray commas are dropped.

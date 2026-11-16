@@ -24,13 +24,15 @@ data "aws_iam_policy_document" "lambda_assume" {
 }
 
 resource "aws_iam_role" "pre_sign_up" {
-  name               = "${var.project}-pre-sign-up"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+  name                 = "${var.project}-pre-sign-up"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_assume.json
+  permissions_boundary = local.permissions_boundary
 }
 
 resource "aws_iam_role" "pre_token_generation" {
-  name               = "${var.project}-pre-token-generation"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+  name                 = "${var.project}-pre-token-generation"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_assume.json
+  permissions_boundary = local.permissions_boundary
 }
 
 resource "aws_iam_role_policy_attachment" "pre_sign_up_logs" {

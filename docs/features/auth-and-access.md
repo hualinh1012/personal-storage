@@ -315,6 +315,7 @@ person must also be a Google **test user**.
 | Principal tag mapping | for the user pool provider | `aws_cognito_identity_pool_provider_principal_tag.email` | `infra/` |
 | Authenticated role | `family-drive-authenticated`, inline policy `drive-access` | `aws_iam_role.authenticated`, `aws_iam_role_policy.authenticated`, `aws_cognito_identity_pool_roles_attachment.main` | `infra/` |
 | SSM parameters | `/family-drive/{google_client_id,google_client_secret,allowed_emails,access}` | `aws_ssm_parameter.*` | `infra/foundation/` (retained) |
+| Permissions boundary (on all three roles above, #53) | managed policy `family-drive-boundary`: S3 on the files bucket's `Global/`, `Personal/`, `Deleted/`; logs for `/aws/lambda/family-drive-*` | `aws_iam_policy.boundary` (`infra/foundation/boundary.tf`); roles set `permissions_boundary = local.permissions_boundary` | `infra/foundation/` (retained) |
 
 The app stack is disposable ([ADR 0004](../adr/0004-retained-foundation-and-disposable-app-stack.md)).
 Recreating it creates a new user pool (everyone signs in again, as new Cognito users) and a new
@@ -338,9 +339,17 @@ Statements in `ci/iam/app-pipeline-policy.json` this feature needs: `ReadFoundat
 the `Cognito*` statements (including `cognito-identity:SetPrincipalTagAttributeMap`/`GetPrincipalTagAttributeMap`
 for the tag mapping; #58 scopes them to this account's pools, creates need the request tag
 `Project = family-drive` and changes need the pool to carry it, which the provider's `default_tags` set), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRoles`,
-`AttachOnlyLambdaBasicExecution`, `PassLambdaRoles` and `PassIdentityPoolRole` (not limited by
-`iam:PassedToService`: Cognito Identity doesn't send it). The foundation pipeline's
-`FoundationParameters` creates the SSM parameters.
+`AppRolesOnlyWithBoundary` (`CreateRole`, `PutRolePolicy`, `PutRolePermissionsBoundary` only when
+the role has the `family-drive-boundary` boundary, #53), `AppRolesTrust` (`UpdateAssumeRolePolicy`
+on the three roles by name: IAM has no boundary condition for it), `AttachOnlyLambdaBasicExecution`
+(also boundary-conditioned), `DetachLambdaBasicExecution`, `PassLambdaRoles` and
+`PassIdentityPoolRole` (not limited by `iam:PassedToService`: Cognito Identity doesn't send it),
+plus three `Deny` statements: never remove a boundary, never set another one, never edit
+`family-drive-boundary`. The foundation pipeline's `FoundationParameters` creates the SSM
+parameters and `AppRoleBoundary` the boundary.
+
+A new S3 or logs permission for one of these roles works only if the boundary allows it too: widen
+`infra/foundation/boundary.tf` first (foundation pipeline), then the role in `infra/`.
 
 ### Service configuration as deployed
 

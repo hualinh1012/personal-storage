@@ -60,7 +60,7 @@ says how changes are checked against this document.
 | NFR-S3 | Content of uploaded files is never executed in the app's origin. | Viewers' safety rules and their tests | §7 | [file-preview.md](../features/file-preview.md) | Met |
 | NFR-S4 | A defence in depth against script injection. | A Content Security Policy is sent | §7 | #55 | Partly met: sent report-only until `csp_enforce` is turned on |
 | NFR-S5 | Changing production requires review. | `main` protected; foundation pipeline gated | §7 | #52 | Open |
-| NFR-S6 | Pipelines can't grant themselves more than the app needs. | Permissions boundary on created roles | §7 | #53 | Open |
+| NFR-S6 | Pipelines can't grant themselves more than the app needs. | Permissions boundary on created roles | §7 | #53 | Met (`family-drive-boundary`; the owner checks it with the IAM policy simulator) |
 | NFR-S7 | Production trusts only its own origin. | No `localhost` in callbacks, CORS or Google origins | §7 | #57 | Met in Terraform (`dev_origin` empty by default); the owner removes the Google `localhost` entries |
 | NFR-S8 | No known high or critical vulnerability ships. | `npm audit` clean in both packages; IaC scan triaged | §7 | #12 (baseline), #22 (won't fix: continuous) | Met for npm; IaC scan pending |
 

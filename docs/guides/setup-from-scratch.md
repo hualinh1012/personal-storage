@@ -130,6 +130,10 @@ Attach the repository's least-privilege policy to it:
 aws iam put-role-policy --role-name <foundation-pipeline-role> --policy-name family-drive-foundation --policy-document file://ci/iam/foundation-pipeline-policy.json
 ```
 
+Besides the buckets and parameters, the foundation creates `family-drive-boundary`, the permissions
+boundary every app role must carry (#53); the app pipeline can't create roles without it, so the
+foundation always runs first.
+
 The policy names the account, the artifact bucket and the region. If your account ID differs from the
 one in the file, replace it first; if your artifact bucket isn't named `codepipeline-ap-southeast-1-*`
 (Pipeline → **Settings → Artifact store**), edit the `PipelineArtifacts` statement.
