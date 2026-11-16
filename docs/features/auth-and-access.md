@@ -58,7 +58,7 @@ personal folder and Deleted folder docs.
 | Access level → claims | Pre token generation | `functions/allowlist/src/access.ts`, `preTokenGeneration.ts` |
 | Claims → session tags | Identity Pool principal tag mapping | `aws_cognito_identity_pool_provider_principal_tag.email` in `infra/identity.tf` |
 | What each tag allows in S3 | IAM policy on the authenticated role | `aws_iam_role_policy.authenticated` in `infra/identity.tf` |
-| What the UI shows | SPA reads the same claims | `web/src/access.ts`, `web/src/config.ts` |
+| What the UI shows | SPA reads the same claims | `web/src/access.ts`, `web/src/locationPolicy.ts` |
 
 The **IAM policy is the security boundary**. The browser holds real AWS credentials, so anything
 the UI hides could still be sent by hand; IAM refuses it.
@@ -109,12 +109,12 @@ The role's trust policy (`data.aws_iam_policy_document.authenticated_assume`) le
 
 | UI behaviour | Source | IAM rule that actually stops it |
 |---|---|---|
-| `Global/` gets Storage Browser permissions `["get", "list"]` without `write`, which hides Upload, Create folder, Delete, Copy, Move and Import there | `driveLocation()` in `web/src/config.ts` | `WriteDriveObjects` needs `global_access` = `write` |
+| `Global/` gets Storage Browser permissions `["get", "list"]` without `write`, which hides Upload, Create folder, Delete, Copy, Move and Import there | `driveLocation()` / `locationPolicy()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` needs `global_access` = `write` |
 | Top-bar Upload/Import hidden without a writable location | `showWriteButtons` in `web/src/pages/Drive.tsx` | same |
 | Home lists `Personal/<email>/` only with `personal` | `listDriveLocations()` | `ListOwnPersonalFolder`, `ManageOwnPersonalObjects` |
 | Home lists `Deleted/` only with `trash` | `listDriveLocations()` | `ListDeletedFolder`, `ManageDeletedObjects` |
 | Home never lists other people's folders | `listDriveLocations()` (replaces the adapter's `listLocations`) | No statement allows `Personal/<someone else>/` |
-| Restore refuses targets the person can't write | `canWriteFor()` in `web/src/trash/actions.ts` | the `Global/` and personal statements |
+| Restore refuses targets the person can't write | `canWriteAt()` in `web/src/locationPolicy.ts` | the `Global/` and personal statements |
 
 ## 4. Flows
 
@@ -238,7 +238,7 @@ up to an hour.
 | Sign-out, email from the ID token | `web/src/session.ts` | `web/test/session.test.ts` |
 | Access-denied redirect | `web/src/authErrors.ts` | `web/test/authErrors.test.ts` |
 | Access claims in the SPA | `web/src/access.ts` | `web/test/access.test.ts` |
-| Locations per access level | `web/src/config.ts` (`driveLocation`, `personalLocation`, `deletedLocation`, `listDriveLocations`) | `web/test/driveLocation.test.ts` |
+| Locations and capabilities per access level (the Location policy) | `web/src/locationPolicy.ts` (`locationPolicy`, `capabilitiesOf`, `hideUnless`, `canWriteAt`, `driveLocation`, `listDriveLocations`) | `web/test/locationPolicy.test.ts` |
 | Pipeline | `ci/pipeline.sh`, `ci/iam/app-pipeline-policy.json` | |
 
 `currentUser()` reads the email from the ID token rather than calling `fetchUserAttributes()`:
@@ -459,7 +459,7 @@ Extensions → Lambda triggers); Cognito → Identity pools → `family-drive` �
 
 - **Unit tests:** `npm test --prefix functions/allowlist` (allowlist parsing, access parsing and
   claims, both handlers including refresh denial and malformed `ACCESS_LEVELS`) and
-  `npm test --prefix web` (`access`, `authErrors`, `session`, `config`, `driveLocation`).
+  `npm test --prefix web` (`access`, `authErrors`, `session`, `config`, `locationPolicy`).
 - **Terraform:** `terraform -chdir=infra validate` (offline); `terraform plan` exercises the
   preconditions against the real SSM values.
 - **Playground:** `/playground.html?view=drive&access=read` (also `read%2Bpersonal`, `write`,

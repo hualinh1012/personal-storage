@@ -72,7 +72,7 @@ of truth.
 | SPA shell: config, Amplify setup, routing to landing / access denied / drive | `web/src/main.tsx`, `App.tsx`, `config.ts`, `pages/Landing.tsx`, `pages/AccessDenied.tsx` | web | [auth-and-access.md](../features/auth-and-access.md) |
 | Sign-out, email and access from the ID token | `web/src/session.ts`, `access.ts`, `authErrors.ts` | web | [auth-and-access.md](../features/auth-and-access.md) |
 | Drive screen, Storage Browser setup, top bar | `web/src/pages/Drive.tsx` | web | [global-drive.md](../features/global-drive.md) |
-| Locations and Home (Global, own folder, Deleted) | `web/src/config.ts` (`driveLocation`, `personalLocation`, `deletedLocation`, `listDriveLocations`) | web | [personal-folders.md](../features/personal-folders.md) |
+| Location policy: kinds, capabilities and Storage Browser permissions per location; Home (Global, own folder, Deleted); action `hide` checks; Restore's write check | `web/src/locationPolicy.ts` (`locationPolicy`, `hideUnless`, `canWriteAt`, `driveLocation`, `listDriveLocations`) | web | [personal-folders.md](../features/personal-folders.md) |
 | Pager with folder totals | `web/src/pagination/` | web | [global-drive.md](../features/global-drive.md) |
 | Move | `web/src/move/` | web | [global-drive.md](../features/global-drive.md) |
 | Delete → `Deleted/`, Restore, Delete permanently, Empty | `web/src/trash/` | web | [deleted-folder.md](../features/deleted-folder.md) |

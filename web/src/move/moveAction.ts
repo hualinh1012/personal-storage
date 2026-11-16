@@ -1,5 +1,6 @@
 import { getProperties } from "@aws-amplify/storage/internals";
 import { defaultActionConfigs, defaultHandlers } from "@aws-amplify/ui-react-storage/browser";
+import { hideUnless } from "../locationPolicy";
 import { moveFile, type MoveItem, type MoveOps } from "./moveFile";
 
 /** What Storage Browser passes to an action handler (the parts we use). */
@@ -60,7 +61,7 @@ export const moveActionConfig = {
     icon: "folder" as const,
     label: "Move",
     disable: defaultActionConfigs.copy.actionListItem.disable,
-    hide: (permissions: string[]) => !permissions.includes("write") || !permissions.includes("delete"),
+    hide: hideUnless("move"),
   },
   handler: (input: HandlerInput) => ({
     result: moveFile(input.data, storageOps(input)).then((r) =>

@@ -83,11 +83,11 @@ the owner in ADR 0011). They can't restore into someone else's folder: they have
 
 | UI | Source | Enforced by |
 |---|---|---|
-| Home lists `Personal/<own email>/` only when `personal` is `yes` and the email is known | `listDriveLocations()` in `web/src/config.ts` | `ListOwnPersonalFolder`, `ManageOwnPersonalObjects` need `personal` = `yes` |
+| Home lists `Personal/<own email>/` only when `personal` is `yes` and the email is known | `listDriveLocations()` in `web/src/locationPolicy.ts` | `ListOwnPersonalFolder`, `ManageOwnPersonalObjects` need `personal` = `yes` |
 | Home never lists anyone else's folder | `listDriveLocations()` (replaces the Amplify adapter's `listLocations`; listing everyone's would mean shipping the allowlist to the browser) | no statement matches another email |
-| The personal location always has `["delete", "get", "list", "write"]` | `personalLocation()` | same statements, independent of `global_access` |
+| The personal location always has `["delete", "get", "list", "write"]` | `locationPolicy()` (kind `personal`) | same statements, independent of `global_access` |
 | Top-bar Upload/Import shown on Home when the person can write somewhere | `showWriteButtons` in `web/src/pages/Drive.tsx` | |
-| Restore refuses targets in another person's folder with a clear message | `canWriteFor()` in `web/src/trash/actions.ts`, `cantWriteMessage()` in `trash.ts` | no write on that folder |
+| Restore refuses targets in another person's folder with a clear message | `canWriteAt()` in `web/src/locationPolicy.ts`, `cantWriteMessage()` in `trash.ts` | no write on that folder |
 
 ### Lower-casing the email
 
@@ -158,11 +158,11 @@ Upload, download, Copy, Move, Edit and import call S3 exactly as in `Global/`
 
 | Area | Files | Tests |
 |---|---|---|
-| Prefix, location, Home list | `web/src/config.ts` (`PERSONAL_PREFIX`, `personalPrefix`, `personalLocation`, `isPersonalPrefix`, `listDriveLocations`) | `web/test/driveLocation.test.ts` |
+| Prefix, location, Home list | `web/src/locationPolicy.ts` (`PERSONAL_PREFIX`, `personalPrefix`, `locationKind`, `locationPolicy`, `listDriveLocations`) | `web/test/locationPolicy.test.ts` |
 | `personal` claim in the SPA | `web/src/access.ts` | `web/test/access.test.ts` |
 | Email from the ID token | `web/src/session.ts` (`currentUser`, `emailFromIdTokenPayload`) | `web/test/session.test.ts` |
 | Drive wiring, top bar, import label | `web/src/pages/Drive.tsx` | playground |
-| Restore's write check | `web/src/trash/actions.ts` (`canWriteFor`), `trash.ts` (`cantWriteMessage`) | `web/test/trash.test.ts` |
+| Restore's write check | `web/src/locationPolicy.ts` (`canWriteAt`), `web/src/trash/trash.ts` (`cantWriteMessage`) | `web/test/trash.test.ts` |
 | `personal` flag → claim | `functions/allowlist/src/access.ts`, `preTokenGeneration.ts` | `functions/allowlist/test/access.test.ts`, `handlers.test.ts` |
 | Tag mapping and IAM statements | `infra/identity.tf` | `terraform validate` |
 | SSM `access` validation | `infra/foundation_inputs.tf` | `terraform plan` |
@@ -327,7 +327,7 @@ Failure messages for upload, Move, Delete and Edit are the shared drive's
 
 - **Unit tests:** `npm test --prefix web` (`driveLocation`: lower-cased prefix, full-access
   location, Home lists only the signed-in person's folder and none when the email is unknown;
-  `access`; `trash`: `canWriteFor` allows only the person's own folder) and
+  `access`; `locationPolicy`: `canWriteAt` allows only the person's own folder) and
   `npm test --prefix functions/allowlist` (the `personal` flag and claim).
 - **Playground:** `/playground.html?view=drive` (signed in as `you@example.com`, with a personal
   folder); `&access=read` hides it, `&access=read%2Bpersonal` shows a read-only `Global/` with a

@@ -9,7 +9,7 @@ import {
   type ObjectVersion,
   type TrashOps,
 } from "../src/trash/trash";
-import { canWriteFor, deleteCompleteMessage } from "../src/trash/actions";
+import { deleteCompleteMessage } from "../src/trash/actions";
 import { copySource } from "../src/trash/s3Ops";
 import { emptySummaryText, failureLines } from "../src/trash/TrashViews";
 
@@ -222,18 +222,6 @@ describe("emptyDeleted", () => {
     expect(summary).toEqual({ removed: 1, failed: 1, firstError: "a (deleted 2026-11-10 14-03-12 7f2c).jpg: removeVersion denied" });
     expect(emptySummaryText(summary)).toMatch(/1 couldn't be removed/);
     expect(emptySummaryText({ removed: 0, failed: 0 })).toBe("Deleted was already empty.");
-  });
-});
-
-describe("canWriteFor", () => {
-  it("allows Global/ with write access and only the person's own personal folder", () => {
-    const can = canWriteFor({ globalWrite: true, personal: true, trash: true }, "Me@x.com");
-    expect(can("Global/a.jpg")).toBe(true);
-    expect(can("Personal/me@x.com/a.jpg")).toBe(true);
-    expect(can("Personal/mom@x.com/a.jpg")).toBe(false);
-    const readOnly = canWriteFor({ globalWrite: false, personal: false, trash: true }, "me@x.com");
-    expect(readOnly("Global/a.jpg")).toBe(false);
-    expect(readOnly("Personal/me@x.com/a.jpg")).toBe(false);
   });
 });
 

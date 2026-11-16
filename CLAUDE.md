@@ -65,7 +65,7 @@ personal folder `Personal/${aws:PrincipalTag/email}/*`, and listing only for tho
 The Identity Pool maps the ID token's `email` claim to that session tag
 (`aws_cognito_identity_pool_provider_principal_tag`). Folders are keyed by email, not
 identity ID, so they survive recreating the app stack ([ADR 0009](docs/adr/0009-personal-folders-keyed-by-email.md)).
-The SPA builds the prefix lower-cased (`personalPrefix()` in `web/src/config.ts`); IAM compares
+The SPA builds the prefix lower-cased (`personalPrefix()` in `web/src/locationPolicy.ts`); IAM compares
 it with the raw claim, which Google sends lower-case.
 
 Per-person access levels ([ADR 0010](docs/adr/0010-per-person-access-levels-in-ssm.md)) use the
@@ -73,9 +73,13 @@ same mechanism. Everyone can list and read `Global/`; writes there need the sess
 `global_access` = `write`, and every personal-folder statement needs `personal` = `yes`. Both
 tags come from ID-token claims the pre token generation trigger adds. A missing tag fails the
 condition, so the fallback is read-only. The SPA reads the same claims (`web/src/access.ts`)
-only to hide what IAM would refuse: a read-only `Global/` location gets Storage Browser
-permissions `["get", "list"]`, Move and Google import hide without `write`, and Home lists the
-personal folder only when `personal` is `yes`.
+only to hide what IAM would refuse, and **one module answers "who can do what where"**:
+`web/src/locationPolicy.ts` (#38) turns `Access`, email and a prefix into the location's kind
+(shared / personal / deleted / other), its capabilities (`read`, `write`, `move`,
+`manageDeleted`) and Storage Browser permissions. Home, the top bar, every action's `hide`
+(`hideUnless(...)`, since `hide` only gets permissions) and Restore's `canWriteAt` read it; never
+re-derive access from permission strings or flags elsewhere. Its table test
+(`web/test/locationPolicy.test.ts`) is checked by hand against `infra/identity.tf`: change both together.
 
 The Deleted folder ([ADR 0011](docs/adr/0011-delete-moves-to-a-deleted-folder.md)) adds a
 third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
@@ -98,7 +102,7 @@ Every IAM role the app stack creates sets `permissions_boundary = local.permissi
 - Access levels: SSM `/family-drive/access` is a **JSON `String`** (not StringList: JSON has commas), e.g. `{"a@x.com": {"global": "write", "personal": true, "trash": true}}`. Unlisted allowlisted emails get read-only `Global/`, no personal folder and no Deleted folder.
   - `functions/allowlist/src/access.ts` parses it (lower-cased keys; rejects bad JSON, unknown keys, bad values and the same email twice in different case) and turns it into string claims `global_access` (`read`/`write`), `personal` and `trash` (`yes`/`no`).
   - Terraform (`infra/foundation_inputs.tf`) checks the same rules in preconditions, plus that every email is allowlisted, and passes a normalized `jsonencode` to pre token generation as env `ACCESS_LEVELS`.
-  - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping, an IAM condition, and `web/src/access.ts`.
+  - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping, an IAM condition, `web/src/access.ts` and `web/src/locationPolicy.ts` (plus its test table).
 
 ### Two Terraform stacks
 - **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules), the SSM parameters and the app roles' permissions boundary. Every resource has `prevent_destroy`.
@@ -156,7 +160,7 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - `.gitattributes` forces LF for `*.sh`, so scripts keep working after a Windows checkout.
 - Terraform: `>= 1.10`, AWS provider `~> 6.0`. The S3 backend uses `use_lockfile`, and the bucket name is passed as `-backend-config`.
 - The Lambdas run on `nodejs22.x` (esbuild targets node22). The web build and tests need Node ≥ 22.12.
-- `web/src/pages/Drive.tsx` renders Storage Browser (`@aws-amplify/ui-react-storage/browser`) with the Amplify auth adapter, opened at the `Global/` prefix via `driveLocation()` in `web/src/config.ts`. Home lists only `Global/` and the signed-in person's folder: `listDriveLocations()` replaces the adapter's `listLocations` (Amplify's own paths can only use the identity ID). Create the browser after `Amplify.configure` (the adapter reads the storage config when built), never at module level.
+- `web/src/pages/Drive.tsx` renders Storage Browser (`@aws-amplify/ui-react-storage/browser`) with the Amplify auth adapter, opened at the `Global/` prefix via `driveLocation()` in `web/src/locationPolicy.ts`. Home lists only the locations the person can read (`Global/`, their own folder, `Deleted/`): `listDriveLocations()` replaces the adapter's `listLocations` (Amplify's own paths can only use the identity ID). Create the browser after `Amplify.configure` (the adapter reads the storage config when built), never at module level.
 - File preview (the panel beside the list) uses Storage Browser's `filePreview` option. Image, video and text use its built-in viewers; extra types are entries in `web/src/preview/registry.ts` (extensions/content types → viewer component). One limit, `MAX_PREVIEW_BYTES` (50 MB, in **bytes** despite the library docs saying KB), applies to every type; the "too big" wording is `previewDisplayText`, passed to `StorageBrowser` as `displayText`. PDF uses `react-pdf` (PDF.js), loaded lazily through `PdfPreviewLazy.tsx` so it stays out of the main bundle; it fetches the bytes because the pre-signed URL is `Content-Disposition: attachment` (an iframe would download), and `scripts/deploy.sh` uploads `.mjs` (the PDF.js worker) as `text/javascript`. Markdown: `MarkdownPreview.tsx` renders with `react-markdown` + `remark-gfm` (tables, checklists) using `skipHtml`, the default URL sanitising and images shown as links — keep those when touching it, since rendered files run in every family member's browser.
 
 ## Docs
@@ -174,7 +178,7 @@ The project uses Matt Pocock's skills (`mattpocock-skills`), not superpowers (tu
   sections each. Update a feature's doc in the same PR as any change to that feature.
 - **`docs/adr/`**: architecture decisions (`NNNN-slug.md`). Read the ones touching an area
   before changing it, and say so explicitly if a change contradicts one.
-- **`GLOSSARY.md`** at the root: the project's terms. Created when the first term is settled.
+- **`GLOSSARY.md`** at the root: the project's terms (locations and their kinds, access flags, capabilities).
 - **Specs and plans are tickets in the issue tracker**, not files in `docs/`.
 - **`docs/agents/`**: where issues live and how they're labelled, written by `/setup-matt-pocock-skills`.
 

@@ -9,7 +9,7 @@
  * - Delete permanently and Empty Deleted remove every version, so nothing is
  *   left to recover in the console either.
  */
-import { DELETED_PREFIX } from "../config";
+import { DELETED_PREFIX } from "../locationPolicy";
 import { deletedKey, originalKey, randomTag } from "./paths";
 
 export interface ObjectVersion {

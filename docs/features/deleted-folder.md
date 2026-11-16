@@ -114,13 +114,13 @@ Nobody can list or read `Deleted/` without `trash`, not even what they deleted t
 
 | UI | Source | Enforced by |
 |---|---|---|
-| Home lists `Deleted/` only with `trash` | `listDriveLocations()` (`web/src/config.ts`) | `ListDeletedFolder`, `ManageDeletedObjects` |
-| `Deleted/` gets permissions `["delete", "get", "list"]` (no `write`), so Upload, Create folder, Copy, Move, Edit and the move-to-Deleted Delete are hidden there | `deletedLocation()` | no write statement covers `Deleted/` except the two move-in ones |
+| Home lists `Deleted/` only with `trash` | `listDriveLocations()` (`web/src/locationPolicy.ts`) | `ListDeletedFolder`, `ManageDeletedObjects` |
+| `Deleted/` gets permissions `["delete", "get", "list"]` (no `write`), so Upload, Create folder, Copy, Move, Edit and the move-to-Deleted Delete are hidden there | `locationPolicy()` (kind `deleted`) | no write statement covers `Deleted/` except the two move-in ones |
 | Delete (move) shown where the location has `write` and `delete` | `makeTrashActions().delete.actionListItem.hide` | the write statements |
-| Restore, Delete permanently, Empty Deleted shown only where the location has `delete` but not `write` (i.e. `Deleted/`) | `inDeleted()` in `trash/actions.ts` | `ManageDeletedObjects`, `ListDeletedFolder` |
-| Restore refuses targets the person can't write, with a reason | `canWriteFor()`, `cantWriteMessage()` | the write statements |
+| Restore, Delete permanently, Empty Deleted shown only where the location has `delete` but not `write` (i.e. `Deleted/`) | `hideUnless("manageDeleted")` from `web/src/locationPolicy.ts` | `ManageDeletedObjects`, `ListDeletedFolder` |
+| Restore refuses targets the person can't write, with a reason | `canWriteAt()`, `cantWriteMessage()` | the write statements |
 | Delete permanently refuses keys outside `Deleted/` | `deletePermanently()` | no `DeleteObjectVersion` outside `Deleted/*` |
-| The retention note only in `Deleted/`'s list | `isDeletedPrefix()` in `Drive.tsx` | (display only) |
+| The retention note only in `Deleted/`'s list | `locationPolicy().kind === "deleted"` in `Drive.tsx` | (display only) |
 
 With raw credentials a writer can still `DeleteObject` in `Global/` directly, skipping `Deleted/`;
 versioning is the backstop for that (accepted in ADR 0011 and the security assessment).
@@ -168,7 +168,7 @@ sequenceDiagram
     RV->>RV: confirm "Put N items back where they were?"
     loop each file (folder: ListObjectsV2 first)
         T->>T: originalKey() from the stamp, else refuse
-        T->>T: canWriteFor(original), else refuse with the reason
+        T->>T: canWriteAt(original), else refuse with the reason
         T->>S3: HeadObject original
         alt exists
             T-->>RV: A file with this name is already at …
@@ -228,11 +228,11 @@ sequenceDiagram
 |---|---|---|
 | Rules: move, restore, purge, empty (injected `TrashOps`) | `web/src/trash/trash.ts` | `web/test/trash.test.ts` |
 | Key mapping and stamp | `web/src/trash/paths.ts` | `trash.test.ts` (`deletedKey`/`originalKey`) |
-| Storage Browser actions, Delete's wording and messages, `canWriteFor` | `web/src/trash/actions.ts` | `trash.test.ts` (messages, `canWriteFor`) |
+| Storage Browser actions, Delete's wording and messages | `web/src/trash/actions.ts` | `trash.test.ts` (messages) |
 | Views: Restore, Delete permanently (reuse DeleteView parts), Empty Deleted, `TrashContext` | `web/src/trash/TrashViews.tsx` | `trash.test.ts` (failure lines) |
 | S3 operations (AWS SDK, lazy) | `web/src/trash/s3Ops.ts` | `trash.test.ts` (`copySource` encoding) |
 | Retention note | `web/src/trash/retention.ts` | `web/test/retention.test.ts` |
-| Location and Home | `web/src/config.ts` (`DELETED_PREFIX`, `deletedLocation`, `isDeletedPrefix`, `listDriveLocations`) | `web/test/driveLocation.test.ts` |
+| Location, Home and Restore's write check | `web/src/locationPolicy.ts` (`DELETED_PREFIX`, `locationPolicy`, `listDriveLocations`, `canWriteAt`) | `web/test/locationPolicy.test.ts` |
 | Wiring | `web/src/pages/Drive.tsx` (`delete` handler, custom actions, views, `TrashContext`, the note, S3 target, `once()`), `useStableItems` in `web/src/stableItems.ts` | playground |
 | CSS | `web/src/styles.css` (`.trash-view--restore` hides Delete's hard-coded "Deleted" progress column, `.folder-note`) | |
 | `trash` flag | `functions/allowlist/src/access.ts`, `infra/foundation_inputs.tf`, `infra/identity.tf`, `web/src/access.ts` | `access.test.ts` (both packages) |
@@ -381,9 +381,9 @@ Console: S3 → bucket → `Deleted/` with **Show versions**; Management → Lif
   - `trash.test.ts`: key mapping round trips, random tags, move (copy before remove, failures,
     folders and placeholders), restore (never overwrites, write check, unknown original, folders,
     purge of every version), delete permanently (only that key, folders, refuses outside
-    `Deleted/`), empty (progress, continues past failures), `canWriteFor`, messages, `copySource`;
+    `Deleted/`), empty (progress, continues past failures), messages, `copySource`;
   - `retention.test.ts`: parsing and the note;
-  - `driveLocation.test.ts`: `Deleted/` location permissions, listed last and only with `trash`.
+  - `locationPolicy.test.ts`: `Deleted/` capabilities and permissions, listed last and only with `trash`, `canWriteAt`.
 - **Playground:** `/playground.html?view=drive` (everything, including `Deleted/`): Delete, Restore,
   Delete permanently and Empty Deleted work on the sample files; a reload resets them.
   `&access=write` hides `Deleted/` while Delete still works.

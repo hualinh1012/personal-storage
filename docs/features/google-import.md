@@ -64,7 +64,7 @@ ordinary upload can. From `aws_iam_role_policy.authenticated` in `infra/identity
 
 | UI | Source | Enforced by |
 |---|---|---|
-| Action and top-bar button hidden without `write` on the location | `googleImportActionConfig.hide`, `canWrite()` in `Drive.tsx` | the write statements above |
+| Action and top-bar button hidden without `write` on the location | `googleImportActionConfig.hide` (`hideUnless("write")`), `locationPolicy().write` in `Drive.tsx`, both from `web/src/locationPolicy.ts` | the write statements above |
 | Destination is always the open folder | `GoogleImportContext.prefix` from `DriveView` | the same; a forged key outside the allowed prefixes gets `AccessDenied` |
 
 ### Google side
