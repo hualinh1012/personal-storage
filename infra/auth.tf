@@ -181,11 +181,13 @@ resource "aws_cognito_user_pool_client" "web" {
   explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
 
   # Explicit instead of the default (every attribute; issue #58). Write: only
-  # what the Google attribute mapping sets on each sign-in (Cognito needs write
-  # access to mapped attributes). Read: only what the ID token needs; `email`
-  # keys personal folders. The access claims come from the pre token
+  # `email`, the one writable attribute the Google mapping sets (Cognito needs
+  # write access to mapped attributes). `email_verified` can't be listed:
+  # Cognito rejects it as a write attribute ("Invalid write attributes") and
+  # sets it from the mapping regardless. Read: only what the ID token needs;
+  # `email` keys personal folders. The access claims come from the pre token
   # generation trigger, not from attributes.
-  write_attributes = ["email", "email_verified"]
+  write_attributes = ["email"]
   read_attributes  = ["email", "email_verified"]
 
   # Bounds how long a removed person keeps access: an ID token lives 1 hour and
