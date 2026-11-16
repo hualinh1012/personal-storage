@@ -358,8 +358,9 @@ A new S3 or logs permission for one of these roles works only if the boundary al
 - **App client:** no secret, `code` flow only, scopes `openid email profile`, Google only,
   `explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]`. Callback and logout URLs
   `https://<cloudfront domain>/` only (plus `<dev_origin>/` while `dev_origin` is set for local
-  development), matching `toAmplifyOutputs()`. `read_attributes` and `write_attributes` are both
-  just `email` and `email_verified` (what the Google mapping writes and the ID token needs; #58).
+  development), matching `toAmplifyOutputs()`. `read_attributes` is `email` and `email_verified`
+  (what the ID token needs) and `write_attributes` just `email` (#58): Cognito refuses
+  `email_verified` as a write attribute and sets it from the Google mapping anyway.
 - **Token lifetimes:** ID and access 60 minutes, refresh 30 days.
 - **Triggers:** pre sign-up; pre token generation with `lambda_version = "V1_0"`.
 - **Lambdas:** `nodejs22.x`, handlers `preSignUp.handler` / `preTokenGeneration.handler`,
