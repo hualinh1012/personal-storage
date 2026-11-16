@@ -188,8 +188,10 @@ flowchart TB
 - **Deleted folder:** writers may write into their part of `Deleted/`; only `trash` reads or purges it
   ([ADR 0011](../adr/0011-delete-moves-to-a-deleted-folder.md)).
 - **Transport and hosting:** HTTPS everywhere; the foundation buckets deny non-TLS requests; the web
-  bucket is private behind CloudFront OAC; CloudFront adds the managed security headers.
-- **CORS** on the files bucket allows the site's origin and `http://localhost:5173` (#57).
+  bucket is private behind CloudFront OAC; CloudFront adds the security headers, a Content Security
+  Policy with exact hosts (report-only until `csp_enforce`, #55) and a `Permissions-Policy`.
+- **CORS** on the files bucket allows only the site's origin; `dev_origin` (e.g.
+  `http://localhost:5173`) is added only while someone develops locally (#57).
 - **Untrusted file content:** previews never run it (Markdown without HTML, PDF.js without scripts,
   SVG as `<img>`); downloads come from the S3 origin, never the app's
   ([file-preview.md §3](../features/file-preview.md#3-access-control)).
@@ -251,7 +253,7 @@ must match the app client's callback URLs in `infra/auth.tf`. A rework of this p
 
 | | Foundation `infra/foundation/` | App `infra/` |
 |---|---|---|
-| Holds | files bucket, state bucket, SSM parameters | Cognito, Lambdas, Identity Pool, role, CloudFront, web bucket, files bucket CORS |
+| Holds | files bucket, state bucket, SSM parameters, the app roles' permissions boundary | Cognito, Lambdas, Identity Pool, role, CloudFront, web bucket, files bucket CORS |
 | Lifetime | retained: every resource `prevent_destroy` | disposable: destroy and rebuild freely |
 | State | `s3://family-drive-tfstate-<account>/foundation/terraform.tfstate` | `…/family-drive/terraform.tfstate` |
 | Applied by | `bootstrap.sh` (foundation pipeline, `AUTO_APPROVE=1`) | `ci/pipeline.sh` (app pipeline) |
@@ -265,7 +267,7 @@ but creates new users and identity IDs (harmless: folders are keyed by email) an
 
 | Pipeline | Trigger | Runs |
 |---|---|---|
-| Foundation | push to `main` touching `infra/foundation/**` | `terraform fmt -check`, `bootstrap.sh`: init (or first-run local state then migrate), import existing parameters and buckets, apply |
+| Foundation | push to `main` touching `infra/foundation/**` | `terraform fmt -check`, `bootstrap.sh`: init (or first-run local state then migrate), import existing parameters, buckets and the boundary policy, apply |
 | App deploy | push to `main` excluding `infra/foundation/**` | `ci/pipeline.sh` (below) |
 | App destroy | manual, after an approval | `ci/destroy-app.sh`: build Lambdas, init, `terraform destroy` of `infra/` only |
 
@@ -277,7 +279,12 @@ but creates new users and identity IDs (harmless: folders are keyed by email) an
 
 Each pipeline's role has a least-privilege inline policy from `ci/iam/`; adding a new AWS resource type
 means adding its actions there and re-attaching the policy **before** pushing. The pipelines don't update
-their own roles. Their known weaknesses (unprotected `main`, role escalation) are #52 and #53.
+their own roles. Every IAM role the app stack creates carries the `family-drive-boundary` permissions
+boundary (foundation, #53), and the app pipeline can create or change a `family-drive-*` role only with it,
+so it can't make a role with more than S3 on the files bucket's three prefixes and the trigger Lambdas'
+logs. What the app pipeline can still do with family files: list their names (`FilesBucketCorsOnly`,
+#58), and read or write them through a role it creates or re-trusts inside that boundary. It can't make
+itself or anything else an administrator. Its other known weakness (unprotected `main`) is #52.
 
 ### Caching on deploy
 

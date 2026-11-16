@@ -8,6 +8,15 @@ resource "aws_s3_bucket" "tfstate" {
   }
 }
 
+# ACLs off (issue #58), as for the files bucket.
+resource "aws_s3_bucket_ownership_controls" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "tfstate" {
   bucket                  = aws_s3_bucket.tfstate.id
   block_public_acls       = true

@@ -229,8 +229,7 @@ flowchart LR
 | CodePipeline V2, Commands action | Deploy | Terraform 1.16.6 installed per run |
 | Google Identity Services, Picker, Drive API v3 | Sign-in, import | `drive.readonly` |
 
-**Baseline = target**, except: production still trusts `http://localhost:5173` (#57) and the pipeline
-roles need tightening (#52, #53, #58).
+**Baseline = target**, except: `main` isn't protected and pipelines aren't gated yet (#52).
 
 ## 7. Security architecture
 
@@ -253,7 +252,7 @@ flowchart TB
 | Authorisation | Role policy with `s3:prefix` and `aws:PrincipalTag/{email,global_access,personal,trash}`; fails closed | `infra/identity.tf` |
 | Session | 60-minute tokens, 1-hour credentials, 30-day refresh, server-side token check | `infra/auth.tf`, `infra/identity.tf` |
 | Data | SSE-S3, TLS-only bucket policies, public access blocked, versioning | `infra/foundation/` |
-| Application | No rendering of file content as code (Markdown without HTML, PDF.js without scripts); React escaping; managed security headers | `web/src/preview/`, `infra/web.tf` |
+| Application | No rendering of file content as code (Markdown without HTML, PDF.js without scripts); React escaping; security headers and a Content Security Policy (#55) | `web/src/preview/`, `infra/web.tf` |
 | Third party | Google token in memory only, sent only to Google; API key restricted | `web/src/googleImport/` |
 | Delivery | Least-privilege pipeline policies; lockfiles and `npm ci`; pinned Terraform | `ci/iam/`, `ci/` |
 
@@ -278,7 +277,7 @@ exploitable by an outsider; the widest boundary is the pipelines.
 | Business | All capabilities in place | Same, Drive-style experience | #13 |
 | Data | Access levels validated in TS and HCL separately; config key lists differ | One validator; one config contract | #41; #42 (undecided) |
 | Application | Hand wiring in `Drive.tsx`; four storage ports; scattered permission rules | Location policy, storage seam, feature seam | #38, #39 (needs a decision), #40 |
-| Technology | Production trusts localhost; broad pipeline `Resource: "*"` | Dev origin only in dev; scoped pipeline policies | #57, #58 |
+| Technology | Closed: production trusted localhost; broad pipeline `Resource: "*"` | Dev origin only in dev; scoped pipeline policies | #57, #58 |
 | Security | Unprotected `main`; pipeline escalation; no CSP | Protected and gated; boundary; CSP | #52, #53, #55 |
 | Documentation | Setup spread through `deployment.md` | Step-by-step setup guide | #19 |
 
@@ -304,10 +303,10 @@ exploitable by an outsider; the widest boundary is the pipelines.
 
 | Risk | Impact | Mitigation | Status |
 |---|---|---|---|
-| A push to `main` (or a compromised GitHub account) changes AWS | Account takeover, data loss | Branch protection, pipeline approval, permissions boundary | #52, #53 open |
+| A push to `main` (or a compromised GitHub account) changes AWS | Account takeover, data loss | Branch protection, pipeline approval, permissions boundary | #52 open; boundary in place (#53) |
 | Files lost with no second copy | Family photos gone | Versioning (30 days), `Deleted/`, `prevent_destroy` | Accepted (#54) |
 | Unnoticed misuse or cost spike | Late discovery | Manual checks; incident steps in the security assessment | Accepted (#56) |
-| XSS steals the 30-day refresh token | Ongoing access to files | Careful viewers; CSP | #55 open |
+| XSS steals the 30-day refresh token | Ongoing access to files | Careful viewers; CSP | #55: shipped report-only, enforce after checking |
 | A Storage Browser upgrade breaks custom parts | Broken layout or actions | Pinned behaviour notes, playground re-check, feature seam | CLAUDE.md, #40 |
 | Google changes the import scope rules or Testing limits | Import stops | ADR 0008 notes the switch-back path | Watch |
 | Lambda runtime or dependency end of life | Deploys or sign-in break | Track deprecation dates and CVEs | Manual (#22 won't fix) |

@@ -67,6 +67,28 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 **Storage cost:** files under `Global/` and `Personal/` move to S3 Intelligent-Tiering within a day or two of being uploaded, and to cheaper tiers when nobody opens them for 30 days. Only the tiers that open instantly are used (ADR 0013). Don't turn on Intelligent-Tiering's archive tiers or switch to a Glacier class: downloads, previews, Move and Delete would fail on archived files.
 
+**Check the permissions boundary (#53)** after re-attaching the app pipeline policy, with the IAM policy
+simulator. Creating a `family-drive-*` role without the boundary must be denied, and with it allowed:
+
+```bash
+aws iam simulate-custom-policy --policy-input-list file://ci/iam/app-pipeline-policy.json --action-names iam:CreateRole iam:PutRolePolicy --resource-arns arn:aws:iam::084519186805:role/family-drive-x --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text
+```
+
+```bash
+aws iam simulate-custom-policy --policy-input-list file://ci/iam/app-pipeline-policy.json --action-names iam:CreateRole iam:PutRolePolicy --resource-arns arn:aws:iam::084519186805:role/family-drive-x --context-entries ContextKeyName=iam:PermissionsBoundary,ContextKeyValues=arn:aws:iam::084519186805:policy/family-drive-boundary,ContextKeyType=string --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text
+```
+
+The first prints `implicitDeny` for both actions, the second `allowed`. In the console,
+`family-drive-pre-sign-up`, `family-drive-pre-token-generation` and `family-drive-authenticated` show
+**Permissions boundary: family-drive-boundary**.
+
+**Turn on the Content Security Policy (#55):** it ships as `Content-Security-Policy-Report-Only`, so
+browsers only log what it would block. Go through the end-to-end checklist below with the browser's
+console open (desktop Chrome, and once on a phone), on the deployed site. Messages starting with
+`[Report Only] Refused to …` name the blocked URL and directive. Add any legitimate host to `local.csp`
+in `infra/web.tf`; when a full run shows none, set `csp_enforce` to `true` in `infra/variables.tf` and
+push. If something breaks after that, set it back to `false` and push.
+
 **Change the foundation:** edit `infra/foundation/` and push. The foundation pipeline picks it up.
 
 **When a policy in `ci/iam/` changes:** re-run its `aws iam put-role-policy` command ([setup steps 4.2 and 7.2](guides/setup-from-scratch.md#42-give-the-pipeline-its-permissions)) **before** pushing the change that needs it. The pipelines don't update their own roles.
@@ -90,6 +112,11 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 | `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | AccessDenied opening your own personal folder | The Identity Pool's principal tag mapping is missing (stack not re-applied), or the account's email has capitals in its claim | Re-run the app pipeline; check the `email` claim in the ID token is lower case (ADR 0009). |
 | `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
+| Signing in on `http://localhost:5173` fails with `redirect_mismatch`, or the drive shows CORS errors there | Production doesn't trust localhost (#57) | Set `dev_origin` and apply from your machine ([setup step 11](guides/setup-from-scratch.md#step-11-local-development-against-the-real-backend)). |
+| `AccessDenied` on a `cloudfront:` or `cognito-` action for a resource that exists | The app pipeline only changes distributions, user pools and identity pools tagged `Project = family-drive` (#58) | Tag it `Project = family-drive` in the console (Terraform's `default_tags` set it on everything it creates), or re-attach the current `ci/iam/app-pipeline-policy.json`. |
+| App plan or apply fails on a role with `NoSuchEntity` / `policy/family-drive-boundary` | The foundation hasn't created the boundary yet (#53) | Run the foundation pipeline (with `ci/iam/foundation-pipeline-policy.json` re-attached), then the app pipeline. |
+| `AccessDenied … iam:CreateRole` / `iam:PutRolePolicy` / `iam:AttachRolePolicy` on a `family-drive-*` role | The role doesn't set `permissions_boundary = local.permissions_boundary`, or the policy attached to the pipeline role is older than the code | Set the boundary on the role; re-attach the current `ci/iam/app-pipeline-policy.json`. |
+| A permission added to an app role has no effect (AccessDenied in the app) | The boundary `family-drive-boundary` doesn't allow it (#53) | Widen `infra/foundation/boundary.tf`, run the foundation pipeline, then the app pipeline. |
 | `Node >= 22.12 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
 | Google shows `redirect_uri_mismatch` | [Setup step 8](guides/setup-from-scratch.md#step-8-finish-google-sign-in) not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse` ([setup step 8](guides/setup-from-scratch.md#step-8-finish-google-sign-in)). Google's error details page shows the exact URI it received. |
 | Google says the account can't access the app (consent screen in Testing) | The account isn't a test user | Add it under **Test users** ([setup step 5](guides/setup-from-scratch.md#step-5-google-oauth-client-and-consent-screen); publishing isn't an option once Google Drive import is set up). |
@@ -129,6 +156,7 @@ Run after a deploy, ideally in a private window.
 - [ ] Create folder `Tết 2026`, upload `ảnh gia đình.jpg` into it, then download it and check it opens.
 - [ ] Preview a photo, a video, a `.txt` file, a `.md` file (formatted headings/lists) and a multi-page PDF (Previous/Next work); a `.docx` shows no preview but can be downloaded.
 - [ ] Click a file over 50 MB (e.g. a video): the panel says "File is too big to preview" and the download button works.
+- [ ] With the browser console open: no `Refused to …` CSP messages (`[Report Only]` while `csp_enforce` is off) during sign-in, browsing, upload, download, every preview type (including a PDF), Edit, and Import from Google Drive (sign-in popup and Picker). The response headers include `Content-Security-Policy` (or `-Report-Only`) and `Permissions-Policy`.
 - [ ] Copy a file, then delete the copy.
 - [ ] Move two files into another folder; they disappear from the old folder and appear in the new one. Move one back onto a same-named file: it's refused with "already exists" and both stay.
 - [ ] Select one `.txt` file and choose **Edit** in the ⋮ menu: it opens with its text (Vietnamese characters intact). Change a line and **Save**: "Saved." shows, **Back** returns to the folder with the new size, and the preview shows the change. Edit is disabled with two files or a non-`.txt` file selected, and missing in a read-only `Global/` and in `Deleted/`.

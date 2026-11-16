@@ -182,7 +182,7 @@ Files deleted in the app are restored from `Deleted/` instead ([deleted-folder.m
 
 | Area | Files |
 |---|---|
-| Files bucket, versioning, lifecycle, encryption, public access block | `infra/foundation/files.tf` |
+| Files bucket, versioning, lifecycle, encryption, public access block, object ownership | `infra/foundation/files.tf` |
 | TLS-only bucket policies | `infra/foundation/tls.tf` |
 | State bucket | `infra/foundation/state.tf` |
 | Retention variable and its validation | `infra/foundation/main.tf` (`deleted_retention_days`) |

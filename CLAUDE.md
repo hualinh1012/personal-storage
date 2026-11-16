@@ -82,6 +82,12 @@ third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
 (`Deleted/Global/*`, `Deleted/Personal/<own email>/*`) but not list or read it; only
 `trash` = `yes` lists, reads and deletes there, including every version.
 
+Every IAM role the app stack creates sets `permissions_boundary = local.permissions_boundary`
+([#53](https://github.com/hualinh1012/personal-storage/issues/53)): the managed policy `family-drive-boundary`
+(`infra/foundation/boundary.tf`, retained) allows only S3 on the files bucket's `Global/`, `Personal/` and
+`Deleted/` and the trigger Lambdas' logs, and the app pipeline policy only creates or changes a
+`family-drive-*` role that has it. A new permission outside that needs the boundary widened first (foundation).
+
 ### Allowlist enforcement spans three places
 - `functions/allowlist/src/allowlist.ts` holds the pure logic: case-insensitive matching, ignores surrounding whitespace, requires `email_verified`, and an empty list denies everyone.
 - Two Cognito triggers use it:
@@ -95,9 +101,9 @@ third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
   - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping, an IAM condition, and `web/src/access.ts`.
 
 ### Two Terraform stacks
-- **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules) and the SSM parameters. Every resource has `prevent_destroy`.
+- **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules), the SSM parameters and the app roles' permissions boundary. Every resource has `prevent_destroy`.
   - Files under `Global/` and `Personal/` move to Intelligent-Tiering via lifecycle; `Deleted/` stays Standard. Never add an `aws_s3_bucket_intelligent_tiering_configuration` or a Glacier class: archived objects break download, preview, Move and Delete ([ADR 0013](docs/adr/0013-files-in-intelligent-tiering-without-archive-tiers.md)).
-  - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters and buckets.
+  - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters, buckets and the boundary policy.
   - The SSM parameters are created with a `CHANGE_ME` placeholder and `ignore_changes` on their value, so Terraform never overwrites real values.
 - **`infra/` is the app stack and is disposable:** Cognito, the Lambdas, the Identity Pool, CloudFront, the web bucket, and the files bucket's CORS rule.
   - It finds foundation resources **by naming convention through data sources** (`infra/foundation_inputs.tf`), not through remote state.
@@ -111,7 +117,7 @@ third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
 3. `web/src/config.ts` `loadConfig()` reads that file at runtime.
 4. `toAmplifyOutputs()` builds an Amplify Gen 2–shaped outputs object by hand. The project uses Amplify JS only as a client library, with no Amplify backend tooling.
 
-The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/` and `http://localhost:5173/`).
+The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/`, plus `http://localhost:5173/` only when `dev_origin` is set). `dev_origin` is empty in production (#57): local development against the real backend sets it in `infra/terraform.tfvars` and applies from that machine; the next pipeline run removes it again.
 
 ### CI/CD (AWS CodePipeline, Commands actions)
 - **`ci/pipeline.sh`** deploys the app. It tests and builds the Lambdas, runs the web tests, runs plan and apply on `infra/`, then runs `scripts/deploy.sh`, which builds the SPA, uploads it (hashed assets cached forever, `index.html`/`config.json` with `no-cache`) and invalidates CloudFront.
@@ -133,7 +139,7 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - **Import from Google Drive** (`web/src/googleImport/`) runs entirely in the browser (no backend, ADR 0001). It's a custom Storage Browser action plus a top-bar button (same remount trick as Upload); `GoogleImportView` gets the open folder and its exit through `GoogleImportContext` from `DriveView`, and exiting remounts the browser, which re-lists the folder.
   - Google sign-in (GIS token client) and Picker load lazily when the view opens. The token asks for `drive.readonly` ([ADR 0008](docs/adr/0008-google-drive-import-scope.md): `drive.file` can't see inside picked folders), lives only in `google.ts` memory and is sent only to Google; `driveClient.ts` is the only code calling the Drive API.
   - Pure, tested modules hold the rules: `plan.ts` (keys, `(n)` names, re-run skips, conversion targets, 500 MB cut-off; never overwrites), `listing.ts`/`prepare.ts` (recursive folder walk), `queue.ts` (3 at a time, cancel), `retry.ts`, `importFile.ts`. Google and S3 are injected through `deps.ts`, which is how the playground fakes them.
-  - Gated by config: `googleImportConfig()` in `web/src/config.ts` returns null while the SSM values (`/family-drive/google_api_key`, `/family-drive/google_project_number`) are `CHANGE_ME`, and the view says it isn't set up. They're deliberately not in the deploy precondition. A CSP, if ever added, must allow `accounts.google.com`, `apis.google.com`, `docs.google.com` and `www.googleapis.com`.
+  - Gated by config: `googleImportConfig()` in `web/src/config.ts` returns null while the SSM values (`/family-drive/google_api_key`, `/family-drive/google_project_number`) are `CHANGE_ME`, and the view says it isn't set up. They're deliberately not in the deploy precondition. The CSP (`infra/web.tf`, `local.csp`) allows `accounts.google.com`, `apis.google.com`, `docs.google.com` and `www.googleapis.com` for this; keep them when touching it.
 - **Edit text files** (`web/src/edit/`, issue #45): a custom ⋮ action for exactly one `.txt` file up to 1 MB, hidden without `write`. `EditTextView` finds the selection through `useView("Delete")` (like Restore) and gets its ops and exit through `EditTextContext`; exiting remounts the browser, which re-lists the folder.
   - `text.ts` holds the rules (UTF-8 only, refuses invalid bytes; keeps a BOM and CRLF/LF on save); `textFile.ts` opens/saves over injected `TextFileOps`; `s3Ops.ts` uses the lazily loaded SDK (`GetObject`/`PutObject`). Saving is last-write-wins on purpose (owner's choice: family app); versioning is the undo.
   - More types (Markdown, CSV) are extensions in `EDITABLE_EXTENSIONS` plus whatever the view needs.
@@ -141,6 +147,7 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
   - `folderTracker.ts` wraps the `listLocationItems` handler. A first-page listing (open folder, Refresh, back from any action) triggers a recount (`countFolder.ts`: one `listAll` LIST); stale counts are dropped. It tells search (page size ≠ 100) and Copy's destination listings (`exclude`) apart from the file list by their options.
   - `rows.ts` holds the pure rules: `countRows` mirrors Storage Browser's `parseResult` (subfolders + files, minus the folder's own placeholder and dot keys). Jumping forward re-paginates until enough rows are loaded (Storage Browser fetches one page per call). Repeated tokens get an empty page, and "done fetching" is reported on a later task so the pager never paginates with a stale token.
   - Falls back to visited pages + Next while counting, when the count fails and during search. Re-check after upgrading `@aws-amplify/ui-react-storage`.
+- **Security headers** (`infra/web.tf`, #55): a custom CloudFront response headers policy keeps the managed security headers and adds a Content Security Policy (exact hosts: the files bucket, this region's Cognito endpoints and hosted domain, the Google hosts; `'unsafe-inline'` for styles only) and a `Permissions-Policy`. `csp_enforce` (default `false`) sends the CSP as `Content-Security-Policy-Report-Only`. A new external host the browser loads or calls (fetch, script, iframe, image, media) must be added to `local.csp`. It applies only behind CloudFront: `npm run dev` and the playground aren't affected.
 - Storage Browser's download service worker (`public/amplify-storage-download/download-sw.js`) is copied from the package by `npm run copy-sw` (runs before dev/build, git-ignored) and deployed with `no-cache`. Without it, downloads fall back to in-memory blobs.
 
 - Installable as a PWA: `public/manifest.webmanifest` + head tags in `index.html`, icons in `public/icons/` generated by `web/scripts/make-icons.mjs` (committed PNGs). There is deliberately **no app service worker / offline cache** — it would fight the `no-cache` entry points. `scripts/deploy.sh` uploads the manifest (as `application/manifest+json`) and icons with `no-cache`, since their names aren't hashed.

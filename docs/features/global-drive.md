@@ -273,7 +273,7 @@ sequenceDiagram
 |---|---|---|
 | `config.json` | `filesBucket`, `region` | Amplify storage config → Storage Browser and the SDK clients |
 | `config.json` | `userPoolId`, `userPoolClientId`, `identityPoolId`, `cognitoDomain` | credentials (see auth doc) |
-| Terraform (`infra/`) | `dev_origin` (`http://localhost:5173`) | second CORS origin |
+| Terraform (`infra/`) | `dev_origin` (empty in production; `http://localhost:5173` for local development) | second CORS origin, only when set |
 | Terraform (foundation) | `deleted_retention_days` (30) | `Deleted/` lifecycle (not `Global/`) |
 | SSM | `/family-drive/access` | who gets `global_access` = `write` |
 
@@ -315,23 +315,31 @@ There are no shared-drive-specific SSM parameters or Google Cloud settings.
 ### IAM for the pipeline
 
 App pipeline (`ci/iam/app-pipeline-policy.json`): `FilesBucketCorsOnly` (the app stack only
-reads the files bucket and manages its CORS), `WebBucket`, `CloudFront`, and `AppRoles` /
+reads the files bucket's settings and manages its CORS; its `s3:ListBucket`, which
+`data.aws_s3_bucket` needs, also lets the pipeline list file names, including personal folder
+names, but not read or write the files: accepted, #58), `WebBucket`, the `CloudFront*` statements
+(the distribution only when tagged `Project = family-drive`, #58; `CloudFrontResponseHeadersPolicy`
+for the security headers, #55), and `AppRoles` /
 `PassIdentityPoolRole` for the authenticated role. Foundation pipeline
 (`ci/iam/foundation-pipeline-policy.json`): `FoundationBuckets` (bucket settings, versioning,
 lifecycle).
 
 ### Service configuration as deployed
 
-- **CORS** (`infra/storage.tf`): origins `https://<cloudfront domain>` and
-  `http://localhost:5173`; methods `GET PUT POST DELETE HEAD`; all request headers (Amplify sends
+- **CORS** (`infra/storage.tf`): origin `https://<cloudfront domain>` (plus `dev_origin` only while
+  it is set for local development, #57); methods `GET PUT POST DELETE HEAD`; all request headers (Amplify sends
   checksum and `If-None-Match` headers); exposes `ETag` (multipart completion needs it),
   `x-amz-server-side-encryption`, `x-amz-request-id`, `x-amz-id-2`, `x-amz-version-id`;
   `max_age_seconds = 3000`. These follow Storage Browser's CORS requirements.
-- **Files bucket:** versioning `Enabled`, SSE-S3, all public access blocked, lifecycle as in §2.
-- **Web hosting:** private web bucket readable only by CloudFront through OAC (`sigv4`, always
+- **Files bucket:** versioning `Enabled`, SSE-S3, all public access blocked, ACLs off
+  (`BucketOwnerEnforced`, as on the state and web buckets), lifecycle as in §2.
+- **Web hosting:** private web bucket (ACLs off) readable only by CloudFront through OAC (`sigv4`, always
   sign; bucket policy conditioned on the distribution ARN). Default behaviour: HTTPS redirect,
-  `GET`/`HEAD`, compression, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`
-  (HSTS, `X-Frame-Options SAMEORIGIN`, `nosniff`, referrer policy). 403 and 404 from the origin
+  `GET`/`HEAD`, compression, `Managed-CachingOptimized`, and the custom response headers policy
+  `family-drive-security-headers` (#55): the managed policy's headers (HSTS, `X-Frame-Options SAMEORIGIN`,
+  `nosniff`, referrer policy, `X-XSS-Protection`) plus a Content Security Policy (report-only while
+  `csp_enforce` is `false`) and a `Permissions-Policy` turning off camera, microphone, geolocation
+  and similar. 403 and 404 from the origin
   become `/index.html` with 200 (SPA routing). `PriceClass_200`, default certificate.
 - **Cache headers** (`scripts/deploy.sh`):
   - hashed assets `public,max-age=31536000,immutable` (`.mjs` uploaded as `text/javascript`);

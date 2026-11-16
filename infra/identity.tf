@@ -36,6 +36,10 @@ resource "aws_iam_role" "authenticated" {
   name                 = "${var.project}-authenticated"
   assume_role_policy   = data.aws_iam_policy_document.authenticated_assume.json
   max_session_duration = 3600
+
+  # Caps what this role can ever do (issue #53, infra/foundation/boundary.tf).
+  # A statement below that the boundary doesn't also allow has no effect.
+  permissions_boundary = local.permissions_boundary
 }
 
 data "aws_iam_policy_document" "authenticated" {

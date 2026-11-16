@@ -85,6 +85,7 @@
         "s3:GetBucket*",
         "s3:PutBucket*",
         "s3:DeleteBucketPolicy",
+        "s3:DeleteBucketOwnershipControls",
         "s3:GetAccelerateConfiguration",
         "s3:GetEncryptionConfiguration",
         "s3:PutEncryptionConfiguration",
@@ -101,69 +102,170 @@
       ]
     },
     {
-      "Sid": "CloudFront",
+      "Sid": "CloudFrontCreateDistribution",
       "Effect": "Allow",
       "Action": [
         "cloudfront:CreateDistribution",
-        "cloudfront:GetDistribution",
-        "cloudfront:GetDistributionConfig",
+        "cloudfront:TagResource"
+      ],
+      "Resource": "arn:aws:cloudfront::084519186805:distribution/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "family-drive"
+        }
+      }
+    },
+    {
+      "Sid": "CloudFrontOwnDistribution",
+      "Effect": "Allow",
+      "Action": [
         "cloudfront:UpdateDistribution",
         "cloudfront:DeleteDistribution",
+        "cloudfront:CreateInvalidation",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource"
+      ],
+      "Resource": "arn:aws:cloudfront::084519186805:distribution/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "family-drive"
+        }
+      }
+    },
+    {
+      "Sid": "CloudFrontRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:GetInvalidation",
+        "cloudfront:ListTagsForResource",
+        "cloudfront:GetCachePolicy",
+        "cloudfront:GetResponseHeadersPolicy"
+      ],
+      "Resource": [
+        "arn:aws:cloudfront::084519186805:distribution/*",
+        "arn:aws:cloudfront::*:cache-policy/*",
+        "arn:aws:cloudfront::*:response-headers-policy/*"
+      ]
+    },
+    {
+      "Sid": "CloudFrontOriginAccessControl",
+      "Effect": "Allow",
+      "Action": [
         "cloudfront:CreateOriginAccessControl",
         "cloudfront:GetOriginAccessControl",
         "cloudfront:UpdateOriginAccessControl",
-        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl"
+      ],
+      "Resource": "arn:aws:cloudfront::084519186805:origin-access-control/*"
+    },
+    {
+      "Sid": "CloudFrontResponseHeadersPolicy",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateResponseHeadersPolicy",
+        "cloudfront:UpdateResponseHeadersPolicy",
+        "cloudfront:DeleteResponseHeadersPolicy"
+      ],
+      "Resource": "arn:aws:cloudfront::084519186805:response-headers-policy/*"
+    },
+    {
+      "Sid": "CloudFrontList",
+      "Effect": "Allow",
+      "Action": [
         "cloudfront:ListOriginAccessControls",
-        "cloudfront:GetCachePolicy",
         "cloudfront:ListCachePolicies",
-        "cloudfront:CreateInvalidation",
-        "cloudfront:GetInvalidation",
-        "cloudfront:TagResource",
-        "cloudfront:UntagResource",
-        "cloudfront:ListTagsForResource",
-        "cloudfront:GetResponseHeadersPolicy",
         "cloudfront:ListResponseHeadersPolicies"
       ],
       "Resource": "*"
     },
     {
-      "Sid": "Cognito",
+      "Sid": "CognitoCreatePools",
       "Effect": "Allow",
       "Action": [
         "cognito-idp:CreateUserPool",
+        "cognito-identity:CreateIdentityPool"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "family-drive"
+        }
+      }
+    },
+    {
+      "Sid": "CognitoUserPoolRead",
+      "Effect": "Allow",
+      "Action": [
         "cognito-idp:DescribeUserPool",
+        "cognito-idp:GetUserPoolMfaConfig",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:DescribeIdentityProvider",
+        "cognito-idp:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cognito-idp:ap-southeast-1:084519186805:userpool/*"
+    },
+    {
+      "Sid": "CognitoDescribeDomain",
+      "Effect": "Allow",
+      "Action": "cognito-idp:DescribeUserPoolDomain",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CognitoOwnUserPool",
+      "Effect": "Allow",
+      "Action": [
         "cognito-idp:UpdateUserPool",
         "cognito-idp:DeleteUserPool",
-        "cognito-idp:GetUserPoolMfaConfig",
         "cognito-idp:SetUserPoolMfaConfig",
         "cognito-idp:CreateUserPoolClient",
-        "cognito-idp:DescribeUserPoolClient",
         "cognito-idp:UpdateUserPoolClient",
         "cognito-idp:DeleteUserPoolClient",
         "cognito-idp:CreateUserPoolDomain",
-        "cognito-idp:DescribeUserPoolDomain",
         "cognito-idp:UpdateUserPoolDomain",
         "cognito-idp:DeleteUserPoolDomain",
         "cognito-idp:CreateIdentityProvider",
-        "cognito-idp:DescribeIdentityProvider",
         "cognito-idp:UpdateIdentityProvider",
         "cognito-idp:DeleteIdentityProvider",
         "cognito-idp:TagResource",
-        "cognito-idp:UntagResource",
-        "cognito-idp:ListTagsForResource",
-        "cognito-identity:CreateIdentityPool",
+        "cognito-idp:UntagResource"
+      ],
+      "Resource": "arn:aws:cognito-idp:ap-southeast-1:084519186805:userpool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "family-drive"
+        }
+      }
+    },
+    {
+      "Sid": "CognitoIdentityPoolRead",
+      "Effect": "Allow",
+      "Action": [
         "cognito-identity:DescribeIdentityPool",
+        "cognito-identity:GetIdentityPoolRoles",
+        "cognito-identity:GetPrincipalTagAttributeMap",
+        "cognito-identity:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cognito-identity:ap-southeast-1:084519186805:identitypool/*"
+    },
+    {
+      "Sid": "CognitoOwnIdentityPool",
+      "Effect": "Allow",
+      "Action": [
         "cognito-identity:UpdateIdentityPool",
         "cognito-identity:DeleteIdentityPool",
         "cognito-identity:SetIdentityPoolRoles",
-        "cognito-identity:GetIdentityPoolRoles",
-        "cognito-identity:TagResource",
-        "cognito-identity:UntagResource",
-        "cognito-identity:ListTagsForResource",
         "cognito-identity:SetPrincipalTagAttributeMap",
-        "cognito-identity:GetPrincipalTagAttributeMap"
+        "cognito-identity:TagResource",
+        "cognito-identity:UntagResource"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:cognito-identity:ap-southeast-1:084519186805:identitypool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "family-drive"
+        }
+      }
     },
     {
       "Sid": "Lambdas",
@@ -209,29 +311,62 @@
       "Sid": "AppRoles",
       "Effect": "Allow",
       "Action": [
-        "iam:CreateRole",
         "iam:GetRole",
         "iam:DeleteRole",
         "iam:UpdateRole",
-        "iam:UpdateAssumeRolePolicy",
         "iam:TagRole",
         "iam:UntagRole",
         "iam:ListRolePolicies",
         "iam:ListAttachedRolePolicies",
         "iam:ListInstanceProfilesForRole",
-        "iam:PutRolePolicy",
         "iam:GetRolePolicy",
         "iam:DeleteRolePolicy"
       ],
       "Resource": "arn:aws:iam::084519186805:role/family-drive-*"
     },
     {
-      "Sid": "AttachOnlyLambdaBasicExecution",
+      "Sid": "AppRolesOnlyWithBoundary",
       "Effect": "Allow",
       "Action": [
-        "iam:AttachRolePolicy",
-        "iam:DetachRolePolicy"
+        "iam:CreateRole",
+        "iam:PutRolePolicy",
+        "iam:PutRolePermissionsBoundary"
       ],
+      "Resource": "arn:aws:iam::084519186805:role/family-drive-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::084519186805:policy/family-drive-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "AppRolesTrust",
+      "Effect": "Allow",
+      "Action": "iam:UpdateAssumeRolePolicy",
+      "Resource": [
+        "arn:aws:iam::084519186805:role/family-drive-pre-sign-up",
+        "arn:aws:iam::084519186805:role/family-drive-pre-token-generation",
+        "arn:aws:iam::084519186805:role/family-drive-authenticated"
+      ]
+    },
+    {
+      "Sid": "AttachOnlyLambdaBasicExecution",
+      "Effect": "Allow",
+      "Action": "iam:AttachRolePolicy",
+      "Resource": "arn:aws:iam::084519186805:role/family-drive-*",
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        },
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::084519186805:policy/family-drive-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "DetachLambdaBasicExecution",
+      "Effect": "Allow",
+      "Action": "iam:DetachRolePolicy",
       "Resource": "arn:aws:iam::084519186805:role/family-drive-*",
       "Condition": {
         "ArnEquals": {
@@ -258,6 +393,40 @@
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": "arn:aws:iam::084519186805:role/family-drive-authenticated"
+    },
+    {
+      "Sid": "NeverLiftTheBoundary",
+      "Effect": "Deny",
+      "Action": [
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:DeleteUserPermissionsBoundary"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NeverSwapTheBoundary",
+      "Effect": "Deny",
+      "Action": [
+        "iam:PutRolePermissionsBoundary",
+        "iam:PutUserPermissionsBoundary"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::084519186805:policy/family-drive-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "NeverEditTheBoundary",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicy",
+        "iam:DeletePolicyVersion",
+        "iam:SetDefaultPolicyVersion"
+      ],
+      "Resource": "arn:aws:iam::084519186805:policy/family-drive-boundary"
     }
   ]
 }

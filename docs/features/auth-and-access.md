@@ -286,8 +286,9 @@ turns them into Amplify's `auth` block with `identity_providers: ["GOOGLE"]`, sc
 
 ### Terraform variables
 
-`project` (`family-drive`), `region` (`ap-southeast-1`), `dev_origin`
-(`http://localhost:5173`, added to the callback and logout URLs and to CORS).
+`project` (`family-drive`), `region` (`ap-southeast-1`), `dev_origin` (empty by default; when set,
+e.g. `http://localhost:5173` in `infra/terraform.tfvars` for local development, it is added to the
+callback and logout URLs and to CORS. Production leaves it empty, #57).
 
 ### Google Cloud
 
@@ -314,6 +315,7 @@ person must also be a Google **test user**.
 | Principal tag mapping | for the user pool provider | `aws_cognito_identity_pool_provider_principal_tag.email` | `infra/` |
 | Authenticated role | `family-drive-authenticated`, inline policy `drive-access` | `aws_iam_role.authenticated`, `aws_iam_role_policy.authenticated`, `aws_cognito_identity_pool_roles_attachment.main` | `infra/` |
 | SSM parameters | `/family-drive/{google_client_id,google_client_secret,allowed_emails,access}` | `aws_ssm_parameter.*` | `infra/foundation/` (retained) |
+| Permissions boundary (on all three roles above, #53) | managed policy `family-drive-boundary`: S3 on the files bucket's `Global/`, `Personal/`, `Deleted/`; logs for `/aws/lambda/family-drive-*` | `aws_iam_policy.boundary` (`infra/foundation/boundary.tf`); roles set `permissions_boundary = local.permissions_boundary` | `infra/foundation/` (retained) |
 
 The app stack is disposable ([ADR 0004](../adr/0004-retained-foundation-and-disposable-app-stack.md)).
 Recreating it creates a new user pool (everyone signs in again, as new Cognito users) and a new
@@ -334,11 +336,20 @@ Identity Pool (new identity IDs), which is why personal folders are keyed by ema
 ### IAM for the pipeline
 
 Statements in `ci/iam/app-pipeline-policy.json` this feature needs: `ReadFoundationParams`,
-`Cognito` (including `cognito-identity:SetPrincipalTagAttributeMap`/`GetPrincipalTagAttributeMap`
-for the tag mapping), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRoles`,
-`AttachOnlyLambdaBasicExecution`, `PassLambdaRoles` and `PassIdentityPoolRole` (not limited by
-`iam:PassedToService`: Cognito Identity doesn't send it). The foundation pipeline's
-`FoundationParameters` creates the SSM parameters.
+the `Cognito*` statements (including `cognito-identity:SetPrincipalTagAttributeMap`/`GetPrincipalTagAttributeMap`
+for the tag mapping; #58 scopes them to this account's pools, creates need the request tag
+`Project = family-drive` and changes need the pool to carry it, which the provider's `default_tags` set), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRoles`,
+`AppRolesOnlyWithBoundary` (`CreateRole`, `PutRolePolicy`, `PutRolePermissionsBoundary` only when
+the role has the `family-drive-boundary` boundary, #53), `AppRolesTrust` (`UpdateAssumeRolePolicy`
+on the three roles by name: IAM has no boundary condition for it), `AttachOnlyLambdaBasicExecution`
+(also boundary-conditioned), `DetachLambdaBasicExecution`, `PassLambdaRoles` and
+`PassIdentityPoolRole` (not limited by `iam:PassedToService`: Cognito Identity doesn't send it),
+plus three `Deny` statements: never remove a boundary, never set another one, never edit
+`family-drive-boundary`. The foundation pipeline's `FoundationParameters` creates the SSM
+parameters and `AppRoleBoundary` the boundary.
+
+A new S3 or logs permission for one of these roles works only if the boundary allows it too: widen
+`infra/foundation/boundary.tf` first (foundation pipeline), then the role in `infra/`.
 
 ### Service configuration as deployed
 
@@ -346,7 +357,9 @@ for the tag mapping), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRol
   Google IdP scopes `openid email profile`, mapping `email`, `email_verified`, `username = sub`.
 - **App client:** no secret, `code` flow only, scopes `openid email profile`, Google only,
   `explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]`. Callback and logout URLs
-  `https://<cloudfront domain>/` and `http://localhost:5173/`, matching `toAmplifyOutputs()`.
+  `https://<cloudfront domain>/` only (plus `<dev_origin>/` while `dev_origin` is set for local
+  development), matching `toAmplifyOutputs()`. `read_attributes` and `write_attributes` are both
+  just `email` and `email_verified` (what the Google mapping writes and the ID token needs; #58).
 - **Token lifetimes:** ID and access 60 minutes, refresh 30 days.
 - **Triggers:** pre sign-up; pre token generation with `lambda_version = "V1_0"`.
 - **Lambdas:** `nodejs22.x`, handlers `preSignUp.handler` / `preTokenGeneration.handler`,

@@ -24,13 +24,15 @@ data "aws_iam_policy_document" "lambda_assume" {
 }
 
 resource "aws_iam_role" "pre_sign_up" {
-  name               = "${var.project}-pre-sign-up"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+  name                 = "${var.project}-pre-sign-up"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_assume.json
+  permissions_boundary = local.permissions_boundary
 }
 
 resource "aws_iam_role" "pre_token_generation" {
-  name               = "${var.project}-pre-token-generation"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+  name                 = "${var.project}-pre-token-generation"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_assume.json
+  permissions_boundary = local.permissions_boundary
 }
 
 resource "aws_iam_role_policy_attachment" "pre_sign_up_logs" {
@@ -171,11 +173,20 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
 
-  # Must match the SPA Amplify redirect URIs (origin + "/").
-  callback_urls = ["${local.app_url}/", "${var.dev_origin}/"]
-  logout_urls   = ["${local.app_url}/", "${var.dev_origin}/"]
+  # Must match the SPA Amplify redirect URIs (origin + "/"). The dev origin is
+  # included only when dev_origin is set (issue #57).
+  callback_urls = [for o in local.app_origins : "${o}/"]
+  logout_urls   = [for o in local.app_origins : "${o}/"]
 
   explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
+
+  # Explicit instead of the default (every attribute; issue #58). Write: only
+  # what the Google attribute mapping sets on each sign-in (Cognito needs write
+  # access to mapped attributes). Read: only what the ID token needs; `email`
+  # keys personal folders. The access claims come from the pre token
+  # generation trigger, not from attributes.
+  write_attributes = ["email", "email_verified"]
+  read_attributes  = ["email", "email_verified"]
 
   # Bounds how long a removed person keeps access: an ID token lives 1 hour and
   # the Identity Pool credentials obtained with it up to 1 more hour. Every
