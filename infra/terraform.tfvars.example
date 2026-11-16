@@ -2,4 +2,6 @@
 # Google client and allowed emails come from SSM, managed by infra/foundation.
 project              = "family-drive"
 region               = "ap-southeast-1"
-dev_origin           = "http://localhost:5173"
+# Only while developing locally against the real backend (issue #57). Leave it
+# out otherwise: production trusts only its own origin.
+# dev_origin         = "http://localhost:5173"

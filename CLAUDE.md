@@ -111,7 +111,7 @@ third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
 3. `web/src/config.ts` `loadConfig()` reads that file at runtime.
 4. `toAmplifyOutputs()` builds an Amplify Gen 2–shaped outputs object by hand. The project uses Amplify JS only as a client library, with no Amplify backend tooling.
 
-The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/` and `http://localhost:5173/`).
+The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/`, plus `http://localhost:5173/` only when `dev_origin` is set). `dev_origin` is empty in production (#57): local development against the real backend sets it in `infra/terraform.tfvars` and applies from that machine; the next pipeline run removes it again.
 
 ### CI/CD (AWS CodePipeline, Commands actions)
 - **`ci/pipeline.sh`** deploys the app. It tests and builds the Lambdas, runs the web tests, runs plan and apply on `infra/`, then runs `scripts/deploy.sh`, which builds the SPA, uploads it (hashed assets cached forever, `index.html`/`config.json` with `no-cache`) and invalidates CloudFront.

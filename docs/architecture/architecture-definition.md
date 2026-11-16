@@ -229,8 +229,7 @@ flowchart LR
 | CodePipeline V2, Commands action | Deploy | Terraform 1.16.6 installed per run |
 | Google Identity Services, Picker, Drive API v3 | Sign-in, import | `drive.readonly` |
 
-**Baseline = target**, except: production still trusts `http://localhost:5173` (#57) and the pipeline
-roles need tightening (#52, #53, #58).
+**Baseline = target**, except: the pipeline roles need tightening (#52, #53, #58).
 
 ## 7. Security architecture
 

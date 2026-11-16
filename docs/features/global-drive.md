@@ -273,7 +273,7 @@ sequenceDiagram
 |---|---|---|
 | `config.json` | `filesBucket`, `region` | Amplify storage config → Storage Browser and the SDK clients |
 | `config.json` | `userPoolId`, `userPoolClientId`, `identityPoolId`, `cognitoDomain` | credentials (see auth doc) |
-| Terraform (`infra/`) | `dev_origin` (`http://localhost:5173`) | second CORS origin |
+| Terraform (`infra/`) | `dev_origin` (empty in production; `http://localhost:5173` for local development) | second CORS origin, only when set |
 | Terraform (foundation) | `deleted_retention_days` (30) | `Deleted/` lifecycle (not `Global/`) |
 | SSM | `/family-drive/access` | who gets `global_access` = `write` |
 
@@ -322,8 +322,8 @@ lifecycle).
 
 ### Service configuration as deployed
 
-- **CORS** (`infra/storage.tf`): origins `https://<cloudfront domain>` and
-  `http://localhost:5173`; methods `GET PUT POST DELETE HEAD`; all request headers (Amplify sends
+- **CORS** (`infra/storage.tf`): origin `https://<cloudfront domain>` (plus `dev_origin` only while
+  it is set for local development, #57); methods `GET PUT POST DELETE HEAD`; all request headers (Amplify sends
   checksum and `If-None-Match` headers); exposes `ETag` (multipart completion needs it),
   `x-amz-server-side-encryption`, `x-amz-request-id`, `x-amz-id-2`, `x-amz-version-id`;
   `max_age_seconds = 3000`. These follow Storage Browser's CORS requirements.

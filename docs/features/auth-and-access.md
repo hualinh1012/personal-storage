@@ -286,8 +286,9 @@ turns them into Amplify's `auth` block with `identity_providers: ["GOOGLE"]`, sc
 
 ### Terraform variables
 
-`project` (`family-drive`), `region` (`ap-southeast-1`), `dev_origin`
-(`http://localhost:5173`, added to the callback and logout URLs and to CORS).
+`project` (`family-drive`), `region` (`ap-southeast-1`), `dev_origin` (empty by default; when set,
+e.g. `http://localhost:5173` in `infra/terraform.tfvars` for local development, it is added to the
+callback and logout URLs and to CORS. Production leaves it empty, #57).
 
 ### Google Cloud
 
@@ -346,7 +347,8 @@ for the tag mapping), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRol
   Google IdP scopes `openid email profile`, mapping `email`, `email_verified`, `username = sub`.
 - **App client:** no secret, `code` flow only, scopes `openid email profile`, Google only,
   `explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]`. Callback and logout URLs
-  `https://<cloudfront domain>/` and `http://localhost:5173/`, matching `toAmplifyOutputs()`.
+  `https://<cloudfront domain>/` only (plus `<dev_origin>/` while `dev_origin` is set for local
+  development), matching `toAmplifyOutputs()`.
 - **Token lifetimes:** ID and access 60 minutes, refresh 30 days.
 - **Triggers:** pre sign-up; pre token generation with `lambda_version = "V1_0"`.
 - **Lambdas:** `nodejs22.x`, handlers `preSignUp.handler` / `preTokenGeneration.handler`,

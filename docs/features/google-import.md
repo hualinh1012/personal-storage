@@ -79,7 +79,7 @@ ordinary upload can. From `aws_iam_role_policy.authenticated` in `infra/identity
 - **Same OAuth client** as Google sign-in through Cognito (SSM `/family-drive/google_client_id`).
   The import needs the site as an **Authorized JavaScript origin** on it.
 - **API key:** public (it's in `config.json`); protected by its restrictions (Websites: the site
-  and `localhost:5173`; APIs: Google Picker API only).
+  only; APIs: Google Picker API only). Production lists no `localhost` entries (#57).
 
 ## 4. Flows
 
@@ -201,8 +201,8 @@ remounts Storage Browser into the view, and `onExit` remounts it on the folder, 
   then says it isn't set up. The API key and project number are deliberately **not** in the deploy
   precondition, so the app deploys without them.
 - **Google Cloud** (same project as sign-in, [setup guide step 10](../guides/setup-from-scratch.md#step-10-optional-google-drive-import)):
-  Google Drive API and Google Picker API enabled; the site and `http://localhost:5173` as
-  Authorized JavaScript origins; the API key restricted to those websites and the Picker API;
+  Google Drive API and Google Picker API enabled; the site (only) as the
+  Authorized JavaScript origin; the API key restricted to that website and the Picker API;
   `drive.readonly` on the consent screen; every family member a test user.
 - A new CloudFront URL (app stack rebuilt) needs the JavaScript origin and the key's website
   restriction updated.

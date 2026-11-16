@@ -324,9 +324,10 @@ Google Cloud project. Details and the reasons: [google-import.md](../features/go
 1. **APIs & Services → Library:** enable the **Google Drive API** and the **Google Picker API** (not the
    Google *Photos* Picker API).
 2. **Credentials →** your OAuth client → **Authorized JavaScript origins:** add `https://<id>.cloudfront.net`
-   (no trailing slash). Add `http://localhost:5173` only if you develop locally against this project (see #57). **Save.**
+   (no trailing slash). Don't add `http://localhost:5173`: production trusts only its own origin (#57).
+   To use Google Drive import from a local dev server, see step 11. **Save.**
 3. **Create credentials → API key**, then edit it:
-   - **Application restrictions:** Websites, `https://<id>.cloudfront.net/*` (and `http://localhost:5173/*` for local development);
+   - **Application restrictions:** Websites, `https://<id>.cloudfront.net/*` only;
    - **API restrictions:** Restrict key → **Google Picker API** only.
    The key ends up in the public `config.json`; the restrictions are what protect it.
 4. **Project number:** on the project's **Dashboard** (or **IAM & Admin → Settings**); also the digits
@@ -356,15 +357,32 @@ restriction to the new `app_url`.
 
 ## Step 11. Local development against the real backend
 
-Run the app on your machine against the deployed AWS resources. `http://localhost:5173` is allowed by the
-Cognito callback URLs and the files bucket CORS rule (`dev_origin`; #57 plans to make this opt-in).
+Run the app on your machine against the deployed AWS resources. Production doesn't trust
+`http://localhost:5173` (#57), so this is opt-in and temporary: `dev_origin` adds it to the Cognito
+callback URLs and the files bucket CORS rule only while it's set, and the next pipeline run (which
+has no `terraform.tfvars`) removes it again.
 
-1. Sign the AWS CLI in to the account (read access to the app state is enough).
-2. Build the config from the deployed outputs:
+1. Sign the AWS CLI in to the account with rights to apply the app stack (an admin, or the app
+   pipeline's permissions).
+2. Trust the dev server, then build the config from the deployed outputs:
 
    ```bash
-   bash ci/tf-init.sh && bash scripts/write-config.sh
+   cp infra/terraform.tfvars.example infra/terraform.tfvars
    ```
+
+   Uncomment `dev_origin = "http://localhost:5173"` in `infra/terraform.tfvars` (git-ignored), then:
+
+   ```bash
+   npm ci --prefix functions/allowlist && npm run build --prefix functions/allowlist
+   ```
+
+   ```bash
+   bash ci/tf-init.sh && terraform -chdir=infra apply && bash scripts/write-config.sh
+   ```
+
+   For Google Drive import locally, also add `http://localhost:5173` to the OAuth client's
+   **Authorized JavaScript origins** and `http://localhost:5173/*` to the API key's **Websites**
+   (step 10), and remove both when you're done.
 
 3. Start the dev server:
 
@@ -375,6 +393,10 @@ Cognito callback URLs and the files bucket CORS rule (`dev_origin`; #57 plans to
 4. Open `http://localhost:5173` and sign in with an allowlisted account.
 
 **Check:** you reach the drive locally; `web/public/config.json` exists (it's git-ignored, never commit it).
+
+**When you're done:** delete `infra/terraform.tfvars` (or comment `dev_origin` out again) and re-run the app
+pipeline (or `terraform -chdir=infra apply`), so production stops trusting localhost; remove any Google
+`localhost` entries you added.
 
 Before changing code, read [CLAUDE.md](../../CLAUDE.md) (commands, conventions, gotchas) and the
 [Architecture Contract](../architecture/architecture-contract.md) (the checklist every PR follows).

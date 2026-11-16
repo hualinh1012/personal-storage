@@ -171,9 +171,10 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
 
-  # Must match the SPA Amplify redirect URIs (origin + "/").
-  callback_urls = ["${local.app_url}/", "${var.dev_origin}/"]
-  logout_urls   = ["${local.app_url}/", "${var.dev_origin}/"]
+  # Must match the SPA Amplify redirect URIs (origin + "/"). The dev origin is
+  # included only when dev_origin is set (issue #57).
+  callback_urls = [for o in local.app_origins : "${o}/"]
+  logout_urls   = [for o in local.app_origins : "${o}/"]
 
   explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
 

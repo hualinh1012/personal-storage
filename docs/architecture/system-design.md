@@ -189,7 +189,8 @@ flowchart TB
   ([ADR 0011](../adr/0011-delete-moves-to-a-deleted-folder.md)).
 - **Transport and hosting:** HTTPS everywhere; the foundation buckets deny non-TLS requests; the web
   bucket is private behind CloudFront OAC; CloudFront adds the managed security headers.
-- **CORS** on the files bucket allows the site's origin and `http://localhost:5173` (#57).
+- **CORS** on the files bucket allows only the site's origin; `dev_origin` (e.g.
+  `http://localhost:5173`) is added only while someone develops locally (#57).
 - **Untrusted file content:** previews never run it (Markdown without HTML, PDF.js without scripts,
   SVG as `<img>`); downloads come from the S3 origin, never the app's
   ([file-preview.md §3](../features/file-preview.md#3-access-control)).

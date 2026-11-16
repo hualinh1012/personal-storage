@@ -188,7 +188,7 @@ showing it. So PDF.js fetches the bytes over CORS and draws the pages itself.
 | Code constant | `MAX_PREVIEW_BYTES` = 50 MB | every type's limit |
 | Code | `previewDisplayText.LocationDetailView.filePreview` | the too-big wording (keep it in step with the constant) |
 | `config.json` | `filesBucket`, `region` | where `getUrl` signs for |
-| Terraform | `dev_origin` | CORS origin for local `fetch` previews |
+| Terraform | `dev_origin` | CORS origin for local `fetch` previews (empty in production) |
 
 There are no SSM parameters or Google settings for preview.
 
@@ -220,7 +220,8 @@ including the PDF.js files.
 
 ### Service configuration as deployed
 
-- **CORS** (`infra/storage.tf`): `GET` from the site and `http://localhost:5173`. Needed by the
+- **CORS** (`infra/storage.tf`): `GET` from the site (and `dev_origin` while it is set for local
+  development). Needed by the
   text, Markdown and PDF viewers, which `fetch` the presigned URL. Images and videos load without
   CORS.
 - **Presigned URLs:** `response-content-disposition=attachment` in the query string; S3 returns
