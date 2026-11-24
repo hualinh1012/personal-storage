@@ -54,7 +54,7 @@ import_if_missing() { # <address> <import id>
 # state is lost with the build container).
 import_existing() {
   local name
-  for name in google_client_id google_client_secret allowed_emails access google_api_key google_project_number deleted_retention_days; do
+  for name in google_client_id google_client_secret allowed_emails access google_api_key google_project_number deleted_retention_days custom_domain certificate_arn hosted_zone_id; do
     if param_exists "/${PROJECT}/${name}"; then
       import_if_missing "aws_ssm_parameter.${name}" "/${PROJECT}/${name}"
     fi
@@ -99,3 +99,7 @@ echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/
 echo "  # Google Drive import (optional; see docs/deployment.md):"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_api_key --value '<browser API key>'"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_project_number --value '<project number>'"
+echo "  # Custom domain (optional, all three; see docs/deployment.md):"
+echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/custom_domain --value 'drive.example.com'"
+echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/certificate_arn --value 'arn:aws:acm:us-east-1:<account>:certificate/<id>'"
+echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/hosted_zone_id --value '<Route 53 zone id>'"

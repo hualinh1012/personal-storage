@@ -224,6 +224,13 @@ aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/a
 | `/family-drive/google_api_key` | String | Leave `CHANGE_ME` until step 10 |
 | `/family-drive/google_project_number` | String | Leave `CHANGE_ME` until step 10 |
 | `/family-drive/deleted_retention_days` | String | **Set by Terraform; don't edit** |
+| `/family-drive/custom_domain` | String | Optional: leave `CHANGE_ME` for the `cloudfront.net` address |
+| `/family-drive/certificate_arn` | String | Optional: ACM certificate in **us-east-1** for the custom domain |
+| `/family-drive/hosted_zone_id` | String | Optional: Route 53 zone holding the custom domain |
+
+A custom domain needs all three of the last parameters, or none. If you want one from the start, set them
+now ([deployment.md, **Use a custom domain**](../deployment.md#day-to-day)), and `app_url` below
+will be `https://<your domain>` instead of the `cloudfront.net` one.
 
 **Check:**
 
@@ -425,7 +432,8 @@ Takes the app down without touching the files, the settings or the state.
 
 **Running it:** **Release change**, then approve; about 5–15 minutes, mostly waiting for CloudFront.
 **Bringing the app back:** run the app pipeline. The Cognito domain stays the same, so sign-in keeps
-working, but the CloudFront URL changes: share the new `app_url` and update step 10's Google settings.
+working. Without a custom domain the CloudFront URL changes: share the new `app_url` and update step 10's
+Google settings. With one, the address and the Google settings stay the same.
 
 There is deliberately **no foundation destroy pipeline**: removing the foundation deletes the family's files
 and all Terraform state. It takes manual steps (back up the files, destroy the app, remove

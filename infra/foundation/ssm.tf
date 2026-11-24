@@ -100,3 +100,41 @@ resource "aws_ssm_parameter" "deleted_retention_days" {
     prevent_destroy = true
   }
 }
+
+# Custom domain for the app (optional). While any of these is CHANGE_ME the app
+# is served at its *.cloudfront.net address; set all three to switch. The
+# certificate must be an issued ACM certificate in us-east-1 (CloudFront's
+# region) covering the domain, and the hosted zone a Route 53 zone in this
+# account where the app stack creates the domain's alias records.
+resource "aws_ssm_parameter" "custom_domain" {
+  name  = "/${var.project}/custom_domain"
+  type  = "String"
+  value = local.placeholder
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [value, insecure_value]
+  }
+}
+
+resource "aws_ssm_parameter" "certificate_arn" {
+  name  = "/${var.project}/certificate_arn"
+  type  = "String"
+  value = local.placeholder
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [value, insecure_value]
+  }
+}
+
+resource "aws_ssm_parameter" "hosted_zone_id" {
+  name  = "/${var.project}/hosted_zone_id"
+  type  = "String"
+  value = local.placeholder
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [value, insecure_value]
+  }
+}

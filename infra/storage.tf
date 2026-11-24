@@ -1,6 +1,9 @@
 locals {
   account_id = data.aws_caller_identity.current.account_id
-  app_url    = "https://${aws_cloudfront_distribution.web.domain_name}"
+  # The custom domain when one is set (SSM, infra/foundation_inputs.tf), else
+  # the distribution's own address. Only one: Cognito, CORS and config.json
+  # trust the app at this origin alone.
+  app_url = local.custom_domain == null ? "https://${aws_cloudfront_distribution.web.domain_name}" : "https://${local.custom_domain}"
 
   # Origins the app trusts: the site, plus the local dev server only when
   # dev_origin is set (issue #57).

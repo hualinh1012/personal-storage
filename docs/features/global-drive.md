@@ -340,7 +340,9 @@ lifecycle).
   `nosniff`, referrer policy, `X-XSS-Protection`) plus a Content Security Policy (report-only while
   `csp_enforce` is `false`) and a `Permissions-Policy` turning off camera, microphone, geolocation
   and similar. 403 and 404 from the origin
-  become `/index.html` with 200 (SPA routing). `PriceClass_200`, default certificate.
+  become `/index.html` with 200 (SPA routing). `PriceClass_200`. The default `cloudfront.net` certificate,
+  or with a custom domain ([ADR 0014](../adr/0014-custom-domain-from-ssm.md)) the domain as an alias,
+  its us-east-1 ACM certificate (SNI, minimum `TLSv1.2_2021`) and Route 53 `A`/`AAAA` alias records.
 - **Cache headers** (`scripts/deploy.sh`):
   - hashed assets `public,max-age=31536000,immutable` (`.mjs` uploaded as `text/javascript`);
   - `index.html`, `config.json`, `amplify-storage-download/download-sw.js`,

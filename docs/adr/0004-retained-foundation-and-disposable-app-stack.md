@@ -4,4 +4,4 @@
 
 ## Consequences
 
-Anything an outside system remembers must survive an app rebuild. That's why the Cognito domain is fixed ([0005](0005-fixed-cognito-domain.md)). The CloudFront URL still changes on a rebuild, which breaks bookmarks and home-screen installs until a custom domain is added.
+Anything an outside system remembers must survive an app rebuild. That's why the Cognito domain is fixed ([0005](0005-fixed-cognito-domain.md)). The CloudFront URL still changes on a rebuild, which breaks bookmarks and home-screen installs unless a custom domain is set ([0014](0014-custom-domain-from-ssm.md)).

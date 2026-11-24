@@ -121,6 +121,8 @@ Every IAM role the app stack creates sets `permissions_boundary = local.permissi
 3. `web/src/config.ts` `loadConfig()` reads that file at runtime.
 4. `toAmplifyOutputs()` builds an Amplify Gen 2–shaped outputs object by hand. The project uses Amplify JS only as a client library, with no Amplify backend tooling.
 
+`local.app_url` (`infra/storage.tf`) is `https://<custom domain>` when the three SSM parameters `custom_domain`, `certificate_arn` (us-east-1) and `hosted_zone_id` are set, else the distribution's `cloudfront.net` address ([ADR 0014](docs/adr/0014-custom-domain-from-ssm.md)). It's the only trusted origin, so it drives Cognito's URLs, the files bucket's CORS and `config.json`; `infra/web.tf` adds the alias, certificate and Route 53 `A`/`AAAA` records.
+
 The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/`, plus `http://localhost:5173/` only when `dev_origin` is set). `dev_origin` is empty in production (#57): local development against the real backend sets it in `infra/terraform.tfvars` and applies from that machine; the next pipeline run removes it again.
 
 ### CI/CD (AWS CodePipeline, Commands actions)
