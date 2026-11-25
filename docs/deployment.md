@@ -39,6 +39,16 @@ Set up by following the [setup guide](guides/setup-from-scratch.md). Values spec
 | Cognito domain | `family-drive-084519186805.auth.ap-southeast-1.amazoncognito.com` |
 | Files bucket | `family-drive-files-084519186805` |
 
+**Required controls on production** (#52). Every push to `main` deploys, so these are what stops an
+unreviewed change reaching AWS. Keep them in place:
+
+| Control | Setting |
+|---|---|
+| `main` ruleset | Pull request required (0 approvals: single maintainer), force pushes and deletion blocked |
+| Foundation pipeline | Manual approval stage before `bootstrap.sh` runs |
+| Destroy | Only in the separate manual destroy pipeline, which has its own approval; never a stage of the deploy pipeline |
+| AWS Connector GitHub App | Installed for **all** repositories (owner's choice: the connection is used elsewhere). Scoping it to this repository would be stricter. |
+
 ## Day-to-day
 
 **Add or remove a family member:**

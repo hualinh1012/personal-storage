@@ -90,11 +90,14 @@ itself at `/` needs `web/public/config.json`, which step 11 creates.
 ## Step 3. Connect GitHub to AWS and protect `main`
 
 1. AWS console → **Developer Tools → Settings → Connections → Create connection** → GitHub.
-2. Install the **AWS Connector for GitHub** app, and give it access to **only this repository**.
+2. Install the **AWS Connector for GitHub** app. Give it access to **only this repository** unless you
+   use the connection for other repositories too (this deployment does: it's installed for all of them,
+   the owner's choice in #52).
 3. Wait until the connection shows **Available**.
-4. On GitHub: **Settings → Branches → Add branch ruleset** (or protection rule) for `main`: require a
+4. **Required.** On GitHub: **Settings → Rules → Rulesets → New branch ruleset** for `main`: require a
    pull request before merging, block force pushes and deletion. Every push to `main` deploys to AWS,
-   so this is the main control on who can change production (#52).
+   so this is the main control on who can change production (#52). With a single maintainer, set the
+   required approvals to **0**: GitHub doesn't let you approve your own pull request.
 
 **Check:** the connection is **Available**; pushing straight to `main` is refused.
 
@@ -109,8 +112,8 @@ The foundation creates the files bucket, the Terraform state bucket and the SSM 
 2. **Source stage:** GitHub (via GitHub App): the connection from step 3, the repository, branch `main`,
    default output artifact format.
 3. **Trigger:** push, branch `main`, file path filter **including** `infra/foundation/**`.
-4. **Approval stage:** add one with a **Manual approval** action. The foundation can change the bucket
-   that holds the family's files, so it should never apply without you looking.
+4. **Approval stage (required):** add one with a **Manual approval** action. The foundation can change
+   the bucket that holds the family's files, so it must never apply without you looking (#52).
 5. **Deploy stage:** an action of type **Commands**, input artifact = Source, commands:
 
    ```bash
@@ -421,7 +424,8 @@ Before changing code, read [CLAUDE.md](../../CLAUDE.md) (commands, conventions, 
 
 ## Step 12. Optional: the destroy pipeline (manual only)
 
-Takes the app down without touching the files, the settings or the state.
+Takes the app down without touching the files, the settings or the state. The pipeline itself is optional,
+but **Destroy never goes in the deploy pipeline**, not even behind a disabled transition (#52).
 
 1. **Create pipeline** (V2), same source.
 2. In the source action, **untick "Start the pipeline on source code change"** and remove any triggers.
