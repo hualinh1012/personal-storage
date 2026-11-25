@@ -85,7 +85,6 @@
         "s3:GetBucket*",
         "s3:PutBucket*",
         "s3:DeleteBucketPolicy",
-        "s3:DeleteBucketOwnershipControls",
         "s3:GetAccelerateConfiguration",
         "s3:GetEncryptionConfiguration",
         "s3:PutEncryptionConfiguration",
