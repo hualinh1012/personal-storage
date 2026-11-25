@@ -101,40 +101,37 @@ resource "aws_ssm_parameter" "deleted_retention_days" {
   }
 }
 
-# Custom domain for the app (optional). While any of these is CHANGE_ME the app
-# is served at its *.cloudfront.net address; set all three to switch. The
-# certificate must be an issued ACM certificate in us-east-1 (CloudFront's
-# region) covering the domain, and the hosted zone a Route 53 zone in this
-# account where the app stack creates the domain's alias records.
+# Custom domain for the app (ADR 0014), published for the app stack, which
+# finds foundation values by name. Like deleted_retention_days, Terraform owns
+# these values: set the variables in main.tf, never the parameters. An empty
+# variable is written as CHANGE_ME (SSM refuses empty values), which the app
+# stack reads as "not set".
 resource "aws_ssm_parameter" "custom_domain" {
   name  = "/${var.project}/custom_domain"
   type  = "String"
-  value = local.placeholder
+  value = var.custom_domain == "" ? local.placeholder : var.custom_domain
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [value, insecure_value]
   }
 }
 
 resource "aws_ssm_parameter" "certificate_arn" {
   name  = "/${var.project}/certificate_arn"
   type  = "String"
-  value = local.placeholder
+  value = var.certificate_arn == "" ? local.placeholder : var.certificate_arn
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [value, insecure_value]
   }
 }
 
 resource "aws_ssm_parameter" "hosted_zone_id" {
   name  = "/${var.project}/hosted_zone_id"
   type  = "String"
-  value = local.placeholder
+  value = var.hosted_zone_id == "" ? local.placeholder : var.hosted_zone_id
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [value, insecure_value]
   }
 }

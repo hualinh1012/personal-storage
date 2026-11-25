@@ -166,7 +166,7 @@ resource "aws_cloudfront_distribution" "web" {
   default_root_object = "index.html"
   price_class         = "PriceClass_200"
 
-  # Custom domain (optional, SSM /family-drive/custom_domain): CloudFront then
+  # Custom domain (optional, foundation variable custom_domain via SSM): CloudFront then
   # answers on it with the ACM certificate below.
   aliases = local.custom_domain == null ? [] : [local.custom_domain]
 
@@ -216,7 +216,7 @@ resource "aws_cloudfront_distribution" "web" {
 }
 
 # The custom domain's DNS: alias records to the distribution (IPv4 and IPv6),
-# in the Route 53 zone from SSM /family-drive/hosted_zone_id.
+# in the Route 53 zone from the foundation variable hosted_zone_id.
 resource "aws_route53_record" "web" {
   for_each = local.custom_domain == null ? toset([]) : toset(["A", "AAAA"])
 

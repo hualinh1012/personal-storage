@@ -224,13 +224,11 @@ aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/a
 | `/family-drive/google_api_key` | String | Leave `CHANGE_ME` until step 10 |
 | `/family-drive/google_project_number` | String | Leave `CHANGE_ME` until step 10 |
 | `/family-drive/deleted_retention_days` | String | **Set by Terraform; don't edit** |
-| `/family-drive/custom_domain` | String | Optional: leave `CHANGE_ME` for the `cloudfront.net` address |
-| `/family-drive/certificate_arn` | String | Optional: ACM certificate in **us-east-1** for the custom domain |
-| `/family-drive/hosted_zone_id` | String | Optional: Route 53 zone holding the custom domain |
+| `/family-drive/custom_domain`, `certificate_arn`, `hosted_zone_id` | String | **Set by Terraform; don't edit** (custom domain, optional) |
 
-A custom domain needs all three of the last parameters, or none. If you want one from the start, set them
-now ([deployment.md, **Use a custom domain**](../deployment.md#day-to-day)), and `app_url` below
-will be `https://<your domain>` instead of the `cloudfront.net` one.
+For a custom domain from the start, set the three foundation variables in `infra/foundation/main.tf`
+before step 4 ([deployment.md, **Use a custom domain**](../deployment.md#day-to-day)); `app_url` below
+is then `https://<your domain>` instead of the `cloudfront.net` one.
 
 **Check:**
 

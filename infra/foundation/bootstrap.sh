@@ -99,7 +99,3 @@ echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/
 echo "  # Google Drive import (optional; see docs/deployment.md):"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_api_key --value '<browser API key>'"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_project_number --value '<project number>'"
-echo "  # Custom domain (optional, all three; see docs/deployment.md):"
-echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/custom_domain --value 'drive.example.com'"
-echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/certificate_arn --value 'arn:aws:acm:us-east-1:<account>:certificate/<id>'"
-echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/hosted_zone_id --value '<Route 53 zone id>'"
