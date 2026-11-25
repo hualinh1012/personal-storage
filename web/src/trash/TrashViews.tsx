@@ -189,8 +189,7 @@ function EmptyDeletedView() {
   const empty = async () => {
     setPhase({ kind: "running", done: 0, total: 0 });
     try {
-      const ops = await ctx.deps.ops();
-      const summary = await emptyDeleted(ops, (done, total) => setPhase({ kind: "running", done, total }));
+      const summary = await emptyDeleted(ctx.deps.storage, (done, total) => setPhase({ kind: "running", done, total }));
       setPhase({ kind: "finished", summary });
     } catch (error) {
       setPhase({ kind: "error", message: error instanceof Error ? error.message : String(error) });

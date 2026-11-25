@@ -1,69 +1,69 @@
-import { describe, expect, it, vi } from "vitest";
-import { moveFile, type MoveOps } from "../src/move/moveFile";
+import { describe, expect, it } from "vitest";
+import { moveFile } from "../src/move/moveFile";
+import { DriveStorageError, type DriveStorage } from "../src/storage/driveStorage";
+import { memoryDriveStorage } from "../src/storage/memoryStorage";
 
 const item = { key: "Global/b/photo.jpg", sourceKey: "Global/a/photo.jpg" };
+const fail = (message: string) => async () => {
+  throw new DriveStorageError("Other", message);
+};
 
-function ops(overrides: Partial<MoveOps> = {}) {
-  const calls: string[] = [];
-  const o: MoveOps = {
-    exists: vi.fn(async (key: string) => {
-      calls.push(`exists ${key}`);
-      return false;
-    }),
-    copy: vi.fn(async (i) => {
-      calls.push(`copy ${i.sourceKey} -> ${i.key}`);
-    }),
-    remove: vi.fn(async (key: string) => {
-      calls.push(`remove ${key}`);
-    }),
-    ...overrides,
-  };
-  return { o, calls };
+/** The in-memory drive with the photo in Global/a/, plus any failing operations. */
+function drive(overrides: Partial<DriveStorage> = {}, extra: string[] = []) {
+  const memory = memoryDriveStorage([item.sourceKey, ...extra].map((key) => ({ key, body: key })));
+  return { memory, storage: { ...memory, ...overrides } };
 }
 
 describe("moveFile", () => {
-  it("checks the destination, copies, then deletes the original", async () => {
-    const { o, calls } = ops();
-    await expect(moveFile(item, o)).resolves.toEqual({ status: "COMPLETE" });
-    expect(calls).toEqual(["exists Global/b/photo.jpg", "copy Global/a/photo.jpg -> Global/b/photo.jpg", "remove Global/a/photo.jpg"]);
+  it("copies to the destination, then deletes the original", async () => {
+    const { memory, storage } = drive();
+    await expect(moveFile(item, storage)).resolves.toEqual({ status: "COMPLETE" });
+    expect(memory.keys()).toEqual([item.key]);
+    expect(new TextDecoder().decode(await memory.read(item.key))).toBe(item.sourceKey);
   });
 
   it("refuses to overwrite a file with the same name at the destination", async () => {
-    const { o } = ops({ exists: vi.fn(async () => true) });
-    const result = await moveFile(item, o);
+    const { memory, storage } = drive({}, [item.key]);
+    const result = await moveFile(item, storage);
     expect(result).toEqual({ status: "FAILED", message: "A file with this name already exists in the destination." });
-    expect(o.copy).not.toHaveBeenCalled();
-    expect(o.remove).not.toHaveBeenCalled();
+    expect(memory.keys().sort()).toEqual([item.sourceKey, item.key].sort());
+    expect(new TextDecoder().decode(await memory.read(item.key))).toBe(item.key);
   });
 
   it("does nothing when the destination is the file's own folder", async () => {
-    const { o } = ops();
-    const result = await moveFile({ key: item.sourceKey, sourceKey: item.sourceKey }, o);
+    const { memory, storage } = drive({ exists: fail("should not be called") });
+    const result = await moveFile({ key: item.sourceKey, sourceKey: item.sourceKey }, storage);
     expect(result).toEqual({ status: "FAILED", message: "It's already in this folder." });
-    expect(o.exists).not.toHaveBeenCalled();
-    expect(o.copy).not.toHaveBeenCalled();
+    expect(memory.keys()).toEqual([item.sourceKey]);
   });
 
   it("never deletes the original when the copy fails", async () => {
-    const { o } = ops({ copy: vi.fn(async () => Promise.reject(new Error("AccessDenied"))) });
-    const result = await moveFile(item, o);
-    expect(result).toEqual({ status: "FAILED", message: "Couldn't copy it (AccessDenied). The original wasn't touched." });
-    expect(o.remove).not.toHaveBeenCalled();
+    const { memory, storage } = drive({ copy: fail("Access Denied") });
+    const result = await moveFile(item, storage);
+    expect(result).toEqual({ status: "FAILED", message: "Couldn't copy it (Access Denied). The original wasn't touched." });
+    expect(memory.keys()).toEqual([item.sourceKey]);
   });
 
   it("reports when the copy worked but the original couldn't be deleted", async () => {
-    const { o } = ops({ remove: vi.fn(async () => Promise.reject(new Error("Throttled"))) });
-    const result = await moveFile(item, o);
+    const { memory, storage } = drive({ remove: fail("Throttled") });
+    const result = await moveFile(item, storage);
     expect(result).toEqual({
       status: "FAILED",
       message: "Copied, but the original couldn't be deleted (Throttled), so it's now in both folders.",
     });
+    expect(memory.keys().sort()).toEqual([item.sourceKey, item.key].sort());
   });
 
   it("stops before copying if the destination can't be checked", async () => {
-    const { o } = ops({ exists: vi.fn(async () => Promise.reject(new Error("Network"))) });
-    const result = await moveFile(item, o);
+    const { memory, storage } = drive({ exists: fail("Network") });
+    const result = await moveFile(item, storage);
     expect(result).toEqual({ status: "FAILED", message: "Couldn't check the destination (Network). Nothing was moved." });
-    expect(o.copy).not.toHaveBeenCalled();
+    expect(memory.keys()).toEqual([item.sourceKey]);
+  });
+
+  it("explains a vanished original with the storage's not-found reason", async () => {
+    const { storage } = drive();
+    const result = await moveFile({ key: "Global/b/x.jpg", sourceKey: "Global/a/x.jpg" }, storage);
+    expect(result).toEqual({ status: "FAILED", message: "Couldn't copy it (No such key: Global/a/x.jpg). The original wasn't touched." });
   });
 });

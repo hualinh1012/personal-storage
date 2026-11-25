@@ -127,9 +127,9 @@ versioning is the backstop for that (accepted in ADR 0011 and the security asses
 
 ## 4. Flows
 
-All S3 calls in this feature use `@aws-sdk/client-s3`, loaded on first use (`trash/s3Ops.ts`),
-because Amplify Storage has no version APIs. Credentials come from Amplify's `fetchAuthSession`
-on every request.
+All S3 calls in this feature go through the drive storage (`web/src/storage/`, #39), whose S3
+adapter uses `@aws-sdk/client-s3`, loaded on first use: Amplify Storage has no version APIs.
+Credentials come from Amplify's `fetchAuthSession` on every request.
 
 ### Delete (move to `Deleted/`)
 
@@ -226,18 +226,18 @@ sequenceDiagram
 
 | Area | Files | Tests |
 |---|---|---|
-| Rules: move, restore, purge, empty (injected `TrashOps`) | `web/src/trash/trash.ts` | `web/test/trash.test.ts` |
+| Rules: move, restore, purge, empty (over the drive storage, `TrashOps`) | `web/src/trash/trash.ts` | `web/test/trash.test.ts` |
 | Key mapping and stamp | `web/src/trash/paths.ts` | `trash.test.ts` (`deletedKey`/`originalKey`) |
 | Storage Browser actions, Delete's wording and messages | `web/src/trash/actions.ts` | `trash.test.ts` (messages) |
 | Views: Restore, Delete permanently (reuse DeleteView parts), Empty Deleted, `TrashContext` | `web/src/trash/TrashViews.tsx` | `trash.test.ts` (failure lines) |
-| S3 operations (AWS SDK, lazy) | `web/src/trash/s3Ops.ts` | `trash.test.ts` (`copySource` encoding) |
+| S3 operations (drive storage, AWS SDK, lazy) | `web/src/storage/s3Storage.ts`, `memoryStorage.ts` | `driveStorage.test.ts` (contract), `s3Storage.test.ts` |
 | Retention note | `web/src/trash/retention.ts` | `web/test/retention.test.ts` |
 | Location, Home and Restore's write check | `web/src/locationPolicy.ts` (`DELETED_PREFIX`, `locationPolicy`, `listDriveLocations`, `canWriteAt`) | `web/test/locationPolicy.test.ts` |
-| Wiring | `web/src/pages/Drive.tsx` (`delete` handler, custom actions, views, `TrashContext`, the note, S3 target, `once()`), `useStableItems` in `web/src/stableItems.ts` | playground |
+| Wiring | `web/src/pages/Drive.tsx` (`delete` handler, custom actions, views, `TrashContext`, the note, the drive storage), `useStableItems` in `web/src/stableItems.ts` | playground |
 | CSS | `web/src/styles.css` (`.trash-view--restore` hides Delete's hard-coded "Deleted" progress column, `.folder-note`) | |
 | `trash` flag | `functions/allowlist/src/access.ts`, `infra/foundation_inputs.tf`, `infra/identity.tf`, `web/src/access.ts` | `access.test.ts` (both packages) |
 | Lifecycle and retention | `infra/foundation/files.tf`, `infra/foundation/main.tf`, `infra/foundation/ssm.tf` | `terraform validate` |
-| Playground fake | `web/src/playground/mockDrive.ts` (`mockTrashOps`, one version per file) | |
+| Playground | `web/src/playground/mockDrive.ts` (the in-memory drive shared by every feature, versioned) | |
 
 Restore and Delete permanently run over Delete's selection, so they pass `useStableItems(tasks)` to
 `useAction`; a fresh `tasks.map(...)` would reset `useAction` every render and loop.

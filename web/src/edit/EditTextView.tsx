@@ -1,17 +1,18 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { warnOnLeave } from "../googleImport/leaveWarning";
 import { fileName, type TextFormat } from "./text";
-import { openText, saveText, type TextFileOps } from "./textFile";
+import { openText, saveText, type TextFileStorage } from "./textFile";
 
 /*
  * The Edit screen (issue #45): a plain-text editor for one selected .txt file.
  * Save overwrites the file (last save wins; versioning keeps the old text).
  * It finds the selected file through Storage Browser's Delete view state, the
- * same way Restore does, and gets its S3 ops and exit from EditTextContext.
+ * same way Restore does, and gets its storage and exit from EditTextContext.
  */
 
 export interface EditTextContextValue {
-  ops(): Promise<TextFileOps>;
+  /** The drive storage as the signed-in person. */
+  storage: TextFileStorage;
   /** Back to the folder (DriveView remounts the browser, which re-lists it). */
   onExit(): void;
 }
@@ -43,10 +44,7 @@ export function makeEditTextView({ useView }: EditTextViewDeps) {
     useEffect(() => {
       if (!ctx || !key) return;
       let live = true;
-      ctx
-        .ops()
-        .then((ops) => openText(key, ops))
-        .then(
+      openText(key, ctx.storage).then(
           ({ text, format }) => live && setPhase({ kind: "editing", saved: text, text, format, saving: false }),
           (error) => live && setPhase({ kind: "failed", message: messageOf(error) }),
         );
@@ -77,7 +75,7 @@ export function makeEditTextView({ useView }: EditTextViewDeps) {
       const { text, format } = phase;
       setPhase({ ...phase, saving: true, status: undefined });
       try {
-        await saveText(key, text, format, await ctx.ops());
+        await saveText(key, text, format, ctx.storage);
         setPhase((p) => (p.kind === "editing" ? { ...p, saved: text, saving: false, status: { error: false, message: "Saved." } } : p));
       } catch (error) {
         setPhase((p) =>

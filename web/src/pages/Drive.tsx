@@ -14,23 +14,22 @@ import { canWriteAt, canWriteSomewhere, driveLocation, listDriveLocations, locat
 import { retentionNote } from "../trash/retention";
 import type { Access } from "../access";
 import { filePreviewConfig, previewDisplayText } from "../preview/registry";
-import { moveActionConfig } from "../move/moveAction";
+import { makeMoveActionConfig } from "../move/moveAction";
 import { makeMoveView, type MoveViewDeps } from "../move/MoveView";
 import type { GoogleImportConfig } from "../config";
 import { realGoogleImportDeps, type GoogleImportDeps } from "../googleImport/deps";
 import { GOOGLE_IMPORT_ACTION, googleImportActionConfig } from "../googleImport/importAction";
 import { GoogleImportContext, GoogleImportView, type GoogleImportContextValue } from "../googleImport/GoogleImportView";
-import { createFolderTracker, type CountFolder } from "../pagination/folderTracker";
+import { createFolderTracker } from "../pagination/folderTracker";
 import { countFolder } from "../pagination/countFolder";
 import { Pager, PagerContext, type PagerContextValue } from "../pagination/Pager";
-import { deleteViewDisplayText, makeTrashActions, type TrashDeps } from "../trash/actions";
+import { deleteViewDisplayText, makeTrashActions } from "../trash/actions";
 import { makeTrashViews, TrashContext, type TrashViewDeps } from "../trash/TrashViews";
-import { s3TrashOps, type S3Target } from "../trash/s3Ops";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { EDIT_TEXT_ACTION, editTextActionConfig } from "../edit/editAction";
 import { EditTextContext, makeEditTextView, type EditTextContextValue, type EditTextViewDeps } from "../edit/EditTextView";
-import { s3TextOps } from "../edit/s3Ops";
-import type { TextFileOps } from "../edit/textFile";
+import type { DriveStorage } from "../storage/driveStorage";
+import { s3DriveStorage } from "../storage/s3Storage";
 
 const displayText = {
   ...previewDisplayText,
@@ -49,30 +48,30 @@ export function DriveView({
   access,
   bucket,
   setup,
+  storage,
   googleImport,
-  countFolder,
-  trash,
   deletedRetentionDays = null,
-  textFiles,
 }: {
   email: string;
   /** Display only: IAM enforces the same access level. setup.config.listLocations must match it. */
   access: Access;
   bucket: string;
   setup: StorageBrowserSetup;
+  /**
+   * The files bucket as the signed-in person (S3 in the app, the in-memory drive
+   * in the playground): every S3 call our own features make goes through it (#39).
+   */
+  storage: DriveStorage;
+  /** Google's side of the import, with the same storage. */
   googleImport: GoogleImportDeps;
-  /** Counts a folder's rows for the pager's total (S3 in the app, sample data in the playground). */
-  countFolder: CountFolder<never>;
-  /** The Deleted folder's S3 operations (issue #24): Delete moves files there. */
-  trash: TrashDeps;
   /** Days before S3 removes files in Deleted/ (issue #25); null hides the note. */
   deletedRetentionDays?: number | null;
-  /** S3 operations for the text editor (issue #45). */
-  textFiles: () => Promise<TextFileOps>;
 }) {
+  // Delete moves files to Deleted/ (issue #24); Restore checks where the person may write.
+  const trash = useMemo(() => ({ storage, canWriteTo: canWriteAt(access, email) }), [storage, access, email]);
   const { StorageBrowser, views, tracker } = useMemo(() => {
     // Watches the file list's listing so the pager can show the folder's total.
-    const tracker = createFolderTracker(countFolder);
+    const tracker = createFolderTracker<never>((prefix) => countFolder(storage, prefix));
     const listLocationItems = setup.actions?.default?.listLocationItems ?? defaultHandlers.listLocationItems;
     const trashActions = makeTrashActions(trash);
     const created = createStorageBrowser({
@@ -87,7 +86,7 @@ export function DriveView({
         },
         custom: {
           ...setup.actions?.custom,
-          move: moveActionConfig as never,
+          move: makeMoveActionConfig(storage) as never,
           [GOOGLE_IMPORT_ACTION]: googleImportActionConfig as never,
           [EDIT_TEXT_ACTION]: editTextActionConfig as never,
           ...(trashActions.custom as unknown as Record<string, never>),
@@ -108,7 +107,7 @@ export function DriveView({
     });
     const EditTextView = makeEditTextView({ useView: created.useView as unknown as EditTextViewDeps["useView"] });
     return { StorageBrowser: created.StorageBrowser, views: { MoveView, GoogleImportView, EditTextView, ...trashViews }, tracker };
-  }, [setup, countFolder, trash]);
+  }, [setup, storage, trash]);
 
   // Storage Browser stays uncontrolled: in controlled mode it only reports
   // changes to its internal state, so an action opened from outside (our
@@ -155,7 +154,7 @@ export function DriveView({
     listPrefix: current.location && !current.actionType ? location.prefix + path : null,
   };
   // Leaving the editor remounts the browser, so the list shows the saved size and time.
-  const editContext: EditTextContextValue = { ops: textFiles, onExit: exitToFolder };
+  const editContext: EditTextContextValue = { storage, onExit: exitToFolder };
   // In the Deleted folder's file list, say when S3 removes its files.
   const note =
     current.location && !current.actionType && policy.kind === "deleted" ? retentionNote(deletedRetentionDays) : null;
@@ -230,46 +229,31 @@ export default function Drive({
     const config = { ...createAmplifyAuthAdapter(), listLocations: listDriveLocations(bucket, email, access) };
     return { setup: { config }, bucket };
   }, [email, access]);
-  const googleImport = useMemo(() => realGoogleImportDeps(google), [google]);
-  const target = useMemo<S3Target>(
-    () => ({
-      bucket,
-      region: Amplify.getConfig().Storage?.S3?.region ?? "",
-      // The S3 clients ask Amplify for fresh credentials per request.
-      credentials: async () => {
-        const { credentials } = await fetchAuthSession();
-        if (!credentials) throw new Error("Not signed in.");
-        return credentials;
-      },
-    }),
+  const storage = useMemo(
+    () =>
+      s3DriveStorage({
+        bucket,
+        region: Amplify.getConfig().Storage?.S3?.region ?? "",
+        // The SDK asks for credentials per request, so Amplify refreshes them as they expire.
+        credentials: async () => {
+          const { credentials } = await fetchAuthSession();
+          if (!credentials) throw new Error("Not signed in.");
+          return credentials;
+        },
+      }),
     [bucket],
   );
-  const trash = useMemo<TrashDeps>(
-    () => ({ ops: once(() => s3TrashOps(target)), canWriteTo: canWriteAt(access, email) }),
-    [target, access, email],
-  );
-  const textFiles = useMemo(() => once(() => s3TextOps(target)), [target]);
+  const googleImport = useMemo(() => realGoogleImportDeps(google, storage), [google, storage]);
   return (
     <DriveView
       email={email}
       access={access}
       bucket={bucket}
       setup={setup}
+      storage={storage}
       googleImport={googleImport}
-      countFolder={countFolder as CountFolder<never>}
-      trash={trash}
       deletedRetentionDays={deletedRetentionDays}
-      textFiles={textFiles}
     />
   );
 }
 
-/** Creates something on first use and reuses it; a failed attempt is retried next time. */
-function once<T>(create: () => Promise<T>): () => Promise<T> {
-  let value: Promise<T> | undefined;
-  return () =>
-    (value ??= create().catch((error) => {
-      value = undefined;
-      throw error;
-    }));
-}

@@ -10,6 +10,8 @@ import { withRetry } from "../src/googleImport/retry";
 import { runQueue, type Outcome, type QueueItem } from "../src/googleImport/queue";
 import { importFile, importItem, type ImportOps } from "../src/googleImport/importFile";
 import { createDriveClient, DriveError } from "../src/googleImport/driveClient";
+import { existingFiles } from "../src/googleImport/deps";
+import { memoryDriveStorage } from "../src/storage/memoryStorage";
 
 describe("sanitiseName", () => {
   it("replaces / and \\ and control characters with _", () => {
@@ -264,16 +266,13 @@ describe("prepareImport", () => {
   });
 
   it("importing a nested folder twice shows the second run as all skipped", async () => {
-    const stored = new Map<string, number>();
-    const listExisting = async (prefix: string) =>
-      [...stored]
-        .filter(([k]) => k.startsWith(prefix) && !k.slice(prefix.length).includes("/"))
-        .map(([k, size]) => ({ name: k.slice(prefix.length), size }));
+    const storage = memoryDriveStorage();
+    const listExisting = (prefix: string) => existingFiles(storage, prefix);
     const ops: ImportOps = {
-      exists: async (k) => stored.has(k),
+      exists: (k) => storage.exists(k),
       download: async (id) => new Blob([new Uint8Array({ top: 9, a: 1, b: 2, c: 3, d: 4 }[id] ?? 0)]),
       exportFile: async () => new Blob(["pdf"]),
-      upload: async (k, data) => void stored.set(k, data.size),
+      upload: (k, data, contentType, signal) => storage.write(k, data, { contentType, signal }),
     };
     const signal = new AbortController().signal;
     const first = await prepareImport(picked, "Global/", { drive: fakeDrive(tree), listExisting, exists: ops.exists });
@@ -283,6 +282,18 @@ describe("prepareImport", () => {
     expect(second.items.every((i) => i.status === "skipped" && i.reason === ALREADY_IMPORTED)).toBe(true);
     const rerun = await runQueue(second.items, (it, s) => importItem(it, ops, s), { concurrency: 3, signal });
     expect(rerun.every((i) => i.status === "skipped")).toBe(true);
+  });
+});
+
+describe("existingFiles", () => {
+  it("lists the files directly in a folder with their sizes, without placeholders or subfolders", async () => {
+    const storage = memoryDriveStorage([
+      { key: "Global/linh/", body: "" },
+      { key: "Global/linh/a.jpg", size: 10 },
+      { key: "Global/linh/Holiday/b.jpg", size: 20 },
+      { key: "Global/linh/Empty/", body: "" },
+    ]);
+    expect(await existingFiles(storage, "Global/linh/")).toEqual([{ name: "a.jpg", size: 10 }]);
   });
 });
 

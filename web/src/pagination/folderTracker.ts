@@ -19,8 +19,8 @@ export interface ListOutput {
   nextToken?: string;
 }
 export type ListHandler<C = unknown> = (input: ListInput<C>) => Promise<ListOutput>;
-/** Counts the rows the folder at `prefix` has across all pages. */
-export type CountFolder<C = unknown> = (config: C, prefix: string) => Promise<number>;
+/** Counts the rows the folder at `prefix` has across all pages (countFolder.ts over the drive storage). */
+export type CountFolder = (prefix: string) => Promise<number>;
 
 export type FolderCount = { status: "counting" } | { status: "done"; total: number } | { status: "failed" };
 
@@ -46,7 +46,7 @@ export interface FolderTracker<C = unknown> {
 
 const INITIAL: FolderState = { mode: "browse", count: { status: "counting" }, loadedRows: 0, hasMore: false, fetching: false, failures: 0 };
 
-export function createFolderTracker<C>(countFolder: CountFolder<C>, pageSize = PAGE_SIZE): FolderTracker<C> {
+export function createFolderTracker<C>(countFolder: CountFolder, pageSize = PAGE_SIZE): FolderTracker<C> {
   let state = INITIAL;
   const listeners = new Set<() => void>();
   const set = (patch: Partial<FolderState>) => {
@@ -68,7 +68,7 @@ export function createFolderTracker<C>(countFolder: CountFolder<C>, pageSize = P
     const gen = ++generation;
     pages = new Map();
     set({ prefix: input.prefix, mode: "browse", count: { status: "counting" }, loadedRows: 0, hasMore: false, fetching: true });
-    countFolder(input.config, input.prefix).then(
+    countFolder(input.prefix).then(
       (total) => gen === generation && set({ count: { status: "done", total } }),
       () => gen === generation && set({ count: { status: "failed" } }),
     );

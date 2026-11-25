@@ -13,8 +13,8 @@ import { hideUnless } from "../locationPolicy";
 import { deletePermanently, moveToDeleted, restore, type Outcome, type TrashOps } from "./trash";
 
 export interface TrashDeps {
-  /** S3 operations as the signed-in person (the real bucket, or sample data in the playground). */
-  ops(): Promise<TrashOps>;
+  /** The drive storage as the signed-in person (S3 in the app, the in-memory drive in the playground). */
+  storage: TrashOps;
   /** Whether the signed-in person may write at a key (`canWriteAt` in locationPolicy); Restore checks it to explain a refusal. */
   canWriteTo(key: string): boolean;
 }
@@ -43,7 +43,7 @@ export function makeTrashActions(deps: TrashDeps) {
         ...defaultActionConfigs.delete.actionListItem,
         hide: hideUnless("move"),
       },
-      handler: ({ data }: HandlerInput) => run(deps.ops().then((ops) => moveToDeleted(data.key, ops))),
+      handler: ({ data }: HandlerInput) => run(moveToDeleted(data.key, deps.storage)),
     },
     custom: {
       [RESTORE_ACTION]: {
@@ -54,7 +54,7 @@ export function makeTrashActions(deps: TrashDeps) {
           disable: noSelection,
           hide: hideUnless("manageDeleted"),
         },
-        handler: ({ data }: HandlerInput) => run(deps.ops().then((ops) => restore(data.key, ops, deps.canWriteTo))),
+        handler: ({ data }: HandlerInput) => run(restore(data.key, deps.storage, deps.canWriteTo)),
       },
       [DELETE_PERMANENTLY_ACTION]: {
         viewName: "DeletePermanentlyView" as const,
@@ -64,7 +64,7 @@ export function makeTrashActions(deps: TrashDeps) {
           disable: noSelection,
           hide: hideUnless("manageDeleted"),
         },
-        handler: ({ data }: HandlerInput) => run(deps.ops().then((ops) => deletePermanently(data.key, ops))),
+        handler: ({ data }: HandlerInput) => run(deletePermanently(data.key, deps.storage)),
       },
       [EMPTY_DELETED_ACTION]: {
         // The work happens in EmptyDeletedView (one run over the whole folder,

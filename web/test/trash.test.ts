@@ -10,7 +10,7 @@ import {
   type TrashOps,
 } from "../src/trash/trash";
 import { deleteCompleteMessage } from "../src/trash/actions";
-import { copySource } from "../src/trash/s3Ops";
+import { memoryDriveStorage } from "../src/storage/memoryStorage";
 import { emptySummaryText, failureLines } from "../src/trash/TrashViews";
 
 const NOW = new Date(2026, 10, 10, 14, 3, 12); // local time
@@ -40,46 +40,32 @@ describe("deletedKey / originalKey", () => {
   });
 });
 
-/** An in-memory bucket: current keys plus a version history, recording calls. */
+/**
+ * The in-memory drive (the drive-storage seam's own adapter), recording calls
+ * and failing the operations `fail` picks. `current` and `versions()` read it live.
+ */
 function fakeOps(initial: string[], fail: Partial<Record<keyof TrashOps, (arg: unknown) => boolean>> = {}) {
-  const current = new Set(initial);
-  const versions: ObjectVersion[] = initial.map((key) => ({ key, versionId: "v1" }));
+  const memory = memoryDriveStorage(initial.map((key) => ({ key, body: key })));
   const calls: string[] = [];
-  const guard = (op: keyof TrashOps, arg: unknown) => {
-    calls.push(`${op} ${JSON.stringify(arg)}`);
-    if (fail[op]?.(arg)) throw new Error(`${op} denied`);
-  };
+  const guarded =
+    <A extends unknown[], R>(op: keyof TrashOps, fn: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R> => {
+      const arg = args.length === 1 ? args[0] : args;
+      calls.push(`${op} ${JSON.stringify(arg)}`);
+      if (fail[op]?.(arg)) throw new Error(`${op} denied`);
+      return fn(...args);
+    };
   const ops: TrashOps = {
-    async exists(key) {
-      guard("exists", key);
-      return current.has(key);
-    },
-    async copy(source, destination) {
-      guard("copy", [source, destination]);
-      if (!current.has(source)) throw new Error("NoSuchKey");
-      current.add(destination);
-      versions.push({ key: destination, versionId: `v${versions.length + 1}` });
-    },
-    async remove(key) {
-      guard("remove", key);
-      current.delete(key);
-      versions.push({ key, versionId: `marker${versions.length + 1}` });
-    },
-    async listKeys(prefix) {
-      guard("listKeys", prefix);
-      return [...current].filter((k) => k.startsWith(prefix));
-    },
-    async listVersions(prefix) {
-      guard("listVersions", prefix);
-      return versions.filter((v) => v.key.startsWith(prefix));
-    },
-    async removeVersion(v) {
-      guard("removeVersion", v);
-      versions.splice(versions.findIndex((x) => x.key === v.key && x.versionId === v.versionId), 1);
-      if (!versions.some((x) => x.key === v.key)) current.delete(v.key);
-    },
+    exists: guarded("exists", memory.exists),
+    copy: guarded("copy", memory.copy),
+    remove: guarded("remove", memory.remove),
+    listKeys: guarded("listKeys", memory.listKeys),
+    listVersions: guarded("listVersions", memory.listVersions),
+    removeVersion: guarded("removeVersion", memory.removeVersion),
   };
-  return { ops, current, versions, calls };
+  const current = { has: (key: string) => memory.keys().includes(key), [Symbol.iterator]: () => memory.keys()[Symbol.iterator]() };
+  const versions = (): Promise<ObjectVersion[]> => memory.listVersions("");
+  return { ops, memory, current, versions, calls };
 }
 
 const D = "Deleted/Global/photos/a (deleted 2026-11-10 14-03-12 7f2c).jpg";
@@ -134,7 +120,7 @@ describe("restore", () => {
     const { ops, current, versions } = fakeOps([D]);
     expect(await restore(D, ops, everywhere)).toEqual({ status: "COMPLETE" });
     expect([...current]).toEqual(["Global/photos/a.jpg"]);
-    expect(versions.filter((v) => v.key.startsWith("Deleted/"))).toEqual([]);
+    expect((await versions()).filter((v) => v.key.startsWith("Deleted/"))).toEqual([]);
   });
 
   it("never overwrites a file that's back at the original key", async () => {
@@ -184,16 +170,16 @@ describe("restore", () => {
 describe("deletePermanently", () => {
   it("removes every version of the file, and no other file's", async () => {
     const other = "Deleted/Global/photos/a (deleted 2026-11-10 14-03-12 zzzz).jpg";
-    const { ops, versions } = fakeOps([D, other]);
-    versions.push({ key: D, versionId: "old" });
+    const { ops, memory, versions } = fakeOps([D, other]);
+    await memory.write(D, new Uint8Array([1]), { contentType: "image/jpeg" }); // a second version
     expect(await deletePermanently(D, ops)).toEqual({ status: "COMPLETE" });
-    expect(versions.map((v) => v.key)).toEqual([other]);
+    expect((await versions()).map((v) => v.key)).toEqual([other]);
   });
 
   it("removes a whole folder in Deleted/ with every version", async () => {
     const { ops, versions } = fakeOps([D, "Deleted/Global/other.txt"]);
     expect(await deletePermanently("Deleted/Global/photos/", ops)).toEqual({ status: "COMPLETE" });
-    expect(versions.map((v) => v.key)).toEqual(["Deleted/Global/other.txt"]);
+    expect((await versions()).map((v) => v.key)).toEqual(["Deleted/Global/other.txt"]);
   });
 
   it("refuses anything outside Deleted/", async () => {
@@ -213,7 +199,7 @@ describe("emptyDeleted", () => {
     const summary = await emptyDeleted(ops, (done, total) => progress.push(`${done}/${total}`));
     expect(summary).toEqual({ removed: 2, failed: 0 });
     expect(progress).toEqual(["1/2", "2/2"]);
-    expect(versions.map((v) => v.key)).toEqual(["Global/keep.txt"]);
+    expect((await versions()).map((v) => v.key)).toEqual(["Global/keep.txt"]);
   });
 
   it("keeps going past failures and reports the first one", async () => {
@@ -243,9 +229,5 @@ describe("messages", () => {
     expect(failureLines([{ status: "FAILED", message: "No.", data: { key: D } }, { status: "COMPLETE", data: { key: "x" } }])).toEqual([
       "a (deleted 2026-11-10 14-03-12 7f2c).jpg: No.",
     ]);
-  });
-
-  it("encodes the copy source per path segment", () => {
-    expect(copySource("b", "Global/Tết 2026/a b.jpg")).toBe("b/Global/T%E1%BA%BFt%202026/a%20b.jpg");
   });
 });

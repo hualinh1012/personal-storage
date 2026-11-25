@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { countRows, jumpStep, pageCount, pageLinks } from "../src/pagination/rows";
+import { countFolder } from "../src/pagination/countFolder";
+import { memoryDriveStorage } from "../src/storage/memoryStorage";
 import { createFolderTracker, type ListInput, type ListOutput } from "../src/pagination/folderTracker";
 
 const P = "Global/photos/";
@@ -9,31 +11,36 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 describe("countRows", () => {
   it("counts files and subfolders like Storage Browser's rows", () => {
     const listing = {
-      items: [{ path: `${P}a.jpg` }, { path: `${P}b.jpg` }],
-      excludedSubpaths: [`${P}2025/`, `${P}2026/`],
+      files: [{ key: `${P}a.jpg` }, { key: `${P}b.jpg` }],
+      folders: [`${P}2025/`, `${P}2026/`],
     };
     expect(countRows(listing, P)).toBe(4);
   });
 
   it("leaves out the folder's own placeholder object", () => {
-    expect(countRows({ items: [{ path: P }, { path: `${P}a.jpg` }] }, P)).toBe(1);
+    expect(countRows({ files: [{ key: P }, { key: `${P}a.jpg` }], folders: [] }, P)).toBe(1);
   });
 
   it("counts a zero-byte folder object once (as a folder row)", () => {
-    // With a delimiter, `Global/photos/old/` comes back as a subpath, never as an item too.
-    expect(countRows({ items: [], excludedSubpaths: [`${P}old/`] }, P)).toBe(1);
+    // With a delimiter, `Global/photos/old/` comes back as a subfolder, never as a file too.
+    expect(countRows({ files: [], folders: [`${P}old/`] }, P)).toBe(1);
   });
 
   it("drops dot keys Storage Browser hides", () => {
     const listing = {
-      items: [{ path: `${P}.` }, { path: `${P}..` }, { path: `${P}.hidden` }],
-      excludedSubpaths: [`${P}/`, `${P}./`, `${P}../`],
+      files: [{ key: `${P}.` }, { key: `${P}..` }, { key: `${P}.hidden` }],
+      folders: [`${P}/`, `${P}./`, `${P}../`],
     };
     expect(countRows(listing, P)).toBe(1);
   });
 
   it("is 0 for an empty folder", () => {
-    expect(countRows({ items: [] }, P)).toBe(0);
+    expect(countRows({ files: [], folders: [] }, P)).toBe(0);
+  });
+
+  it("counts a folder through the drive storage", async () => {
+    const drive = memoryDriveStorage([P, `${P}a.jpg`, `${P}b.jpg`, `${P}2025/c.jpg`, "Global/other.jpg"].map((key) => ({ key })));
+    expect(await countFolder(drive, P)).toBe(3);
   });
 });
 
@@ -100,7 +107,7 @@ describe("folder tracker", () => {
     const { handler } = fakeHandler(250);
     await t.wrap(handler)(page(P));
     await Promise.resolve();
-    expect(count).toHaveBeenCalledWith({}, P);
+    expect(count).toHaveBeenCalledWith(P);
     expect(t.getState()).toMatchObject({ prefix: P, mode: "browse", count: { status: "done", total: 250 }, loadedRows: 100, hasMore: true });
   });
 
@@ -138,7 +145,7 @@ describe("folder tracker", () => {
 
   it("drops a count that finishes after the person moved to another folder", async () => {
     let finishFirst: (n: number) => void = () => {};
-    const count = vi.fn((_c: unknown, prefix: string) =>
+    const count = vi.fn((prefix: string) =>
       prefix === P ? new Promise<number>((r) => (finishFirst = r)) : Promise.resolve(3),
     );
     const t = createFolderTracker(count);

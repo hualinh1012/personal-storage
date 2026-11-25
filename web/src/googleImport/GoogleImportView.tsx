@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { GoogleImportDeps } from "./deps";
+import { existingFiles, type GoogleImportDeps } from "./deps";
 import { importItem } from "./importFile";
 import { warnOnLeave } from "./leaveWarning";
 import type { ImportItem } from "./plan";
@@ -111,8 +111,8 @@ export function GoogleImportView() {
       setPhase({ kind: "preparing" });
       const plan = await prepareImport(files, prefix, {
         drive: google.drive(token.current),
-        listExisting: storage.list,
-        exists: storage.exists,
+        listExisting: (p) => existingFiles(storage, p),
+        exists: (key) => storage.exists(key),
       });
       setPhase({ kind: "ready", plan });
     } catch (e) {
@@ -126,8 +126,8 @@ export function GoogleImportView() {
     setPhase({ kind: "running", items });
     const drive = google.drive(token.current!);
     const ops = {
-      exists: storage.exists,
-      upload: storage.upload,
+      exists: (key: string) => storage.exists(key),
+      upload: (key: string, data: Blob, contentType: string, signal: AbortSignal) => storage.write(key, data, { contentType, signal }),
       download: (id: string, signal: AbortSignal) => drive.download(id, signal),
       exportFile: (id: string, mimeType: string, signal: AbortSignal) => drive.exportFile(id, mimeType, signal),
     };
