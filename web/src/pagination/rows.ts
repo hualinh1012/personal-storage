@@ -6,10 +6,12 @@
 /** Storage Browser's page size (its default; we don't override it). */
 export const PAGE_SIZE = 100;
 
-/** What `list` from @aws-amplify/storage returns with `subpathStrategy: exclude` (the parts we use). */
+/** One level of a folder as the drive-storage seam lists it (src/storage, the parts we use). */
 export interface FolderListing {
-  items: { path: string }[];
-  excludedSubpaths?: string[];
+  /** Objects directly under the prefix. */
+  files: { key: string }[];
+  /** Subfolders (common prefixes). */
+  folders: string[];
 }
 
 // Keys Storage Browser drops because they'd break navigation (`/`, `./`, `../`) or
@@ -27,7 +29,7 @@ const DOT_KEYS = new Set(["/", "./", "../", ".", ".."]);
  * Re-check against that handler after upgrading the package.
  */
 export function countRows(listing: FolderListing, prefix: string): number {
-  const keys = [...(listing.excludedSubpaths ?? []), ...listing.items.map((i) => i.path).filter((p) => p !== prefix)];
+  const keys = [...listing.folders, ...listing.files.map((f) => f.key).filter((key) => key !== prefix)];
   return keys.filter((key) => {
     const rest = (key.startsWith(prefix) ? key.slice(prefix.length) : key).trim();
     return !DOT_KEYS.has(rest);

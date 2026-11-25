@@ -78,7 +78,7 @@ app: versioning stays the backstop against raw-credential misuse.
 | `Global/` location has permissions `["get", "list"]` without write, `["delete", "get", "list", "write"]` with it | `driveLocation()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` |
 | Storage Browser hides Upload, Create folder, Copy and Delete for a location without `write`/`delete` | Storage Browser's own action configs | same |
 | Move, Edit and Delete hide without `write` (Move and Delete also need `delete`) | `hide` in `moveAction.ts`, `editAction.ts`, `trash/actions.ts` | same |
-| Top-bar Upload/Import shown only where the open location has `write` | `locationPolicy().write`, `canWriteSomewhere()`, `showWriteButtons` in `Drive.tsx` | same |
+| Top-bar Upload/Import shown only where the open location has `write` | `locationPolicy().write`, `canWriteSomewhere()`, `showTopBar` in `web/src/driveHost/DriveView.tsx` | same |
 | Home lists only `Global/` (plus own folder/`Deleted/`) | `listDriveLocations()` | `ListDriveFolder` only matches `Global/`; listing the bucket root is denied |
 
 ## 4. Flows
@@ -171,11 +171,11 @@ sequenceDiagram
 
     MV->>S3: ListObjectsV2 (destination picker, folders only)
     loop each selected file
-        MF->>S3: HeadObject destination (getProperties)
+        MF->>S3: HeadObject destination (drive storage exists)
         alt exists
             MF-->>MV: FAILED "already exists in the destination"
         else 404
-            MF->>S3: CopyObject (x-amz-copy-source-if-match / if-unmodified-since)
+            MF->>S3: CopyObject (drive storage copy)
             MF->>S3: DeleteObject source (only after the copy succeeded)
             MF-->>MV: COMPLETE, or FAILED with the reason
         end
@@ -227,14 +227,16 @@ sequenceDiagram
 
 | Area | Files | Tests |
 |---|---|---|
-| Drive screen, Storage Browser setup | `web/src/pages/Drive.tsx` (`Drive` builds the adapter and S3 targets; `DriveView` creates the browser and the top bar) | via the playground |
+| Drive screen, Storage Browser setup | `web/src/pages/Drive.tsx` (`Drive` builds the adapter, the drive storage and the feature list from `web/src/features.ts`); `web/src/driveHost/DriveView.tsx` (creates the browser from the features, the top bar, remount/exit) | `web/test/driveHost.test.tsx` (fake browser), playground |
 | Locations and permissions | `web/src/locationPolicy.ts` (`driveLocation`, `locationPolicy`, `listDriveLocations`), `web/src/config.ts` (`toAmplifyOutputs`) | `web/test/locationPolicy.test.ts`, `web/test/config.test.ts` |
 | App start and `Amplify.configure` | `web/src/App.tsx`, `web/src/main.tsx` | |
 | Move | `web/src/move/moveFile.ts` (rules), `moveAction.ts` (wiring), `MoveView.tsx` (view) | `web/test/moveFile.test.ts`, `web/test/moveView.test.ts` |
-| Delete → `Deleted/` | `web/src/trash/actions.ts`, `trash.ts`, `paths.ts`, `s3Ops.ts`, `TrashViews.tsx` | `web/test/trash.test.ts` |
-| Edit | `web/src/edit/text.ts`, `textFile.ts`, `s3Ops.ts`, `editAction.ts`, `EditTextView.tsx` | `web/test/editText.test.ts` |
+| Delete → `Deleted/` | `web/src/trash/actions.ts`, `trash.ts`, `paths.ts`, `TrashViews.tsx` | `web/test/trash.test.ts` |
+| Edit | `web/src/edit/text.ts`, `textFile.ts`, `editAction.ts`, `EditTextView.tsx` | `web/test/editText.test.ts` |
 | Pager and count | `web/src/pagination/folderTracker.ts`, `countFolder.ts`, `rows.ts`, `Pager.tsx` | `web/test/pagination.test.ts` |
-| Stable selection for custom views | `web/src/stableItems.ts` | |
+| Stable selection for custom views | `web/src/driveHost/stableItems.ts` | |
+| Storage Browser's internal shapes and casts, `failureLines` | `web/src/driveHost/storageBrowser.ts` | |
+| Feature list and composition | `web/src/features.ts`, `web/src/driveHost/feature.ts` (`composeFeatures`) | `driveHost.test.tsx` |
 | Layout | `web/src/styles.css` | playground `?view=drive` |
 | PWA | `web/public/manifest.webmanifest`, `web/index.html`, `web/public/icons/`, `web/scripts/make-icons.mjs` | |
 | Download service worker | copied by `npm run copy-sw` into `web/public/amplify-storage-download/` (git-ignored) | |
@@ -252,12 +254,13 @@ sequenceDiagram
   config when it's built, so it can never be created at module level.
 - `toAmplifyOutputs()` declares one storage bucket named `drive` with the path `Global/*`. The
   real per-location access comes from `listDriveLocations()` and IAM, not from that block.
-- `DriveView` calls `createStorageBrowser()` once (memoised) with:
-  - `listLocationItems` wrapped by the folder tracker;
-  - `delete` replaced by "move to `Deleted/`";
+- `DriveView` (`web/src/driveHost/`, #40) calls `createStorageBrowser()` once (memoised) with what
+  the features in `web/src/features.ts` add, merged by `composeFeatures`:
+  - `listLocationItems` wrapped by the pager feature's folder tracker;
+  - `delete` replaced by "move to `Deleted/`" (trash feature);
   - custom actions `move`, Google import, `editText` and the Deleted folder's three;
-  - `filePreview` from `web/src/preview/registry.ts`;
-  - `components: { Pagination: Pager }`.
+  - `filePreview` from `web/src/preview/registry.ts` (preview feature);
+  - `components: { Pagination }` from the pager feature.
 - Custom views reuse Storage Browser's parts: Move uses `CopyView`'s, Restore and Delete
   permanently use `DeleteView`'s. They must pass `useStableItems(tasks)` to `useAction`
   (a new array each render resets it and loops).
@@ -299,16 +302,16 @@ There are no shared-drive-specific SSM parameters or Google Cloud settings.
 |---|---|---|
 | List a page | `ListObjectsV2` (`Delimiter=/`, `MaxKeys=100`) | Storage Browser `listLocationItems` → Amplify `list` |
 | Search | `ListObjectsV2` (1,000 per call) | same, with a search query |
-| Count for the pager | `ListObjectsV2` (`Delimiter=/`, all pages) | `countFolder()` → Amplify `list` (`listAll`) |
+| Count for the pager | `ListObjectsV2` (`Delimiter=/`, all pages) | `countFolder()` → drive storage `listFolder` (AWS SDK) |
 | Upload ≤ 5 MiB | `PutObject` | Storage Browser upload → Amplify `uploadData` |
 | Upload > 5 MiB | `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload` (`AbortMultipartUpload` on cancel) | same |
 | Create folder | `PutObject` of an empty `name/` key | Storage Browser createFolder → `uploadData` |
 | Download one | `HeadObject`, then a presigned `GetObject` | Storage Browser download → Amplify `getUrl` |
 | Download several | presigned `GetObject` per file | Storage Browser zip download + service worker |
 | Copy | `CopyObject` | Storage Browser copy → Amplify `copy` |
-| Move | `HeadObject`, `CopyObject`, `DeleteObject` | `moveAction.ts`: Amplify `getProperties` + Storage Browser's copy/delete handlers |
-| Delete | (`ListObjectsV2`), `CopyObject`, `DeleteObject` | `trash/s3Ops.ts` (`@aws-sdk/client-s3`) |
-| Edit | `GetObject`, `PutObject` | `edit/s3Ops.ts` (`@aws-sdk/client-s3`) |
+| Move | `HeadObject`, `CopyObject`, `DeleteObject` | `moveAction.ts` → drive storage (AWS SDK, `web/src/storage/s3Storage.ts`) |
+| Delete | (`ListObjectsV2`), `CopyObject`, `DeleteObject` | `trash/trash.ts` → drive storage (AWS SDK) |
+| Edit | `GetObject`, `PutObject` | `edit/textFile.ts` → drive storage (AWS SDK) |
 | Preview | `GetObject` (presigned URL) | Storage Browser `filePreview` |
 | Deploy | `s3 sync`/`cp` to the web bucket, `CreateInvalidation` | `scripts/deploy.sh` (AWS CLI) |
 

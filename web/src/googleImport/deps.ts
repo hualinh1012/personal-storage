@@ -1,11 +1,11 @@
 /**
  * What the import view needs from the outside world, so the playground can
- * swap in fakes. `realGoogleImportDeps` is the production wiring: Google's
- * scripts and Drive API on one side, Amplify Storage (the signed-in person's
- * Identity Pool credentials: `Global/*` and their own `Personal/<email>/*`) on the other.
+ * swap in fakes: Google's scripts and Drive API on one side, the drive storage
+ * (src/storage: S3 as the signed-in person in the app, `Global/*` and their own
+ * `Personal/<email>/*`; the in-memory drive in the playground) on the other.
  */
-import { getProperties, list, uploadData } from "aws-amplify/storage";
 import type { GoogleImportConfig } from "../config";
+import type { DriveStorage } from "../storage/driveStorage";
 import { createDriveClient, type DriveClient } from "./driveClient";
 import { getDriveToken, loadGoogle, pickFiles } from "./google";
 import type { ExistingFile, PickedFile } from "./plan";
@@ -18,55 +18,21 @@ export interface GoogleSide {
   drive(token: string): DriveClient;
 }
 
-export interface StorageSide {
-  /** Files directly under `prefix` (not in subfolders), names relative to it. */
-  list(prefix: string): Promise<ExistingFile[]>;
-  exists(key: string): Promise<boolean>;
-  upload(key: string, data: Blob, contentType: string, signal: AbortSignal): Promise<void>;
-}
+/** The storage operations an import needs. */
+export type ImportStorage = Pick<DriveStorage, "listFolder" | "exists" | "write">;
 
 export interface GoogleImportDeps {
   /** null while the SSM values are still placeholders. */
   config: GoogleImportConfig | null;
   google: GoogleSide;
-  storage: StorageSide;
+  storage: ImportStorage;
 }
 
-const isNotFound = (error: unknown) =>
-  error instanceof Error && (error.name === "NotFound" || /not\s*found|404/i.test(error.message));
-
-export const amplifyStorage: StorageSide = {
-  async list(prefix) {
-    const { items } = await list({
-      path: prefix,
-      options: { listAll: true, subpathStrategy: { strategy: "exclude" } },
-    });
-    return items
-      .filter((i) => i.path !== prefix && !i.path.endsWith("/"))
-      .map((i) => ({ name: i.path.slice(prefix.length), size: i.size }));
-  },
-  async exists(key) {
-    try {
-      await getProperties({ path: key });
-      return true;
-    } catch (error) {
-      if (isNotFound(error)) return false;
-      throw error;
-    }
-  },
-  async upload(key, data, contentType, signal) {
-    if (signal.aborted) throw signal.reason;
-    // Multipart for big files; an aborted upload's parts are cleaned up by the bucket's 7-day rule.
-    const task = uploadData({ path: key, data, options: { contentType } });
-    const cancel = () => task.cancel();
-    signal.addEventListener("abort", cancel, { once: true });
-    try {
-      await task.result;
-    } finally {
-      signal.removeEventListener("abort", cancel);
-    }
-  },
-};
+/** Files directly under `prefix` (not in subfolders, not folder placeholders), names relative to it. */
+export async function existingFiles(storage: Pick<DriveStorage, "listFolder">, prefix: string): Promise<ExistingFile[]> {
+  const { files } = await storage.listFolder(prefix);
+  return files.filter((f) => f.key !== prefix && !f.key.endsWith("/")).map((f) => ({ name: f.key.slice(prefix.length), size: f.size }));
+}
 
 export const googleApis: GoogleSide = {
   load: loadGoogle,
@@ -75,6 +41,6 @@ export const googleApis: GoogleSide = {
   drive: (token) => createDriveClient(token),
 };
 
-export function realGoogleImportDeps(config: GoogleImportConfig | null): GoogleImportDeps {
-  return { config, google: googleApis, storage: amplifyStorage };
+export function realGoogleImportDeps(config: GoogleImportConfig | null, storage: ImportStorage): GoogleImportDeps {
+  return { config, google: googleApis, storage };
 }

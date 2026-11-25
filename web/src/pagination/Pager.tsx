@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
+import { useContext, useEffect, useState, useSyncExternalStore } from "react";
+import { DriveHostContext } from "../driveHost/hostContext";
 import type { FolderState, FolderTracker } from "./folderTracker";
 import { jumpStep, pageCount, pageLinks } from "./rows";
 
@@ -9,20 +10,6 @@ export interface PagerProps {
   highestPageVisited?: number;
   onPaginate?: (page: number) => void;
 }
-
-export interface PagerContextValue {
-  tracker: FolderTracker<never>;
-  /** The folder whose file list is open (full prefix), or null in other views (Home, actions). */
-  listPrefix: string | null;
-}
-
-export const PagerContext = createContext<PagerContextValue | null>(null);
-
-const NO_TRACKER: FolderTracker<never> = {
-  wrap: (h) => h,
-  getState: () => ({ mode: "browse", count: { status: "failed" }, loadedRows: 0, hasMore: false, fetching: false, failures: 0 }),
-  subscribe: () => () => {},
-};
 
 /** The folder total, when it's known and applies to the list on screen. */
 function totalFor(state: FolderState, listPrefix: string | null): number | undefined {
@@ -36,11 +23,24 @@ function totalFor(state: FolderState, listPrefix: string | null): number | undef
  * counted the folder. While counting, if the count failed, during a search
  * and in other views it falls back to the pages visited so far plus Next.
  */
-export function Pager({ page, hasNextPage, highestPageVisited, onPaginate }: PagerProps) {
-  const ctx = useContext(PagerContext);
-  const tracker = ctx?.tracker ?? NO_TRACKER;
+export function makePager(tracker: FolderTracker) {
+  return function Pager(props: PagerProps) {
+    // The folder whose file list is open (full prefix); null on Home and in an action's view.
+    const host = useContext(DriveHostContext);
+    const listPrefix = host?.location && !host.actionType ? host.location.prefix + host.location.path : null;
+    return <PagerView {...props} tracker={tracker} listPrefix={listPrefix} />;
+  };
+}
+
+function PagerView({
+  page,
+  hasNextPage,
+  highestPageVisited,
+  onPaginate,
+  tracker,
+  listPrefix,
+}: PagerProps & { tracker: FolderTracker; listPrefix: string | null }) {
   const state = useSyncExternalStore(tracker.subscribe, tracker.getState);
-  const listPrefix = ctx?.listPrefix ?? null;
   // The tracker describes the list only in the open folder's file list; other
   // views (Home, Copy's destination picker) page through their own items.
   const tracked = listPrefix !== null && state.prefix === listPrefix;

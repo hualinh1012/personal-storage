@@ -1,20 +1,23 @@
 /*
  * Dev-only: fake Google and S3 sides for the import view, so the playground
  * (?view=drive) can run the whole flow with no Google account or AWS. Picking
- * returns a fixed set covering each outcome, plus a nested folder. Uploads are
- * remembered, so running the same import twice shows the re-run skips.
+ * returns a fixed set covering each outcome, plus a nested folder. Files go into
+ * the playground's in-memory drive, so they show in the list, and running the
+ * same import twice shows the re-run skips.
  * ?google=off shows the "isn't set up yet" screen instead.
  */
 import { DriveError, type DriveClient, type DriveFile } from "../googleImport/driveClient";
-import type { GoogleImportDeps } from "../googleImport/deps";
+import type { GoogleImportDeps, ImportStorage } from "../googleImport/deps";
 import type { PickedFile } from "../googleImport/plan";
+import { sampleMarkdown } from "./samples";
 
 const FOLDER = "application/vnd.google-apps.folder";
 
 const picked: PickedFile[] = [
   { id: "g1", name: "Beach day 2025.jpg", mimeType: "image/jpeg", sizeBytes: 3_400_000 },
   { id: "g2", name: "  Passport scan.pdf", mimeType: "application/pdf", sizeBytes: 820_000 },
-  { id: "g3", name: "Tết 2026 plan.md", mimeType: "text/markdown", sizeBytes: 2_100 },
+  // Same name and size as the sample plan in Global/linh/ (→ already imported there).
+  { id: "g3", name: "Tết 2026 plan.md", mimeType: "text/markdown", sizeBytes: new TextEncoder().encode(sampleMarkdown).byteLength },
   { id: "g4", name: "Budget 2026", mimeType: "application/vnd.google-apps.spreadsheet" },
   { id: "g5", name: "Wedding video.mp4", mimeType: "video/mp4", sizeBytes: 48_000_000 },
   { id: "g6", name: "Rate-limited.jpg", mimeType: "image/jpeg", sizeBytes: 1_000_000 },
@@ -73,14 +76,7 @@ const drive: DriveClient = {
   },
 };
 
-// What's "in S3": a same-size copy of the plan (→ already imported) and a
-// different-size beach photo (→ imported as "(1)").
-const stored = new Map<string, number>([
-  ["Global/linh/Tết 2026 plan.md", 2_100],
-  ["Global/linh/Beach day 2025.jpg", 1_234],
-]);
-
-export function mockGoogleImport(enabled: boolean): GoogleImportDeps {
+export function mockGoogleImport(enabled: boolean, storage: ImportStorage): GoogleImportDeps {
   return {
     config: enabled ? { clientId: "playground", apiKey: "playground", projectNumber: "0" } : null,
     google: {
@@ -89,17 +85,6 @@ export function mockGoogleImport(enabled: boolean): GoogleImportDeps {
       pick: async () => picked,
       drive: () => drive,
     },
-    storage: {
-      async list(prefix) {
-        return [...stored]
-          .filter(([key]) => key.startsWith(prefix) && !key.slice(prefix.length).includes("/"))
-          .map(([key, size]) => ({ name: key.slice(prefix.length), size }));
-      },
-      exists: async (key) => stored.has(key),
-      async upload(key, data, _type, signal) {
-        await wait(600, signal);
-        stored.set(key, data.size);
-      },
-    },
+    storage,
   };
 }

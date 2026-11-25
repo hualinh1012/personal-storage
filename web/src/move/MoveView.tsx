@@ -1,5 +1,5 @@
-import { type ComponentType, type ReactNode } from "react";
-import { useStableItems } from "../stableItems";
+import { useStableItems } from "../driveHost/stableItems";
+import { failureLines as hostFailureLines, type BrowserParts, type Task } from "../driveHost/storageBrowser";
 
 /*
  * The Move screen. Storage Browser's Copy view is hard-wired to its copy
@@ -8,44 +8,6 @@ import { useStableItems } from "../stableItems";
  * CopyView.Provider, and swaps in the "move" action for processing, plus our
  * own title, message and start button.
  */
-
-// Loose shapes of the Storage Browser pieces we compose (its typings for these are internal).
-type Part = ComponentType;
-interface CopyViewParts {
-  Provider: ComponentType<Record<string, unknown> & { children?: ReactNode }>;
-  Exit: Part;
-  TasksTable: Part;
-  FoldersSearch: Part;
-  FoldersPagination: Part;
-  FoldersLoadingIndicator: Part;
-  FoldersTable: Part;
-  FoldersMessage: Part;
-  Destination: Part;
-  Statuses: Part;
-  Cancel: Part;
-}
-interface Task {
-  data: unknown;
-  status: string;
-  message?: string;
-  cancel?: () => void;
-}
-interface CopyState extends Record<string, unknown> {
-  tasks: Task[];
-  onActionExit: () => void;
-}
-interface ProcessState {
-  isProcessing: boolean;
-  isProcessingComplete: boolean;
-  statusCounts: Record<string, number>;
-  tasks: Task[];
-}
-
-export interface MoveViewDeps {
-  CopyView: CopyViewParts;
-  useView: (name: "Copy") => CopyState;
-  useAction: (name: "move", options: { items: unknown[] }) => [ProcessState, () => void];
-}
 
 export function summary(counts: Record<string, number>): string {
   const moved = counts.COMPLETE ?? 0;
@@ -59,15 +21,10 @@ export function summary(counts: Record<string, number>): string {
 
 /** Failed files with the reason, since the tasks table only shows a status. */
 export function failureLines(tasks: Task[]): string[] {
-  return tasks
-    .filter((t) => t.status === "FAILED")
-    .map((t) => {
-      const key = (t.data as { sourceKey?: string }).sourceKey ?? "";
-      return `${key.slice(key.lastIndexOf("/") + 1)}: ${t.message ?? "Not moved."}`;
-    });
+  return hostFailureLines(tasks, (data) => (data as { sourceKey?: string }).sourceKey, "Not moved.");
 }
 
-export function makeMoveView({ CopyView, useView, useAction }: MoveViewDeps) {
+export function makeMoveView({ CopyView, useView, useAction }: BrowserParts) {
   return function MoveView() {
     const copy = useView("Copy");
     // Copy's tasks already carry each selected file with its key at the chosen destination.

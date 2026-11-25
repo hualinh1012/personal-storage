@@ -91,18 +91,11 @@ locals {
   access_flags   = ["personal", "trash"]
   access_emails  = [for k in keys(local.access_entries) : lower(trimspace(k))]
 
-  # Normalized for the pre token generation Lambda (env ACCESS_LEVELS): emails
-  # lower-cased, missing flags false. Grouping (...) avoids a duplicate-key
-  # error here; a precondition reports duplicates instead.
-  access = {
-    for email, entries in {
-      for k, v in local.access_entries : lower(trimspace(k)) => {
-        global   = try(tostring(v.global), "read")
-        personal = try(v.personal == true, false)
-        trash    = try(v.trash == true, false)
-      }...
-    } : email => entries[0]
-  }
+  # Passed as written to the pre token generation Lambda (env ACCESS_LEVELS).
+  # Its tested parser (functions/allowlist/src/access.ts) lower-cases emails and
+  # defaults missing flags, so there's no hand-written copy here that could drop
+  # a new flag silently (#41). The preconditions below still stop a bad value.
+  access_levels_json = trimspace(nonsensitive(data.aws_ssm_parameter.access.value))
 }
 
 # Stops the plan before anything changes if the SSM values are still the

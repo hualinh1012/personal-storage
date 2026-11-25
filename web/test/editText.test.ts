@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canEditSelection, decodeText, encodeText, isEditable, MAX_EDIT_BYTES } from "../src/edit/text";
-import { openText, saveText, type TextFileOps } from "../src/edit/textFile";
+import { openText, saveText } from "../src/edit/textFile";
+import { memoryDriveStorage } from "../src/storage/memoryStorage";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
 
@@ -58,36 +59,26 @@ describe("decodeText / encodeText", () => {
   });
 });
 
-function memoryOps(initial: Record<string, Uint8Array>) {
-  const store = new Map(Object.entries(initial));
-  const puts: { key: string; contentType: string }[] = [];
-  const ops: TextFileOps = {
-    async read(key) {
-      const body = store.get(key);
-      if (!body) throw new Error("NoSuchKey");
-      return body;
-    },
-    async write(key, body, contentType) {
-      store.set(key, body);
-      puts.push({ key, contentType });
-    },
-  };
-  return { ops, store, puts };
-}
-
 describe("openText / saveText", () => {
   it("opens a file and saves the edit back to the same key as UTF-8 text", async () => {
-    const { ops, store, puts } = memoryOps({ "Global/list.txt": bytes("﻿gạo\r\n") });
-    const opened = await openText("Global/list.txt", ops);
+    const drive = memoryDriveStorage([{ key: "Global/list.txt", body: bytes("﻿gạo\r\n"), contentType: "text/plain" }]);
+    const opened = await openText("Global/list.txt", drive);
     expect(opened.text).toBe("gạo\n");
-    const size = await saveText("Global/list.txt", opened.text + "muối\n", opened.format, ops);
-    expect(new TextDecoder("utf-8", { ignoreBOM: true }).decode(store.get("Global/list.txt"))).toBe("﻿gạo\r\nmuối\r\n");
-    expect(size).toBe(store.get("Global/list.txt")!.byteLength);
-    expect(puts).toEqual([{ key: "Global/list.txt", contentType: "text/plain; charset=utf-8" }]);
+    const size = await saveText("Global/list.txt", opened.text + "muối\n", opened.format, drive);
+    const saved = await drive.read("Global/list.txt");
+    expect(new TextDecoder("utf-8", { ignoreBOM: true }).decode(saved)).toBe("﻿gạo\r\nmuối\r\n");
+    expect(size).toBe(saved.byteLength);
+    expect(drive.get("Global/list.txt")?.contentType).toBe("text/plain; charset=utf-8");
+    // The old text is still a version (versioning is the undo).
+    expect(await drive.listVersions("Global/list.txt")).toHaveLength(2);
   });
 
   it("refuses to open a file over the cap", async () => {
-    const { ops } = memoryOps({ "Global/big.txt": new Uint8Array(1024 * 1024 + 1) });
-    await expect(openText("Global/big.txt", ops)).rejects.toThrow(/too big to edit/);
+    const drive = memoryDriveStorage([{ key: "Global/big.txt", body: new Uint8Array(1024 * 1024 + 1) }]);
+    await expect(openText("Global/big.txt", drive)).rejects.toThrow(/too big to edit/);
+  });
+
+  it("explains a file that's gone with the storage's not-found reason", async () => {
+    await expect(openText("Global/gone.txt", memoryDriveStorage())).rejects.toThrow(/No such key/);
   });
 });

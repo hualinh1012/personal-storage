@@ -64,8 +64,8 @@ ordinary upload can. From `aws_iam_role_policy.authenticated` in `infra/identity
 
 | UI | Source | Enforced by |
 |---|---|---|
-| Action and top-bar button hidden without `write` on the location | `googleImportActionConfig.hide` (`hideUnless("write")`), `locationPolicy().write` in `Drive.tsx`, both from `web/src/locationPolicy.ts` | the write statements above |
-| Destination is always the open folder | `GoogleImportContext.prefix` from `DriveView` | the same; a forged key outside the allowed prefixes gets `AccessDenied` |
+| Action and top-bar button hidden without `write` on the location | `googleImportActionConfig.hide` (`hideUnless("write")`), `locationPolicy().write` in `web/src/driveHost/DriveView.tsx`, both from `web/src/locationPolicy.ts` | the write statements above |
+| Destination is always the open folder | the open location from `useDriveHost()` (`makeGoogleImportView`) | the same; a forged key outside the allowed prefixes gets `AccessDenied` |
 
 ### Google side
 
@@ -171,7 +171,7 @@ All under `web/src/googleImport/`; tests in `web/test/googleImport.test.ts`.
 | `GoogleImportView.tsx` | The screen: phases choose → preparing → ready → running → finished; concurrency 3 | playground |
 | `google.ts` | Loads GIS and Picker lazily, gets and caches the token, opens Picker | |
 | `driveClient.ts` | The only code calling the Drive API (`files.list`, `alt=media`, `export`); `DriveError` | yes |
-| `deps.ts` | Injected sides: `googleApis` + `amplifyStorage` (production), fakes in the playground | |
+| `deps.ts` | Injected sides: `googleApis` (faked in the playground) and the drive storage (`web/src/storage/`); `existingFiles` | yes |
 | `prepare.ts` | Picked items → full plan; lists each destination folder once | yes |
 | `listing.ts` | Recursive folder walk, every page, empty folders | yes |
 | `plan.ts` | Keys, `(n)` names, re-run skips, conversion targets, 500 MB cut-off | yes |
@@ -183,8 +183,8 @@ All under `web/src/googleImport/`; tests in `web/test/googleImport.test.ts`.
 | `summary.ts` | Status labels, "3 copied, 1 skipped · 12 MB" | yes |
 | `leaveWarning.ts` | `beforeunload` prompt while running | yes |
 
-Wiring elsewhere: `web/src/pages/Drive.tsx` (custom action, top-bar button, `GoogleImportContext`
-with the destination prefix, label and `exitToFolder`), `web/src/config.ts`
+Wiring elsewhere: `web/src/googleImport/feature.ts` (custom action, view, top-bar button; the
+destination, label and `exitToFolder` come from the drive host), `web/src/config.ts`
 (`googleImportConfig()`), `web/src/playground/mockGoogleImport.ts`.
 
 The top-bar button uses the same remount trick as Upload: `openAction(GOOGLE_IMPORT_ACTION)`
@@ -229,15 +229,16 @@ remounts Storage Browser into the view, and `onExit` remounts it on the folder, 
 
 | Step | Call | Issued by |
 |---|---|---|
-| List a destination folder | `ListObjectsV2` (`Delimiter=/`, all pages) | Amplify `list` (`listAll`, `subpathStrategy: exclude`) in `deps.ts` |
-| Existence check (each file and empty folder) | `HeadObject` | Amplify `getProperties` |
-| Upload ≤ 5 MiB | `PutObject` | Amplify `uploadData` |
-| Upload > 5 MiB | `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload` | Amplify `uploadData` |
-| Cancel | `AbortMultipartUpload` | `uploadData` task `cancel()` |
-| Credentials | `GetId`, `GetCredentialsForIdentity` | Amplify, through the default storage config (not Storage Browser's location credentials) |
+| List a destination folder | `ListObjectsV2` (`Delimiter=/`, all pages) | drive storage `listFolder` (`existingFiles` in `deps.ts`) |
+| Existence check (each file and empty folder) | `HeadObject` | drive storage `exists` |
+| Upload ≤ 8 MiB | `PutObject` | drive storage `write` |
+| Upload > 8 MiB | `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload` | drive storage `write` |
+| Cancel or a failed part | `AbortMultipartUpload` | drive storage `write` (the abort signal) |
+| Credentials | `GetId`, `GetCredentialsForIdentity` | Amplify `fetchAuthSession`, through the drive storage's S3 adapter (not Storage Browser's location credentials) |
 
-Amplify `uploadData` splits uploads over 5 MiB into 5 MiB parts (doubled if more than 10,000
-would be needed) and retries failed S3 requests itself; the import adds no S3 retries of its own.
+The drive storage's S3 adapter (`web/src/storage/s3Storage.ts`, #39) uploads files over 8 MiB in
+8 MiB parts, one at a time (500 MB is 63 parts), and aborts the upload if a part fails or the import
+is cancelled. The SDK retries failed S3 requests itself; the import adds no S3 retries of its own.
 Uploads don't use `If-None-Match`: the `HeadObject` just before is the overwrite check (see §7).
 
 ### IAM for the pipeline

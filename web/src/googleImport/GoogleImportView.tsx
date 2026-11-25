@@ -1,5 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { GoogleImportDeps } from "./deps";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { HostState } from "../driveHost/feature";
+import { useDriveHost } from "../driveHost/hostContext";
+import { existingFiles, type GoogleImportDeps } from "./deps";
 import { importItem } from "./importFile";
 import { warnOnLeave } from "./leaveWarning";
 import type { ImportItem } from "./plan";
@@ -7,18 +9,12 @@ import { prepareImport, type PreparedImport } from "./prepare";
 import { runQueue } from "./queue";
 import { STATUS_LABEL, formatBytes, summaryLine } from "./summary";
 
-/** What DriveView hands the import view: the open folder and how to leave. */
-export interface GoogleImportContextValue {
-  deps: GoogleImportDeps;
-  /** Destination prefix, e.g. "Global/linh/". */
-  prefix: string;
-  /** The open folder as people see it. */
-  folderLabel: string;
-  /** Leave the view (DriveView remounts the browser, which refreshes the list). */
-  onExit(): void;
+/** The open folder as people see it: its path, or the location's name at its top. */
+export function importFolderLabel(host: Pick<HostState, "location" | "policy">): string {
+  const path = host.location?.path ?? "";
+  if (path) return path.replace(/\/$/, "");
+  return host.policy.kind === "personal" ? "My files" : "Family Drive";
 }
-
-export const GoogleImportContext = createContext<GoogleImportContextValue | null>(null);
 
 const CONCURRENCY = 3;
 
@@ -73,11 +69,18 @@ function ItemsTable({ items }: { items: ImportItem[] }) {
   );
 }
 
-/** The ⋮ menu's and the top bar's "Import from Google Drive" screen. */
-export function GoogleImportView() {
-  const ctx = useContext(GoogleImportContext);
-  if (!ctx) throw new Error("GoogleImportView needs GoogleImportContext");
-  const { deps, prefix, folderLabel, onExit } = ctx;
+/**
+ * The ⋮ menu's and the top bar's "Import from Google Drive" screen, into the
+ * open folder. Leaving goes through the host, whose remount re-lists the folder.
+ */
+export function makeGoogleImportView(deps: GoogleImportDeps) {
+  return function GoogleImportView() {
+    const host = useDriveHost();
+    return <ImportScreen deps={deps} prefix={(host.location?.prefix ?? "") + (host.location?.path ?? "")} folderLabel={importFolderLabel(host)} onExit={host.exitToFolder} />;
+  };
+}
+
+function ImportScreen({ deps, prefix, folderLabel, onExit }: { deps: GoogleImportDeps; prefix: string; folderLabel: string; onExit(): void }) {
   const { config, google, storage } = deps;
 
   const [phase, setPhase] = useState<Phase>({ kind: "choose" });
@@ -111,8 +114,8 @@ export function GoogleImportView() {
       setPhase({ kind: "preparing" });
       const plan = await prepareImport(files, prefix, {
         drive: google.drive(token.current),
-        listExisting: storage.list,
-        exists: storage.exists,
+        listExisting: (p) => existingFiles(storage, p),
+        exists: (key) => storage.exists(key),
       });
       setPhase({ kind: "ready", plan });
     } catch (e) {
@@ -126,8 +129,8 @@ export function GoogleImportView() {
     setPhase({ kind: "running", items });
     const drive = google.drive(token.current!);
     const ops = {
-      exists: storage.exists,
-      upload: storage.upload,
+      exists: (key: string) => storage.exists(key),
+      upload: (key: string, data: Blob, contentType: string, signal: AbortSignal) => storage.write(key, data, { contentType, signal }),
       download: (id: string, signal: AbortSignal) => drive.download(id, signal),
       exportFile: (id: string, mimeType: string, signal: AbortSignal) => drive.exportFile(id, mimeType, signal),
     };

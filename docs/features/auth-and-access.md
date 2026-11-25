@@ -110,7 +110,7 @@ The role's trust policy (`data.aws_iam_policy_document.authenticated_assume`) le
 | UI behaviour | Source | IAM rule that actually stops it |
 |---|---|---|
 | `Global/` gets Storage Browser permissions `["get", "list"]` without `write`, which hides Upload, Create folder, Delete, Copy, Move and Import there | `driveLocation()` / `locationPolicy()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` needs `global_access` = `write` |
-| Top-bar Upload/Import hidden without a writable location | `showWriteButtons` in `web/src/pages/Drive.tsx` | same |
+| Top-bar Upload/Import hidden without a writable location | `showTopBar` in `web/src/driveHost/DriveView.tsx` | same |
 | Home lists `Personal/<email>/` only with `personal` | `listDriveLocations()` | `ListOwnPersonalFolder`, `ManageOwnPersonalObjects` |
 | Home lists `Deleted/` only with `trash` | `listDriveLocations()` | `ListDeletedFolder`, `ManageDeletedObjects` |
 | Home never lists other people's folders | `listDriveLocations()` (replaces the adapter's `listLocations`) | No statement allows `Personal/<someone else>/` |
@@ -263,14 +263,15 @@ How they reach the Lambdas:
 
 1. `infra/foundation_inputs.tf` reads them with `aws_ssm_parameter` data sources.
 2. `local.allowed_emails` trims, lower-cases, drops empties and de-duplicates.
-3. `local.access` lower-cases emails and fills missing flags with `false`.
+3. `local.access_levels_json` is the SSM value as written (trimmed). There is no normalised copy
+   in Terraform (#41): the Lambda's parser lower-cases emails and fills missing flags with `false`.
 4. The `terraform_data.foundation_inputs_check` preconditions stop the plan on: no emails, a
    non-email entry (including `CHANGE_ME`), `access` that isn't a JSON object, an entry without
    `global` = `read`/`write`, an unknown key, a non-boolean flag, an email listed twice in
    different case, an `access` email missing from the allowlist, or a Google client ID/secret
    still `CHANGE_ME`.
 5. Lambda env: both get `ALLOWED_EMAILS` (`join(",", …)`); pre token generation also gets
-   `ACCESS_LEVELS` (`jsonencode(local.access)`).
+   `ACCESS_LEVELS` (`local.access_levels_json`).
 
 The Lambda's `parseAccess()` applies the same rules again and throws on a malformed value, so
 nobody gets a token rather than someone getting the wrong one.
@@ -372,7 +373,7 @@ A new S3 or logs permission for one of these roles works only if the boundary al
 
 ### Limits and quotas
 
-- **Lambda environment: 4 KB in total.** `ALLOWED_EMAILS` plus the normalised `ACCESS_LEVELS`
+- **Lambda environment: 4 KB in total.** `ALLOWED_EMAILS` plus `ACCESS_LEVELS` (as written in SSM)
   use roughly 30 + 60 bytes per person, so a few dozen people fit easily; a large list would
   need another source.
 - **Cognito trigger timeout: 5 s**, retried up to 3 times. The handlers do no I/O, so they take

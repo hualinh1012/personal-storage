@@ -5,7 +5,8 @@
  *   { "a@x.com": { "global": "write", "personal": true, "trash": true }, "b@x.com": { "global": "read" } }
  *
  * `global` is required. Other flags are booleans and default to false.
- * Terraform validates the same rules before deploying (infra/foundation_inputs.tf).
+ * Terraform validates the same rules before deploying (infra/foundation_inputs.tf)
+ * and then passes the value as written: this parser is the only normalizer (#41).
  */
 export type GlobalAccess = "read" | "write";
 

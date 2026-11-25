@@ -1,6 +1,6 @@
 /**
- * The Deleted folder's rules (issue #24, ADR 0011), with S3 injected so they
- * can be tested without AWS:
+ * The Deleted folder's rules (issue #24, ADR 0011), over the drive-storage
+ * seam (src/storage), so they are tested against the in-memory adapter:
  *
  * - Delete moves a file to Deleted/ (copy, then delete the original only if the
  *   copy worked). Folders move every file under them.
@@ -10,29 +10,18 @@
  *   left to recover in the console either.
  */
 import { DELETED_PREFIX } from "../locationPolicy";
+import { reason, type DriveStorage } from "../storage/driveStorage";
 import { deletedKey, originalKey, randomTag } from "./paths";
 
-export interface ObjectVersion {
-  key: string;
-  versionId: string;
-}
+export type { ObjectVersion } from "../storage/driveStorage";
 
-export interface TrashOps {
-  exists(key: string): Promise<boolean>;
-  copy(sourceKey: string, destinationKey: string): Promise<void>;
-  remove(key: string): Promise<void>;
-  /** Every object key under a prefix, including folder placeholders (keys ending in "/"). */
-  listKeys(prefix: string): Promise<string[]>;
-  /** Every version and delete marker under a prefix. */
-  listVersions(prefix: string): Promise<ObjectVersion[]>;
-  removeVersion(version: ObjectVersion): Promise<void>;
-}
+/** The storage operations the Deleted folder needs (the drive-storage seam, src/storage). */
+export type TrashOps = Pick<DriveStorage, "exists" | "copy" | "remove" | "listKeys" | "listVersions" | "removeVersion">;
 
 export type Outcome = { status: "COMPLETE" } | { status: "FAILED"; message: string };
 
 const COMPLETE: Outcome = { status: "COMPLETE" };
 const failed = (message: string): Outcome => ({ status: "FAILED", message });
-const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const isFolder = (key: string) => key.endsWith("/");
 const fileName = (key: string) => key.slice(key.lastIndexOf("/") + 1);
 
