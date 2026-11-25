@@ -263,14 +263,15 @@ How they reach the Lambdas:
 
 1. `infra/foundation_inputs.tf` reads them with `aws_ssm_parameter` data sources.
 2. `local.allowed_emails` trims, lower-cases, drops empties and de-duplicates.
-3. `local.access` lower-cases emails and fills missing flags with `false`.
+3. `local.access_levels_json` is the SSM value as written (trimmed). There is no normalised copy
+   in Terraform (#41): the Lambda's parser lower-cases emails and fills missing flags with `false`.
 4. The `terraform_data.foundation_inputs_check` preconditions stop the plan on: no emails, a
    non-email entry (including `CHANGE_ME`), `access` that isn't a JSON object, an entry without
    `global` = `read`/`write`, an unknown key, a non-boolean flag, an email listed twice in
    different case, an `access` email missing from the allowlist, or a Google client ID/secret
    still `CHANGE_ME`.
 5. Lambda env: both get `ALLOWED_EMAILS` (`join(",", …)`); pre token generation also gets
-   `ACCESS_LEVELS` (`jsonencode(local.access)`).
+   `ACCESS_LEVELS` (`local.access_levels_json`).
 
 The Lambda's `parseAccess()` applies the same rules again and throws on a malformed value, so
 nobody gets a token rather than someone getting the wrong one.
@@ -372,7 +373,7 @@ A new S3 or logs permission for one of these roles works only if the boundary al
 
 ### Limits and quotas
 
-- **Lambda environment: 4 KB in total.** `ALLOWED_EMAILS` plus the normalised `ACCESS_LEVELS`
+- **Lambda environment: 4 KB in total.** `ALLOWED_EMAILS` plus `ACCESS_LEVELS` (as written in SSM)
   use roughly 30 + 60 bytes per person, so a few dozen people fit easily; a large list would
   need another source.
 - **Cognito trigger timeout: 5 s**, retried up to 3 times. The handlers do no I/O, so they take

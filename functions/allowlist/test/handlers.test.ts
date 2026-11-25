@@ -81,6 +81,19 @@ describe("preTokenGeneration access claims", () => {
     expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no", trash: "no" });
   });
 
+  it("normalizes the raw SSM value itself: mixed-case, padded emails and missing flags (#41)", async () => {
+    // Terraform passes /family-drive/access as the owner wrote it, not re-encoded.
+    process.env.ALLOWED_EMAILS = "mom@gmail.com,dad@gmail.com";
+    process.env.ACCESS_LEVELS = `
+      {
+        " Mom@Gmail.com ": { "global": "write", "trash": true },
+        "DAD@gmail.com":   { "global": "read" }
+      }
+    `;
+    expect(await claims("mom@gmail.com")).toEqual({ global_access: "write", personal: "no", trash: "yes" });
+    expect(await claims("dad@gmail.com")).toEqual({ global_access: "read", personal: "no", trash: "no" });
+  });
+
   it("uses the default when ACCESS_LEVELS is not set", async () => {
     expect(await claims("mom@gmail.com")).toEqual({ global_access: "read", personal: "no", trash: "no" });
   });

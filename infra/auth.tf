@@ -86,8 +86,9 @@ resource "aws_lambda_function" "pre_token_generation" {
   environment {
     variables = {
       ALLOWED_EMAILS = join(",", local.allowed_emails)
-      # Normalized JSON from SSM /family-drive/access (foundation_inputs.tf).
-      ACCESS_LEVELS = jsonencode(local.access)
+      # SSM /family-drive/access as written, after the plan's preconditions
+      # (foundation_inputs.tf); the Lambda's parser normalizes it.
+      ACCESS_LEVELS = local.access_levels_json
     }
   }
 

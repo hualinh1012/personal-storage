@@ -101,8 +101,8 @@ Every IAM role the app stack creates sets `permissions_boundary = local.permissi
 - The allowlist reaches the Lambdas as env `ALLOWED_EMAILS`. It's built in Terraform from the SSM parameter `/family-drive/allowed_emails` (StringList).
 - Access levels: SSM `/family-drive/access` is a **JSON `String`** (not StringList: JSON has commas), e.g. `{"a@x.com": {"global": "write", "personal": true, "trash": true}}`. Unlisted allowlisted emails get read-only `Global/`, no personal folder and no Deleted folder.
   - `functions/allowlist/src/access.ts` parses it (lower-cased keys; rejects bad JSON, unknown keys, bad values and the same email twice in different case) and turns it into string claims `global_access` (`read`/`write`), `personal` and `trash` (`yes`/`no`).
-  - Terraform (`infra/foundation_inputs.tf`) checks the same rules in preconditions, plus that every email is allowlisted, and passes a normalized `jsonencode` to pre token generation as env `ACCESS_LEVELS`.
-  - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags` and normalized object, a claim, a principal tag mapping, an IAM condition, `web/src/access.ts` and `web/src/locationPolicy.ts` (plus its test table).
+  - Terraform (`infra/foundation_inputs.tf`) checks the same rules in preconditions, plus that every email is allowlisted, then passes the value as written (trimmed) to pre token generation as env `ACCESS_LEVELS`; the parser normalizes it, so Terraform has no copy of the flags that could drop one (#41).
+  - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags`, a claim, a principal tag mapping, an IAM condition, `web/src/access.ts` and `web/src/locationPolicy.ts` (plus its test table).
 
 ### Two Terraform stacks
 - **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules), the SSM parameters and the app roles' permissions boundary. Every resource has `prevent_destroy`.
