@@ -258,12 +258,21 @@ destroy the app the moment someone enables it. Destroy is its own manual pipelin
 
 ### 7.2 Give it its permissions
 
+The app pipeline's permissions are two **customer-managed** policies, `family-drive-app-pipeline`
+(`ci/iam/app-pipeline-policy.json`: pipeline, state, S3, CloudFront, Route 53, Lambdas) and
+`family-drive-app-pipeline-identity` (`ci/iam/app-pipeline-identity-policy.json`: Cognito, the app roles and
+the permissions boundary rules). They're managed rather than inline because IAM caps all of a role's inline
+policies together at 10,240 characters, and the starter template already puts one on the role; each managed
+policy has its own 6,144-character limit. The script creates or updates both, attaches them and removes the
+old inline `family-drive-app` policy if there is one:
+
 ```bash
-aws iam put-role-policy --role-name <app-pipeline-role> --policy-name family-drive-app --policy-document file://ci/iam/app-pipeline-policy.json
+bash ci/iam/attach-app-policies.sh <app-pipeline-role>
 ```
 
-Adjust the account ID and `PipelineArtifacts` as in step 4.2. Whenever a file in `ci/iam/` changes later,
-re-run the matching command **before** pushing the change that needs it: pipelines don't update their own roles.
+Adjust the account ID and `PipelineArtifacts` as in step 4.2 first. Whenever a file in `ci/iam/` changes
+later, re-run the matching command **before** pushing the change that needs it: pipelines don't update their
+own roles. Keep each app policy file under 6,144 non-whitespace characters.
 
 ### 7.3 Run it
 
@@ -426,7 +435,7 @@ Takes the app down without touching the files, the settings or the state.
    bash ci/destroy-app.sh
    ```
 
-5. Attach `ci/iam/app-pipeline-policy.json` to this pipeline's role, as in step 7.2.
+5. Attach the app policies to this pipeline's role, as in step 7.2: `bash ci/iam/attach-app-policies.sh <destroy-pipeline-role>`, or pass both roles in one run.
 
 **Running it:** **Release change**, then approve; about 5–15 minutes, mostly waiting for CloudFront.
 **Bringing the app back:** run the app pipeline. The Cognito domain stays the same, so sign-in keeps

@@ -130,7 +130,8 @@ The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callb
 - **`ci/destroy-app.sh`** destroys the app stack only. It runs from a separate pipeline that's manual-only.
 - **`infra/foundation/bootstrap.sh`** runs from the foundation pipeline with `AUTO_APPROVE=1`.
 - **`ci/app-env.sh`** is shared setup that both app scripts source.
-- **`ci/iam/*-pipeline-policy.json`** are the least-privilege inline policies for the pipeline roles. **When adding a new AWS resource type to either stack, add its actions to the matching policy**, or the pipeline fails with AccessDenied.
+- **`ci/iam/*-policy.json`** are the least-privilege policies for the pipeline roles. **When adding a new AWS resource type to either stack, add its actions to the matching policy**, or the pipeline fails with AccessDenied.
+  - The foundation's is inline. The app's is two customer-managed policies, `app-pipeline-policy.json` (pipeline, state, S3, CloudFront, Route 53, Lambdas) and `app-pipeline-identity-policy.json` (Cognito, app roles, the boundary rules), applied by `ci/iam/attach-app-policies.sh <role>`: a role's inline policies share a 10,240-character limit with the starter template's own. Keep each managed file under 6,144 non-whitespace characters.
 
 ## Conventions and gotchas
 

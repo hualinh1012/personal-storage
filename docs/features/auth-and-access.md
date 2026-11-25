@@ -239,7 +239,7 @@ up to an hour.
 | Access-denied redirect | `web/src/authErrors.ts` | `web/test/authErrors.test.ts` |
 | Access claims in the SPA | `web/src/access.ts` | `web/test/access.test.ts` |
 | Locations and capabilities per access level (the Location policy) | `web/src/locationPolicy.ts` (`locationPolicy`, `capabilitiesOf`, `hideUnless`, `canWriteAt`, `driveLocation`, `listDriveLocations`) | `web/test/locationPolicy.test.ts` |
-| Pipeline | `ci/pipeline.sh`, `ci/iam/app-pipeline-policy.json` | |
+| Pipeline | `ci/pipeline.sh`, `ci/iam/app-pipeline-policy.json`, `ci/iam/app-pipeline-identity-policy.json` | |
 
 `currentUser()` reads the email from the ID token rather than calling `fetchUserAttributes()`:
 that would call Cognito `GetUser`, which needs the `aws.cognito.signin.user.admin` scope, and
@@ -335,7 +335,7 @@ Identity Pool (new identity IDs), which is why personal folders are keyed by ema
 
 ### IAM for the pipeline
 
-Statements in `ci/iam/app-pipeline-policy.json` this feature needs: `ReadFoundationParams`,
+Statements in `ci/iam/app-pipeline-policy.json` and `ci/iam/app-pipeline-identity-policy.json` this feature needs: `ReadFoundationParams`,
 the `Cognito*` statements (including `cognito-identity:SetPrincipalTagAttributeMap`/`GetPrincipalTagAttributeMap`
 for the tag mapping; #58 scopes them to this account's pools, creates need the request tag
 `Project = family-drive` and changes need the pool to carry it, which the provider's `default_tags` set), `Lambdas`, `LambdaLogGroups`, `DescribeLogGroups`, `AppRoles`,
