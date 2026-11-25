@@ -13,6 +13,7 @@ import { sampleMarkdown } from "./samples";
 import type { ListLocationItemsHandlerOutput } from "@aws-amplify/ui-react-storage/browser";
 import { listDriveLocations, personalPrefix } from "../locationPolicy";
 import type { Access } from "../access";
+import type { ListInput } from "../driveHost/feature";
 import { DriveStorageError, type DriveStorage } from "../storage/driveStorage";
 import { memoryDriveStorage, type MemoryDriveStorage, type MemorySeed } from "../storage/memoryStorage";
 
@@ -119,20 +120,13 @@ export const mockSetup = (access: Access, memory: MemoryDriveStorage) => ({
     }),
     registerAuthListener: () => {},
   },
-  actions: {
-    default: {
-      // Pages like S3: pageSize items at a time, with the offset as the continuation token.
-      listLocationItems: async (input: {
-        prefix: string;
-        options?: { exclude?: "FILE" | "FOLDER"; pageSize?: number; nextToken?: string };
-      }) => {
-        await new Promise((r) => setTimeout(r, 150));
-        const all = (await listUnder(memory, input.prefix)).filter((i) => i.type !== input.options?.exclude);
-        const start = Number(input.options?.nextToken ?? 0);
-        const end = start + (input.options?.pageSize ?? all.length);
-        return { items: all.slice(start, end), nextToken: end < all.length ? String(end) : undefined };
-      },
-    },
+  // Pages like S3: pageSize items at a time, with the offset as the continuation token.
+  listLocationItems: async (input: ListInput) => {
+    await new Promise((r) => setTimeout(r, 150));
+    const all = (await listUnder(memory, input.prefix)).filter((i) => i.type !== input.options?.exclude);
+    const start = Number(input.options?.nextToken ?? 0);
+    const end = start + (input.options?.pageSize ?? all.length);
+    return { items: all.slice(start, end), nextToken: end < all.length ? String(end) : undefined };
   },
 });
 

@@ -64,8 +64,8 @@ ordinary upload can. From `aws_iam_role_policy.authenticated` in `infra/identity
 
 | UI | Source | Enforced by |
 |---|---|---|
-| Action and top-bar button hidden without `write` on the location | `googleImportActionConfig.hide` (`hideUnless("write")`), `locationPolicy().write` in `Drive.tsx`, both from `web/src/locationPolicy.ts` | the write statements above |
-| Destination is always the open folder | `GoogleImportContext.prefix` from `DriveView` | the same; a forged key outside the allowed prefixes gets `AccessDenied` |
+| Action and top-bar button hidden without `write` on the location | `googleImportActionConfig.hide` (`hideUnless("write")`), `locationPolicy().write` in `web/src/driveHost/DriveView.tsx`, both from `web/src/locationPolicy.ts` | the write statements above |
+| Destination is always the open folder | the open location from `useDriveHost()` (`makeGoogleImportView`) | the same; a forged key outside the allowed prefixes gets `AccessDenied` |
 
 ### Google side
 
@@ -183,8 +183,8 @@ All under `web/src/googleImport/`; tests in `web/test/googleImport.test.ts`.
 | `summary.ts` | Status labels, "3 copied, 1 skipped · 12 MB" | yes |
 | `leaveWarning.ts` | `beforeunload` prompt while running | yes |
 
-Wiring elsewhere: `web/src/pages/Drive.tsx` (custom action, top-bar button, `GoogleImportContext`
-with the destination prefix, label and `exitToFolder`), `web/src/config.ts`
+Wiring elsewhere: `web/src/googleImport/feature.ts` (custom action, view, top-bar button; the
+destination, label and `exitToFolder` come from the drive host), `web/src/config.ts`
 (`googleImportConfig()`), `web/src/playground/mockGoogleImport.ts`.
 
 The top-bar button uses the same remount trick as Upload: `openAction(GOOGLE_IMPORT_ACTION)`

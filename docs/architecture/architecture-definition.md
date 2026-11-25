@@ -180,6 +180,8 @@ flowchart TB
 | Allowlist triggers | | | | R (via env) | |
 
 **Baseline:** each feature wires itself into `Drive.tsx` by hand and keeps its own S3 port and fake.
+**Done (November 2026):** #38, #39 and #40: one Location policy, one drive-storage seam, and a drive host
+(`web/src/driveHost/`) that takes the list of features in `web/src/features.ts`.
 **Target** (architecture review, #38–#40): one Location policy module (#38), one drive-storage seam
 with S3 and in-memory adapters (#39), and a Storage Browser feature seam so `Drive.tsx` takes a list of
 features (#40). The UI follows a Google Drive-style layout (#13). Detail: [system-design.md §1](system-design.md#1-components).

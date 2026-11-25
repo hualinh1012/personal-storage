@@ -97,3 +97,8 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 }
 .edit-text__error { color: #b42318; }
 .edit-text__saved { color: #067647; }
+
+/* A feature's full-height screen inside the browser area (Empty Deleted). */
+.drive-screen { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.drive-screen__body { flex: 1; min-height: 0; overflow-y: auto; }
+.drive-screen__error { color: #b42318; }

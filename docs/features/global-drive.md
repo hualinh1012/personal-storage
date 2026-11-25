@@ -78,7 +78,7 @@ app: versioning stays the backstop against raw-credential misuse.
 | `Global/` location has permissions `["get", "list"]` without write, `["delete", "get", "list", "write"]` with it | `driveLocation()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` |
 | Storage Browser hides Upload, Create folder, Copy and Delete for a location without `write`/`delete` | Storage Browser's own action configs | same |
 | Move, Edit and Delete hide without `write` (Move and Delete also need `delete`) | `hide` in `moveAction.ts`, `editAction.ts`, `trash/actions.ts` | same |
-| Top-bar Upload/Import shown only where the open location has `write` | `locationPolicy().write`, `canWriteSomewhere()`, `showWriteButtons` in `Drive.tsx` | same |
+| Top-bar Upload/Import shown only where the open location has `write` | `locationPolicy().write`, `canWriteSomewhere()`, `showTopBar` in `web/src/driveHost/DriveView.tsx` | same |
 | Home lists only `Global/` (plus own folder/`Deleted/`) | `listDriveLocations()` | `ListDriveFolder` only matches `Global/`; listing the bucket root is denied |
 
 ## 4. Flows
@@ -227,14 +227,16 @@ sequenceDiagram
 
 | Area | Files | Tests |
 |---|---|---|
-| Drive screen, Storage Browser setup | `web/src/pages/Drive.tsx` (`Drive` builds the adapter and S3 targets; `DriveView` creates the browser and the top bar) | via the playground |
+| Drive screen, Storage Browser setup | `web/src/pages/Drive.tsx` (`Drive` builds the adapter, the drive storage and the feature list from `web/src/features.ts`); `web/src/driveHost/DriveView.tsx` (creates the browser from the features, the top bar, remount/exit) | `web/test/driveHost.test.tsx` (fake browser), playground |
 | Locations and permissions | `web/src/locationPolicy.ts` (`driveLocation`, `locationPolicy`, `listDriveLocations`), `web/src/config.ts` (`toAmplifyOutputs`) | `web/test/locationPolicy.test.ts`, `web/test/config.test.ts` |
 | App start and `Amplify.configure` | `web/src/App.tsx`, `web/src/main.tsx` | |
 | Move | `web/src/move/moveFile.ts` (rules), `moveAction.ts` (wiring), `MoveView.tsx` (view) | `web/test/moveFile.test.ts`, `web/test/moveView.test.ts` |
 | Delete → `Deleted/` | `web/src/trash/actions.ts`, `trash.ts`, `paths.ts`, `TrashViews.tsx` | `web/test/trash.test.ts` |
 | Edit | `web/src/edit/text.ts`, `textFile.ts`, `editAction.ts`, `EditTextView.tsx` | `web/test/editText.test.ts` |
 | Pager and count | `web/src/pagination/folderTracker.ts`, `countFolder.ts`, `rows.ts`, `Pager.tsx` | `web/test/pagination.test.ts` |
-| Stable selection for custom views | `web/src/stableItems.ts` | |
+| Stable selection for custom views | `web/src/driveHost/stableItems.ts` | |
+| Storage Browser's internal shapes and casts, `failureLines` | `web/src/driveHost/storageBrowser.ts` | |
+| Feature list and composition | `web/src/features.ts`, `web/src/driveHost/feature.ts` (`composeFeatures`) | `driveHost.test.tsx` |
 | Layout | `web/src/styles.css` | playground `?view=drive` |
 | PWA | `web/public/manifest.webmanifest`, `web/index.html`, `web/public/icons/`, `web/scripts/make-icons.mjs` | |
 | Download service worker | copied by `npm run copy-sw` into `web/public/amplify-storage-download/` (git-ignored) | |
@@ -252,12 +254,13 @@ sequenceDiagram
   config when it's built, so it can never be created at module level.
 - `toAmplifyOutputs()` declares one storage bucket named `drive` with the path `Global/*`. The
   real per-location access comes from `listDriveLocations()` and IAM, not from that block.
-- `DriveView` calls `createStorageBrowser()` once (memoised) with:
-  - `listLocationItems` wrapped by the folder tracker;
-  - `delete` replaced by "move to `Deleted/`";
+- `DriveView` (`web/src/driveHost/`, #40) calls `createStorageBrowser()` once (memoised) with what
+  the features in `web/src/features.ts` add, merged by `composeFeatures`:
+  - `listLocationItems` wrapped by the pager feature's folder tracker;
+  - `delete` replaced by "move to `Deleted/`" (trash feature);
   - custom actions `move`, Google import, `editText` and the Deleted folder's three;
-  - `filePreview` from `web/src/preview/registry.ts`;
-  - `components: { Pagination: Pager }`.
+  - `filePreview` from `web/src/preview/registry.ts` (preview feature);
+  - `components: { Pagination }` from the pager feature.
 - Custom views reuse Storage Browser's parts: Move uses `CopyView`'s, Restore and Delete
   permanently use `DeleteView`'s. They must pass `useStableItems(tasks)` to `useAction`
   (a new array each render resets it and loops).

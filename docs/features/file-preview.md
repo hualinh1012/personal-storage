@@ -154,7 +154,7 @@ showing it. So PDF.js fetches the bytes over CORS and draws the pages itself.
 | Viewer props and entry shape | `web/src/preview/types.ts` | |
 | Markdown viewer | `web/src/preview/MarkdownPreview.tsx` | `web/test/markdownView.test.tsx` |
 | PDF viewer, lazy wrapper | `web/src/preview/PdfPreview.tsx`, `PdfPreviewLazy.tsx` | registry test checks the PDF library isn't loaded up front |
-| Wiring | `web/src/pages/Drive.tsx`: `filePreview: filePreviewConfig`, `displayText` includes `previewDisplayText` | |
+| Wiring | `web/src/preview/feature.ts`: `filePreview: filePreviewConfig`, `displayText: previewDisplayText` | |
 | Layout | `web/src/styles.css` (`__file-preview`, `.markdown-preview`, `.pdf-preview`, `.pdf-pager`, phone rules) | playground |
 | Worker upload | `scripts/deploy.sh` (`.mjs` as `text/javascript`) | |
 | Playground | `web/src/playground/Playground.tsx`, `samples.ts`, `sample.pdf` | |

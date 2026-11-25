@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, type ComponentType, type ReactNode } from "react";
-import { useStableItems } from "../stableItems";
-import { emptyDeleted, type EmptySummary } from "./trash";
-import { DELETE_PERMANENTLY_ACTION, RESTORE_ACTION, type TrashDeps } from "./actions";
+import { useState } from "react";
+import { useDriveHost } from "../driveHost/hostContext";
+import { useStableItems } from "../driveHost/stableItems";
+import { failureLines as hostFailureLines, type BrowserParts, type Task } from "../driveHost/storageBrowser";
+import { emptyDeleted, type EmptySummary, type TrashOps } from "./trash";
+import { DELETE_PERMANENTLY_ACTION, RESTORE_ACTION } from "./actions";
 
 /*
  * The Deleted folder's screens (issue #24). Restore and Delete permanently
@@ -10,37 +12,6 @@ import { DELETE_PERMANENTLY_ACTION, RESTORE_ACTION, type TrashDeps } from "./act
  * Copy's, but run our actions and confirm before every start, not only for
  * folders. Empty Deleted is its own screen: one run over the whole folder.
  */
-
-type Part = ComponentType;
-interface DeleteViewParts {
-  Provider: ComponentType<Record<string, unknown> & { children?: ReactNode }>;
-  Exit: Part;
-  TasksTable: Part;
-  Statuses: Part;
-  Cancel: Part;
-  ConfirmationModal: Part;
-}
-interface Task {
-  data: unknown;
-  status: string;
-  message?: string;
-  cancel?: () => void;
-}
-interface DeleteState extends Record<string, unknown> {
-  tasks: Task[];
-}
-interface ProcessState {
-  isProcessing: boolean;
-  isProcessingComplete: boolean;
-  statusCounts: Record<string, number>;
-  tasks: Task[];
-}
-
-export interface TrashViewDeps {
-  DeleteView: DeleteViewParts;
-  useView: (name: "Delete") => DeleteState;
-  useAction: (name: string, options: { items: unknown[] }) => [ProcessState, () => void];
-}
 
 interface BatchCopy {
   action: string;
@@ -56,12 +27,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Failed items with the reason, since the tasks table only shows a status. */
 export function failureLines(tasks: Task[]): string[] {
-  return tasks
-    .filter((t) => t.status === "FAILED")
-    .map((t) => {
-      const key = ((t.data as { key?: string }).key ?? "").replace(/\/$/, "");
-      return `${key.slice(key.lastIndexOf("/") + 1)}: ${t.message ?? "Failed."}`;
-    });
+  return hostFailureLines(tasks, (data) => (data as { key?: string }).key, "Failed.");
 }
 
 export const RESTORE_COPY: BatchCopy = {
@@ -84,7 +50,7 @@ export const DELETE_PERMANENTLY_COPY: BatchCopy = {
   done: (c) => `${plural(c.COMPLETE ?? 0, "item")} deleted permanently${c.FAILED ? `, ${c.FAILED} not deleted` : ""}.`,
 };
 
-function makeBatchView({ DeleteView, useView, useAction }: TrashViewDeps, copy: BatchCopy) {
+function makeBatchView({ DeleteView, useView, useAction }: BrowserParts, copy: BatchCopy) {
   return function BatchView() {
     const selection = useView("Delete");
     // Delete's tasks already carry each selected file or folder.
@@ -152,21 +118,14 @@ function makeBatchView({ DeleteView, useView, useAction }: TrashViewDeps, copy: 
   };
 }
 
-export function makeTrashViews(deps: TrashViewDeps) {
+/** The Deleted folder's views, keyed by the view names its actions use. */
+export function makeTrashViews(parts: BrowserParts, storage: TrashOps) {
   return {
-    RestoreView: makeBatchView(deps, RESTORE_COPY),
-    DeletePermanentlyView: makeBatchView(deps, DELETE_PERMANENTLY_COPY),
-    EmptyDeletedView,
+    RestoreView: makeBatchView(parts, RESTORE_COPY),
+    DeletePermanentlyView: makeBatchView(parts, DELETE_PERMANENTLY_COPY),
+    EmptyDeletedView: makeEmptyDeletedView(storage),
   };
 }
-
-export interface TrashContextValue {
-  deps: TrashDeps;
-  /** Back to the folder's list, re-listing it. */
-  onExit(): void;
-}
-
-export const TrashContext = createContext<TrashContextValue | null>(null);
 
 type EmptyPhase =
   | { kind: "confirm" }
@@ -181,47 +140,48 @@ export function emptySummaryText({ removed, failed, firstError }: EmptySummary):
 }
 
 /** "Empty Deleted": removes everything in the Deleted folder, every version, after confirming. */
-function EmptyDeletedView() {
-  const ctx = useContext(TrashContext);
-  const [phase, setPhase] = useState<EmptyPhase>({ kind: "confirm" });
-  if (!ctx) return null;
+function makeEmptyDeletedView(storage: TrashOps) {
+  return function EmptyDeletedView() {
+    const { exitToFolder } = useDriveHost();
+    const [phase, setPhase] = useState<EmptyPhase>({ kind: "confirm" });
 
-  const empty = async () => {
-    setPhase({ kind: "running", done: 0, total: 0 });
-    try {
-      const summary = await emptyDeleted(ctx.deps.storage, (done, total) => setPhase({ kind: "running", done, total }));
-      setPhase({ kind: "finished", summary });
-    } catch (error) {
-      setPhase({ kind: "error", message: error instanceof Error ? error.message : String(error) });
-    }
-  };
+    const empty = async () => {
+      setPhase({ kind: "running", done: 0, total: 0 });
+      try {
+        const summary = await emptyDeleted(storage, (done, total) => setPhase({ kind: "running", done, total }));
+        setPhase({ kind: "finished", summary });
+      } catch (error) {
+        setPhase({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+      }
+    };
 
-  return (
-    <div className="amplify-storage-browser google-import">
-      <h2 className="amplify-storage-browser__title">Empty Deleted</h2>
-      <div className="google-import__body">
-        {phase.kind === "confirm" && (
-          <p>
-            Everything in Deleted is removed from the bucket with every saved version. This can't be undone, not even from the AWS
-            console.
-          </p>
-        )}
-        {phase.kind === "running" && <p>Removing… {phase.total ? `${phase.done} of ${phase.total}` : ""}</p>}
-        {phase.kind === "finished" && <p>{emptySummaryText(phase.summary)}</p>}
-        {phase.kind === "error" && <p className="google-import__reason">Couldn't empty Deleted: {phase.message}</p>}
-      </div>
-      <div className="amplify-storage-browser__footer">
-        <div className="amplify-storage-browser__buttons">
-          <button type="button" className="amplify-button" disabled={phase.kind === "running"} onClick={ctx.onExit}>
-            {phase.kind === "confirm" ? "Cancel" : "Back"}
-          </button>
+    return (
+      <div className="amplify-storage-browser drive-screen">
+        <h2 className="amplify-storage-browser__title">Empty Deleted</h2>
+        <div className="drive-screen__body">
           {phase.kind === "confirm" && (
-            <button type="button" className="amplify-button amplify-button--primary" onClick={empty}>
-              Empty Deleted
-            </button>
+            <p>
+              Everything in Deleted is removed from the bucket with every saved version. This can't be undone, not even from the AWS
+              console.
+            </p>
           )}
+          {phase.kind === "running" && <p>Removing… {phase.total ? `${phase.done} of ${phase.total}` : ""}</p>}
+          {phase.kind === "finished" && <p>{emptySummaryText(phase.summary)}</p>}
+          {phase.kind === "error" && <p className="drive-screen__error">Couldn't empty Deleted: {phase.message}</p>}
+        </div>
+        <div className="amplify-storage-browser__footer">
+          <div className="amplify-storage-browser__buttons">
+            <button type="button" className="amplify-button" disabled={phase.kind === "running"} onClick={exitToFolder}>
+              {phase.kind === "confirm" ? "Cancel" : "Back"}
+            </button>
+            {phase.kind === "confirm" && (
+              <button type="button" className="amplify-button amplify-button--primary" onClick={empty}>
+                Empty Deleted
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 }

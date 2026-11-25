@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useDriveHost } from "../driveHost/hostContext";
+import type { BrowserParts } from "../driveHost/storageBrowser";
 import { warnOnLeave } from "../googleImport/leaveWarning";
 import { fileName, type TextFormat } from "./text";
 import { openText, saveText, type TextFileStorage } from "./textFile";
@@ -7,26 +9,9 @@ import { openText, saveText, type TextFileStorage } from "./textFile";
  * The Edit screen (issue #45): a plain-text editor for one selected .txt file.
  * Save overwrites the file (last save wins; versioning keeps the old text).
  * It finds the selected file through Storage Browser's Delete view state, the
- * same way Restore does, and gets its storage and exit from EditTextContext.
+ * same way Restore does. Its storage comes from the feature (feature.ts), and
+ * leaving goes through the host (`exitToFolder` remounts the browser, which re-lists the folder).
  */
-
-export interface EditTextContextValue {
-  /** The drive storage as the signed-in person. */
-  storage: TextFileStorage;
-  /** Back to the folder (DriveView remounts the browser, which re-lists it). */
-  onExit(): void;
-}
-
-export const EditTextContext = createContext<EditTextContextValue | null>(null);
-
-// Loose shape of the Storage Browser state we read (its typings are internal).
-interface SelectionState {
-  tasks: { data: { key: string } }[];
-}
-
-export interface EditTextViewDeps {
-  useView: (name: "Delete") => SelectionState;
-}
 
 type Phase =
   | { kind: "loading" }
@@ -35,31 +20,30 @@ type Phase =
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-export function makeEditTextView({ useView }: EditTextViewDeps) {
+export function makeEditTextView({ useView }: Pick<BrowserParts, "useView">, storage: TextFileStorage) {
   return function EditTextView() {
-    const ctx = useContext(EditTextContext);
-    const key = useView("Delete").tasks[0]?.data.key;
+    const { exitToFolder } = useDriveHost();
+    const key = (useView("Delete").tasks[0]?.data as { key?: string } | undefined)?.key;
     const [phase, setPhase] = useState<Phase>({ kind: "loading" });
 
     useEffect(() => {
-      if (!ctx || !key) return;
+      if (!key) return;
       let live = true;
-      openText(key, ctx.storage).then(
-          ({ text, format }) => live && setPhase({ kind: "editing", saved: text, text, format, saving: false }),
-          (error) => live && setPhase({ kind: "failed", message: messageOf(error) }),
-        );
+      openText(key, storage).then(
+        ({ text, format }) => live && setPhase({ kind: "editing", saved: text, text, format, saving: false }),
+        (error) => live && setPhase({ kind: "failed", message: messageOf(error) }),
+      );
       return () => {
         live = false;
       };
-    }, [ctx, key]);
+    }, [key]);
 
     const dirty = phase.kind === "editing" && phase.text !== phase.saved;
     useEffect(() => (dirty ? warnOnLeave() : undefined), [dirty]);
 
-    if (!ctx) return null;
     if (!key) {
       return (
-        <Frame title="Edit" onBack={ctx.onExit}>
+        <Frame title="Edit" onBack={exitToFolder}>
           <p>Select one text file to edit.</p>
         </Frame>
       );
@@ -67,7 +51,7 @@ export function makeEditTextView({ useView }: EditTextViewDeps) {
 
     const back = () => {
       if (dirty && !window.confirm("Discard your changes?")) return;
-      ctx.onExit();
+      exitToFolder();
     };
 
     const save = async () => {
@@ -75,7 +59,7 @@ export function makeEditTextView({ useView }: EditTextViewDeps) {
       const { text, format } = phase;
       setPhase({ ...phase, saving: true, status: undefined });
       try {
-        await saveText(key, text, format, ctx.storage);
+        await saveText(key, text, format, storage);
         setPhase((p) => (p.kind === "editing" ? { ...p, saved: text, saving: false, status: { error: false, message: "Saved." } } : p));
       } catch (error) {
         setPhase((p) =>

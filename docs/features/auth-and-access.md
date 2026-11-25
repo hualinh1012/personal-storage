@@ -110,7 +110,7 @@ The role's trust policy (`data.aws_iam_policy_document.authenticated_assume`) le
 | UI behaviour | Source | IAM rule that actually stops it |
 |---|---|---|
 | `Global/` gets Storage Browser permissions `["get", "list"]` without `write`, which hides Upload, Create folder, Delete, Copy, Move and Import there | `driveLocation()` / `locationPolicy()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` needs `global_access` = `write` |
-| Top-bar Upload/Import hidden without a writable location | `showWriteButtons` in `web/src/pages/Drive.tsx` | same |
+| Top-bar Upload/Import hidden without a writable location | `showTopBar` in `web/src/driveHost/DriveView.tsx` | same |
 | Home lists `Personal/<email>/` only with `personal` | `listDriveLocations()` | `ListOwnPersonalFolder`, `ManageOwnPersonalObjects` |
 | Home lists `Deleted/` only with `trash` | `listDriveLocations()` | `ListDeletedFolder`, `ManageDeletedObjects` |
 | Home never lists other people's folders | `listDriveLocations()` (replaces the adapter's `listLocations`) | No statement allows `Personal/<someone else>/` |
