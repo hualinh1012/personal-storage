@@ -26,7 +26,8 @@ here it is scaled to a project with one owner, occasional contributors and codin
 3. **IAM stays the boundary.** A new permission is an IAM statement in `infra/identity.tf`; the UI
    may only hide what IAM refuses, never grant.
 4. **Pipeline permissions follow the resources.** A new AWS resource type adds its actions to the
-   matching `ci/iam/*-pipeline-policy.json`, and the owner re-attaches the policy **before** the
+   matching `ci/iam/*-policy.json` (each app file under 6,144 characters), and the owner re-attaches it
+   (`ci/iam/attach-app-policies.sh` for the app) **before** the
    change is pushed.
 5. **Docs move with the code.** A change to a feature updates its doc in `docs/features/` in the same
    PR; a change to components, the config flow or the pipelines updates

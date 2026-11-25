@@ -93,7 +93,7 @@ of truth.
 | Config into the SPA | `scripts/write-config.sh` | scripts | §4 below |
 | Build and upload of the SPA | `scripts/deploy.sh` | scripts | §5 below |
 | Pipelines | `ci/pipeline.sh`, `ci/app-env.sh`, `ci/tf-init.sh`, `ci/destroy-app.sh`, `infra/foundation/bootstrap.sh` | CI | §5 below |
-| Pipeline permissions | `ci/iam/app-pipeline-policy.json`, `ci/iam/foundation-pipeline-policy.json` | CI | §5 below |
+| Pipeline permissions | `ci/iam/app-pipeline-policy.json`, `ci/iam/app-pipeline-identity-policy.json` (managed, applied by `ci/iam/attach-app-policies.sh`), `ci/iam/foundation-pipeline-policy.json` (inline) | CI | §5 below |
 
 ## 2. Request path
 
@@ -280,8 +280,10 @@ the alias records follow the new distribution, so the app's address stays the sa
 3. `terraform fmt -check`, `ci/tf-init.sh` (backend bucket from the account ID), `plan`, `apply`.
 4. `scripts/deploy.sh` (with `WEB_DEPS_INSTALLED=1`): `write-config.sh`, `vite build`, upload, invalidate.
 
-Each pipeline's role has a least-privilege inline policy from `ci/iam/`; adding a new AWS resource type
-means adding its actions there and re-attaching the policy **before** pushing. The pipelines don't update
+Each pipeline's role has least-privilege policies from `ci/iam/`: the foundation's inline, the app's as two
+customer-managed policies (IAM's 10,240-character limit on a role's inline policies, which the starter
+template's own inline policy shares, is too small for it). Adding a new AWS resource type means adding its
+actions there and re-attaching **before** pushing. The pipelines don't update
 their own roles. Every IAM role the app stack creates carries the `family-drive-boundary` permissions
 boundary (foundation, #53), and the app pipeline can create or change a `family-drive-*` role only with it,
 so it can't make a role with more than S3 on the files bucket's three prefixes and the trigger Lambdas'

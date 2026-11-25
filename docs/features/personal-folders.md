@@ -202,7 +202,7 @@ tags are set once per credential exchange (`GetCredentialsForIdentity` →
 
 ### IAM for the pipeline
 
-`ci/iam/app-pipeline-policy.json`: `CognitoOwnIdentityPool` / `CognitoIdentityPoolRead` with
+`ci/iam/app-pipeline-identity-policy.json`: `CognitoOwnIdentityPool` / `CognitoIdentityPoolRead` with
 `cognito-identity:SetPrincipalTagAttributeMap` and `GetPrincipalTagAttributeMap` (the tag mapping), `AppRoles` (the role policy). A policy from
 before personal folders lacks the two tag-map actions and fails with `AccessDenied`.
 

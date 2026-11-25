@@ -76,15 +76,15 @@ aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix
 
 **Storage cost:** files under `Global/` and `Personal/` move to S3 Intelligent-Tiering within a day or two of being uploaded, and to cheaper tiers when nobody opens them for 30 days. Only the tiers that open instantly are used (ADR 0013). Don't turn on Intelligent-Tiering's archive tiers or switch to a Glacier class: downloads, previews, Move and Delete would fail on archived files.
 
-**Check the permissions boundary (#53)** after re-attaching the app pipeline policy, with the IAM policy
+**Check the permissions boundary (#53)** after re-attaching the app pipeline policies, with the IAM policy
 simulator. Creating a `family-drive-*` role without the boundary must be denied, and with it allowed:
 
 ```bash
-aws iam simulate-custom-policy --policy-input-list file://ci/iam/app-pipeline-policy.json --action-names iam:CreateRole iam:PutRolePolicy --resource-arns arn:aws:iam::084519186805:role/family-drive-x --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text
+aws iam simulate-custom-policy --policy-input-list file://ci/iam/app-pipeline-identity-policy.json --action-names iam:CreateRole iam:PutRolePolicy --resource-arns arn:aws:iam::084519186805:role/family-drive-x --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text
 ```
 
 ```bash
-aws iam simulate-custom-policy --policy-input-list file://ci/iam/app-pipeline-policy.json --action-names iam:CreateRole iam:PutRolePolicy --resource-arns arn:aws:iam::084519186805:role/family-drive-x --context-entries ContextKeyName=iam:PermissionsBoundary,ContextKeyValues=arn:aws:iam::084519186805:policy/family-drive-boundary,ContextKeyType=string --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text
+aws iam simulate-custom-policy --policy-input-list file://ci/iam/app-pipeline-identity-policy.json --action-names iam:CreateRole iam:PutRolePolicy --resource-arns arn:aws:iam::084519186805:role/family-drive-x --context-entries ContextKeyName=iam:PermissionsBoundary,ContextKeyValues=arn:aws:iam::084519186805:policy/family-drive-boundary,ContextKeyType=string --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text
 ```
 
 The first prints `implicitDeny` for both actions, the second `allowed`. In the console,
@@ -118,13 +118,14 @@ push. If something breaks after that, set it back to `false` and push.
 | Delete fails with "Couldn't move it to Deleted (AccessDenied…)" | The app stack wasn't re-applied after this change (no `Deleted/` statements or `trash` tag mapping) | Re-run the app pipeline. |
 | Restore says the file "was in <email>'s personal folder, which only they can write to" | Trash managers can't write into other people's personal folders | Give that person `trash` for a moment, or move it back in the console (strip ` (deleted …)` from the name). |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
-| `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
+| `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the app policies (`bash ci/iam/attach-app-policies.sh <app-pipeline-role>`). |
 | AccessDenied opening your own personal folder | The Identity Pool's principal tag mapping is missing (stack not re-applied), or the account's email has capitals in its claim | Re-run the app pipeline; check the `email` claim in the ID token is lower case (ADR 0009). |
-| `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the current `ci/iam/app-pipeline-policy.json`. |
+| `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the app policies (`bash ci/iam/attach-app-policies.sh <app-pipeline-role>`). |
 | Signing in on `http://localhost:5173` fails with `redirect_mismatch`, or the drive shows CORS errors there | Production doesn't trust localhost (#57) | Set `dev_origin` and apply from your machine ([setup step 11](guides/setup-from-scratch.md#step-11-local-development-against-the-real-backend)). |
 | `AccessDenied` on a `cloudfront:` or `cognito-` action for a resource that exists | The app pipeline only changes distributions, user pools and identity pools tagged `Project = family-drive` (#58) | Tag it `Project = family-drive` in the console (Terraform's `default_tags` set it on everything it creates), or re-attach the current `ci/iam/app-pipeline-policy.json`. |
 | App plan or apply fails on a role with `NoSuchEntity` / `policy/family-drive-boundary` | The foundation hasn't created the boundary yet (#53) | Run the foundation pipeline (with `ci/iam/foundation-pipeline-policy.json` re-attached), then the app pipeline. |
 | `AccessDenied … iam:CreateRole` / `iam:PutRolePolicy` / `iam:AttachRolePolicy` on a `family-drive-*` role | The role doesn't set `permissions_boundary = local.permissions_boundary`, or the policy attached to the pipeline role is older than the code | Set the boundary on the role; re-attach the current `ci/iam/app-pipeline-policy.json`. |
+| Attaching the app pipeline policy fails: `Your policy exceeds the non-whitespace character limit of 10240` | The old single inline policy plus the starter template's inline policy exceed IAM's inline limit for one role | Use the two managed policies: `bash ci/iam/attach-app-policies.sh <app-pipeline-role>` (it also removes the old inline one). |
 | A permission added to an app role has no effect (AccessDenied in the app) | The boundary `family-drive-boundary` doesn't allow it (#53) | Widen `infra/foundation/boundary.tf`, run the foundation pipeline, then the app pipeline. |
 | `Node >= 22.12 required` | The Commands image has an older Node | Install a newer Node in the commands before running the script. |
 | Google shows `redirect_uri_mismatch` | [Setup step 8](guides/setup-from-scratch.md#step-8-finish-google-sign-in) not done, or the Cognito domain changed after the app was recreated | Add the current `https://<cognito_domain>/oauth2/idpresponse` ([setup step 8](guides/setup-from-scratch.md#step-8-finish-google-sign-in)). Google's error details page shows the exact URI it received. |
