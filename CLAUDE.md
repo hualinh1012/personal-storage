@@ -108,7 +108,7 @@ Every IAM role the app stack creates sets `permissions_boundary = local.permissi
 - **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules), the SSM parameters and the app roles' permissions boundary. Every resource has `prevent_destroy`.
   - Files under `Global/` and `Personal/` move to Intelligent-Tiering via lifecycle; `Deleted/` stays Standard. Never add an `aws_s3_bucket_intelligent_tiering_configuration` or a Glacier class: archived objects break download, preview, Move and Delete ([ADR 0013](docs/adr/0013-files-in-intelligent-tiering-without-archive-tiers.md)).
   - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters, buckets and the boundary policy.
-  - The SSM parameters are created with a `CHANGE_ME` placeholder and `ignore_changes` on their value, so Terraform never overwrites real values.
+  - The hand-set SSM parameters are created with a `CHANGE_ME` placeholder and `ignore_changes` on their value, so Terraform never overwrites real values. `deleted_retention_days` and the custom domain's three (`custom_domain`, `certificate_arn`, `hosted_zone_id`) are Terraform-owned instead: set the foundation variables in `main.tf`, never the parameters.
 - **`infra/` is the app stack and is disposable:** Cognito, the Lambdas, the Identity Pool, CloudFront, the web bucket, and the files bucket's CORS rule.
   - It finds foundation resources **by naming convention through data sources** (`infra/foundation_inputs.tf`), not through remote state.
   - A `terraform_data` precondition stops the plan while the SSM values are placeholders or not email addresses, or `access` is invalid.
@@ -120,6 +120,8 @@ Every IAM role the app stack creates sets `permissions_boundary = local.permissi
 2. `scripts/write-config.sh` turns them into `web/public/config.json`, which is git-ignored and never hard-coded.
 3. `web/src/config.ts` `loadConfig()` reads that file at runtime.
 4. `toAmplifyOutputs()` builds an Amplify Gen 2–shaped outputs object by hand. The project uses Amplify JS only as a client library, with no Amplify backend tooling.
+
+`local.app_url` (`infra/storage.tf`) is `https://<custom domain>` when the foundation variables `custom_domain`, `certificate_arn` (us-east-1) and `hosted_zone_id` are set (written to SSM, read by name), else the distribution's `cloudfront.net` address ([ADR 0014](docs/adr/0014-custom-domain-as-foundation-variables.md)). It's the only trusted origin, so it drives Cognito's URLs, the files bucket's CORS and `config.json`; `infra/web.tf` adds the alias, certificate and Route 53 `A`/`AAAA` records.
 
 The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/`, plus `http://localhost:5173/` only when `dev_origin` is set). `dev_origin` is empty in production (#57): local development against the real backend sets it in `infra/terraform.tfvars` and applies from that machine; the next pipeline run removes it again.
 

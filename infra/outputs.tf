@@ -18,6 +18,11 @@ output "app_url" {
   value = local.app_url
 }
 
+# The distribution's own address: where a custom domain's DNS points.
+output "cloudfront_domain" {
+  value = aws_cloudfront_distribution.web.domain_name
+}
+
 output "user_pool_id" {
   value = aws_cognito_user_pool.main.id
 }

@@ -45,6 +45,34 @@ data "aws_ssm_parameter" "deleted_retention_days" {
   name = "/${var.project}/deleted_retention_days"
 }
 
+# Custom domain (ADR 0014): foundation variables written to SSM. All three
+# CHANGE_ME (the foundation's "empty") means the app stays at its
+# *.cloudfront.net address. Public values; not secrets.
+data "aws_ssm_parameter" "custom_domain" {
+  name = "/${var.project}/custom_domain"
+}
+
+data "aws_ssm_parameter" "certificate_arn" {
+  name = "/${var.project}/certificate_arn"
+}
+
+data "aws_ssm_parameter" "hosted_zone_id" {
+  name = "/${var.project}/hosted_zone_id"
+}
+
+locals {
+  domain_inputs = {
+    custom_domain   = lower(trimspace(nonsensitive(data.aws_ssm_parameter.custom_domain.value)))
+    certificate_arn = trimspace(nonsensitive(data.aws_ssm_parameter.certificate_arn.value))
+    hosted_zone_id  = trimspace(nonsensitive(data.aws_ssm_parameter.hosted_zone_id.value))
+  }
+  domain_inputs_set = [for k, v in local.domain_inputs : k if !contains(["change_me", ""], lower(v))]
+
+  # null: no custom domain. A partial set stops the plan (precondition below)
+  # rather than half-switching.
+  custom_domain = length(local.domain_inputs_set) == 3 ? local.domain_inputs.custom_domain : null
+}
+
 locals {
   # Permissions boundary from the foundation (infra/foundation/boundary.tf,
   # issue #53). Every IAM role in this stack sets it; the app pipeline can't
@@ -125,6 +153,26 @@ resource "terraform_data" "foundation_inputs_check" {
       # Only the comparison result leaves the sensitive value.
       condition     = !contains(["CHANGE_ME", ""], nonsensitive(data.aws_ssm_parameter.google_client_secret.value))
       error_message = "SSM /${var.project}/google_client_secret is still the CHANGE_ME placeholder."
+    }
+
+    precondition {
+      condition     = contains([0, 3], length(local.domain_inputs_set))
+      error_message = "Custom domain: set all three foundation variables custom_domain, certificate_arn and hosted_zone_id (infra/foundation/main.tf), or none."
+    }
+
+    precondition {
+      condition     = local.custom_domain == null || can(regex("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$", local.domain_inputs.custom_domain))
+      error_message = "custom_domain (infra/foundation/main.tf) must be a host name such as drive.example.com (no scheme, path or trailing dot)."
+    }
+
+    precondition {
+      condition     = local.custom_domain == null || can(regex("^arn:aws:acm:us-east-1:${local.account_id}:certificate/[0-9a-f-]+$", local.domain_inputs.certificate_arn))
+      error_message = "certificate_arn (infra/foundation/main.tf) must be an ACM certificate in us-east-1 in this account: CloudFront only uses certificates from us-east-1."
+    }
+
+    precondition {
+      condition     = local.custom_domain == null || can(regex("^Z[A-Z0-9]+$", local.domain_inputs.hosted_zone_id))
+      error_message = "hosted_zone_id (infra/foundation/main.tf) must be a Route 53 hosted zone ID such as Z0123456789ABCDEFGHIJ."
     }
   }
 }

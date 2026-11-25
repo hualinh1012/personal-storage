@@ -57,6 +57,15 @@ When adding someone, also give them an entry in `/family-drive/access` if they n
 
 **Change how long Deleted keeps files:** edit `deleted_retention_days` in `infra/foundation/main.tf` and push. Once the foundation pipeline has run, run the app pipeline so the note in `Deleted/` shows the new number. A shorter value also applies to files already there.
 
+**Use a custom domain** ([ADR 0014](adr/0014-custom-domain-as-foundation-variables.md)). Do these steps in order:
+1. Issue an ACM certificate in **us-east-1** (CloudFront's region) that covers the domain, for example `drive.example.com`. Validate it with DNS in Route 53. Its status must be **Issued**.
+2. In `infra/foundation/main.tf`, set the defaults of `custom_domain` (e.g. `drive.example.com`), `certificate_arn` (`arn:aws:acm:us-east-1:<account>:certificate/<id>`) and `hosted_zone_id` (from **Route 53 → Hosted zones**, the zone holding the name). Commit and merge: the foundation pipeline writes them to SSM.
+3. Once the foundation pipeline has finished, run the app pipeline (again, if it ran alongside). It adds the domain to CloudFront, creates the `A`/`AAAA` alias records, and moves Cognito, CORS and `config.json` to `https://<domain>`. CloudFront takes 5–15 minutes to deploy. From then on, sign-in works only at the new address.
+4. Google: add `https://<domain>` to the OAuth client's **Authorized JavaScript origins**, and `https://<domain>/*` to the API key's website restriction. Remove the old `https://<id>.cloudfront.net` entries.
+5. Share the new address. Anyone with the app on their home screen re-adds it once from the new address.
+
+To go back to the CloudFront address, set all three variables back to `""` and run both pipelines the same way. A partial set stops the app plan.
+
 **Recover an overwritten file, or one deleted outside the app (within 30 days):**
 ```bash
 aws s3api list-object-versions --bucket family-drive-files-084519186805 --prefix "Global/<path>"
@@ -199,7 +208,7 @@ Run after a deploy, ideally in a private window.
 
 ## Known gaps
 
-- No custom domain: the CloudFront link changes if the app stack is recreated. Home-screen installs point at the old link, so everyone has to re-add the app after that.
+- Without a custom domain (see **Use a custom domain** above), the CloudFront link changes if the app stack is recreated. Home-screen installs point at the old link, so everyone has to re-add the app after that.
 - Home-screen app on iPhone: iOS runs it separately from Safari, so you sign in once more inside it. If Google sign-in opens in Safari and doesn't come back, use the drive from Safari instead.
 - Import from Google Drive runs in the browser tab: closing it stops the import (re-running picks up where it left off, skipping what's done). Files over 500 MB, and Google Docs/Sheets/Slides whose converted copy would be over about 10 MB, have to be downloaded from Google by hand. The Google token lasts about an hour, so a very long import can fail part-way; run it again.
 

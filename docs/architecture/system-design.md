@@ -225,6 +225,7 @@ names, sizes, dates and content types are what S3 returns. Versioning, lifecycle
 | Google OAuth client ID / secret | SSM (`String` / `SecureString`) | owner, by hand | app plan → Cognito Google IdP; the ID also → `config.json` |
 | Google API key, project number | SSM (`String`) | owner, by hand | app plan → outputs → `config.json` |
 | Deleted retention | SSM `/family-drive/deleted_retention_days` | Terraform (foundation variable) | app plan → `config.json` |
+| Custom domain, certificate ARN, hosted zone | SSM `/family-drive/custom_domain`, `certificate_arn`, `hosted_zone_id` | Terraform (foundation variables; `CHANGE_ME` = off) | app plan → CloudFront alias and certificate, Route 53 records, `app_url` |
 | Terraform state | `family-drive-tfstate-<account>`: `foundation/`, `family-drive/` | pipelines | pipelines |
 
 Hand-set parameters are created with a `CHANGE_ME` placeholder and `ignore_changes`; the app plan
@@ -253,7 +254,7 @@ must match the app client's callback URLs in `infra/auth.tf`. A rework of this p
 
 | | Foundation `infra/foundation/` | App `infra/` |
 |---|---|---|
-| Holds | files bucket, state bucket, SSM parameters, the app roles' permissions boundary | Cognito, Lambdas, Identity Pool, role, CloudFront, web bucket, files bucket CORS |
+| Holds | files bucket, state bucket, SSM parameters, the app roles' permissions boundary | Cognito, Lambdas, Identity Pool, role, CloudFront, web bucket, files bucket CORS, the custom domain's Route 53 records (if set) |
 | Lifetime | retained: every resource `prevent_destroy` | disposable: destroy and rebuild freely |
 | State | `s3://family-drive-tfstate-<account>/foundation/terraform.tfstate` | `…/family-drive/terraform.tfstate` |
 | Applied by | `bootstrap.sh` (foundation pipeline, `AUTO_APPROVE=1`) | `ci/pipeline.sh` (app pipeline) |
@@ -262,6 +263,8 @@ must match the app client's callback URLs in `infra/auth.tf`. A rework of this p
 [ADR 0004](../adr/0004-retained-foundation-and-disposable-app-stack.md). Rebuilding the app stack
 keeps the files, settings and Cognito domain (`family-drive-<account>`, [ADR 0005](../adr/0005-fixed-cognito-domain.md)),
 but creates new users and identity IDs (harmless: folders are keyed by email) and a new CloudFront URL.
+With a custom domain (foundation variables `custom_domain`, `certificate_arn`, `hosted_zone_id`; [ADR 0014](../adr/0014-custom-domain-as-foundation-variables.md))
+the alias records follow the new distribution, so the app's address stays the same.
 
 ### Pipelines
 

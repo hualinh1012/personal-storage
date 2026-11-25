@@ -166,6 +166,10 @@ resource "aws_cloudfront_distribution" "web" {
   default_root_object = "index.html"
   price_class         = "PriceClass_200"
 
+  # Custom domain (optional, foundation variable custom_domain via SSM): CloudFront then
+  # answers on it with the ACM certificate below.
+  aliases = local.custom_domain == null ? [] : [local.custom_domain]
+
   origin {
     domain_name              = aws_s3_bucket.web.bucket_regional_domain_name
     origin_id                = "web-s3"
@@ -204,7 +208,26 @@ resource "aws_cloudfront_distribution" "web" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = local.custom_domain == null
+    acm_certificate_arn            = local.custom_domain == null ? null : local.domain_inputs.certificate_arn
+    ssl_support_method             = local.custom_domain == null ? null : "sni-only"
+    minimum_protocol_version       = local.custom_domain == null ? null : "TLSv1.2_2021"
+  }
+}
+
+# The custom domain's DNS: alias records to the distribution (IPv4 and IPv6),
+# in the Route 53 zone from the foundation variable hosted_zone_id.
+resource "aws_route53_record" "web" {
+  for_each = local.custom_domain == null ? toset([]) : toset(["A", "AAAA"])
+
+  zone_id = local.domain_inputs.hosted_zone_id
+  name    = local.custom_domain
+  type    = each.key
+
+  alias {
+    name                   = aws_cloudfront_distribution.web.domain_name
+    zone_id                = aws_cloudfront_distribution.web.hosted_zone_id
+    evaluate_target_health = false
   }
 }
 

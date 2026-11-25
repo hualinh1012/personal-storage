@@ -54,7 +54,7 @@ import_if_missing() { # <address> <import id>
 # state is lost with the build container).
 import_existing() {
   local name
-  for name in google_client_id google_client_secret allowed_emails access google_api_key google_project_number deleted_retention_days; do
+  for name in google_client_id google_client_secret allowed_emails access google_api_key google_project_number deleted_retention_days custom_domain certificate_arn hosted_zone_id; do
     if param_exists "/${PROJECT}/${name}"; then
       import_if_missing "aws_ssm_parameter.${name}" "/${PROJECT}/${name}"
     fi

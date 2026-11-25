@@ -100,3 +100,38 @@ resource "aws_ssm_parameter" "deleted_retention_days" {
     prevent_destroy = true
   }
 }
+
+# Custom domain for the app (ADR 0014), published for the app stack, which
+# finds foundation values by name. Like deleted_retention_days, Terraform owns
+# these values: set the variables in main.tf, never the parameters. An empty
+# variable is written as CHANGE_ME (SSM refuses empty values), which the app
+# stack reads as "not set".
+resource "aws_ssm_parameter" "custom_domain" {
+  name  = "/${var.project}/custom_domain"
+  type  = "String"
+  value = var.custom_domain == "" ? local.placeholder : var.custom_domain
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_ssm_parameter" "certificate_arn" {
+  name  = "/${var.project}/certificate_arn"
+  type  = "String"
+  value = var.certificate_arn == "" ? local.placeholder : var.certificate_arn
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_ssm_parameter" "hosted_zone_id" {
+  name  = "/${var.project}/hosted_zone_id"
+  type  = "String"
+  value = var.hosted_zone_id == "" ? local.placeholder : var.hosted_zone_id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
