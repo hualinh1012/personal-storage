@@ -17,7 +17,7 @@ A one-off review of Family Drive across code, infrastructure, pipelines and supp
 
 | ID | Finding | Severity | Likelihood | Follow-up |
 |---|---|---|---|---|
-| S1 | `main` has no branch protection, and every push to it deploys to AWS | High | Low | #52 |
+| S1 | `main` has no branch protection, and every push to it deploys to AWS | High | Low | #52, **fixed** (connector scope accepted) |
 | S2 | The app pipeline's IAM policy allows escalation to account admin | High | Low | #53 |
 | S3 | The family's files have no backup outside the bucket, and the foundation pipeline can expose or wipe them | High | Low | #54, **accepted** (won't fix: cost) |
 | S4 | No Content Security Policy, while tokens and AWS credentials sit in `localStorage` | Medium | Low | #55 |
@@ -70,6 +70,12 @@ account, which today means the owner's GitHub or AWS account being compromised.
 ## Findings
 
 ### S1. `main` has no branch protection, and every push to it deploys to AWS (High / Low)
+
+**Status (25 November 2026): fixed in #52.** `main` has a ruleset (pull request required, no force
+pushes or deletion; 0 approvals, since there is one maintainer), the foundation pipeline has a manual
+approval stage, and Destroy is only in the locked manual pipeline. **Accepted:** the AWS Connector
+GitHub App stays installed for all repositories (the owner needs it elsewhere). Required status
+checks wait for CI (#22).
 
 **Evidence:** the GitHub API reports `main` as `protected=false` and the repository is public.
 The app pipeline runs `ci/pipeline.sh` on every push to `main`, and the foundation pipeline
@@ -411,6 +417,7 @@ Terraform state versioning; the app stack can be rebuilt from the repo. No indep
 | A leaked presigned URL works until it expires (15 min to 1 h) | Short lifetime |
 | SSE-S3 rather than KMS; client secret in Terraform state | Bucket access is already limited to admins and the pipeline roles |
 | TLS policy of the default CloudFront certificate | Needs a custom domain (known gap) |
+| The AWS Connector GitHub App is installed for all of the owner's repositories, not only this one | Owner's choice: the connection is used elsewhere (#52) |
 | Family members can run up storage costs | Family trust |
 | No backup outside the files bucket (S3) | Owner's decision, 14 November 2026 (#54): a family app on a small budget; a second copy would roughly double storage cost. Versioning (30 days) is the only recovery, so #52 and #53 matter more. |
 | No trail, alarms or budget alert (S5) | Owner's decision, 14 November 2026 (#56): small budget. The incident steps in S5 still apply by hand. |
