@@ -1,23 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Icon } from "../theme/Icon";
+import { useDismiss } from "../theme/useDismiss";
 
 /** The account button in the top bar: the person's initial; its menu shows the email and Sign out. */
 export function AccountMenu({ email, onSignOut }: { email: string; onSignOut: () => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  useDismiss(open, useCallback(() => setOpen(false), []), root);
 
   const initial = email.trim().charAt(0).toUpperCase() || "?";
   return (

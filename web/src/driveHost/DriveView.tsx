@@ -6,6 +6,10 @@ import {
 } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
 import type { Access } from "../access";
+import { ActionsMenu } from "../fileList/ActionsMenu";
+import { ActionsStoreContext, createActionsStore } from "../fileList/actionsStore";
+import { Breadcrumb, Title } from "../fileList/Breadcrumb";
+import { FileTable } from "../fileList/FileTable";
 import { canWriteSomewhere, driveLocation, driveLocations, locationPolicy } from "../locationPolicy";
 import { signOutSafely } from "../session";
 import { Icon } from "../theme/Icon";
@@ -67,8 +71,16 @@ export function DriveView({
         custom: composed.customActions,
       },
       filePreview: composed.filePreview,
-      // The host's own look (the top bar's search) under the features' slots.
-      components: { SearchField: TopBarSearch, ...composed.components },
+      // The host's own look (#13) under the features' slots: the top bar's
+      // search, the Drive-style file list, ⋮ menu and breadcrumb.
+      components: {
+        SearchField: TopBarSearch,
+        DataTable: FileTable,
+        ActionsList: ActionsMenu,
+        Navigation: Breadcrumb,
+        Title,
+        ...composed.components,
+      },
     });
     return { Browser: hosted.Browser, views: composed.views(hosted.parts) };
   }, [composed, setup, createBrowser]);
@@ -130,6 +142,8 @@ export function DriveView({
   const notes = current.location && !current.actionType ? composed.notes(host) : [];
   // The element Storage Browser's search box is portalled into (TopBarSearch).
   const [searchSlot, setSearchSlot] = useState<HTMLElement | null>(null);
+  // What the ⋮ menu offers, for the selection toolbar and the rows' menus.
+  const actionsStore = useMemo(() => createActionsStore(composed.newMenu.map((i) => i.actionType)), [composed]);
   const newMenu = (fab: boolean) =>
     showNew && (
       <NewMenu
@@ -144,6 +158,7 @@ export function DriveView({
   return (
     <DriveHostContext.Provider value={host}>
       <TopBarSearchSlot.Provider value={searchSlot}>
+      <ActionsStoreContext.Provider value={actionsStore}>
       <div className="drive">
         <header className="topbar">
           <button
@@ -190,6 +205,7 @@ export function DriveView({
         </div>
         {newMenu(true)}
       </div>
+      </ActionsStoreContext.Provider>
       </TopBarSearchSlot.Provider>
     </DriveHostContext.Provider>
   );
