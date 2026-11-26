@@ -63,6 +63,8 @@ are in the docs: the screen, drive host and drive storage in
 
 ## Checking a change
 
-- `npm test`, then `npm run build` (type-checks).
+- `npm run lint`, `npm test`, then `npm run build` (type-checks). CI runs the same.
+- Lint warnings (`react/refs`, `react/set-state-in-effect`, `react/exhaustive-deps`) mark code
+  that does this on purpose today. Don't "fix" one without reading why (ADR 0016); don't add new ones.
 - UI changes: the playground (`npm run dev`, `/playground.html?view=drive`), with `&access=read`
   for the read-only screen. Its options are listed in the root `CLAUDE.md`.

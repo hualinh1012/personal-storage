@@ -23,6 +23,7 @@ pass `--prefix <dir>` to `npm`. Run `npm ci` in a package first; `node_modules` 
 npm test                       # vitest
 npm run build                  # esbuild → dist/preSignUp.js, dist/preTokenGeneration.js
 npm run typecheck              # tsc -p .
+npm run lint                   # oxlint (.oxlintrc.json)
 
 # Web app (web)
 npm run dev                    # Vite on http://localhost:5173 (needs web/public/config.json)
@@ -39,6 +40,7 @@ npm run dev                    # Vite on http://localhost:5173 (needs web/public
                                #   Global/linh/shopping list.txt (BOM + CRLF) is editable with Edit in the ⋮ menu
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
+npm run lint                   # oxlint (.oxlintrc.json); warnings don't fail it
 
 # Single test file / single test
 npm test -- test/allowlist.test.ts
@@ -55,8 +57,9 @@ terraform -chdir=infra/foundation init -backend=false && terraform -chdir=infra/
 bash ci/tf-init.sh                                 # real init of infra/ against the S3 state bucket (needs AWS creds)
 ```
 
-There is no linter configured. The Lambdas run on `nodejs22.x`; the web build and tests need
-Node ≥ 22.12.
+The linter is oxlint, not ESLint: TypeScript 7 has no compiler API for typescript-eslint
+([ADR 0016](docs/adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)). The Lambdas run
+on `nodejs22.x`; the web build and tests need Node ≥ 22.12.
 
 ## Architecture in brief
 
@@ -97,6 +100,9 @@ resources by name. Rules in [`infra/CLAUDE.md`](infra/CLAUDE.md).
 (git-ignored, never hard-coded) → `loadConfig()` → `toAmplifyOutputs()`, built by hand: Amplify JS
 is only a client library, with no Amplify backend tooling.
 
+**Pull-request checks** (GitHub Actions, `.github/workflows/ci.yml`, no AWS access): lint,
+type-check, test and build both packages, Terraform `fmt -check` and offline `validate`.
+
 **CI/CD** (AWS CodePipeline): `ci/pipeline.sh` tests, builds, applies `infra/` and runs
 `scripts/deploy.sh`; `ci/destroy-app.sh` (manual pipeline) destroys the app stack only; the
 foundation pipeline runs `bootstrap.sh`. **A new AWS resource type adds its actions to the
@@ -119,7 +125,7 @@ PR description.
 | Import from Google Drive | `web/src/googleImport/` | [google-import.md](docs/features/google-import.md), ADR 0008 |
 | Buckets, versioning, lifecycle, storage classes | `infra/foundation/` | [storage-and-retention.md](docs/features/storage-and-retention.md), ADR 0004, 0013 |
 | CloudFront, CSP, custom domain, CORS | `infra/web.tf`, `infra/storage.tf` | [system-design.md](docs/architecture/system-design.md), ADR 0014, [security assessment](docs/security/assessment-2026-11.md) |
-| Pipelines, deploy, pipeline IAM | `ci/`, `scripts/` | [system-design.md §5](docs/architecture/system-design.md#5-deployment-design), [deployment.md](docs/deployment.md), [`infra/CLAUDE.md`](infra/CLAUDE.md) |
+| Pipelines, deploy, pipeline IAM, pull-request checks, lint rules | `ci/`, `scripts/`, `.github/workflows/`, `*/.oxlintrc.json` | [system-design.md §5](docs/architecture/system-design.md#5-deployment-design), [deployment.md](docs/deployment.md), [`infra/CLAUDE.md`](infra/CLAUDE.md) |
 | PWA, manifest, icons | `web/public/`, `web/index.html` | ADR 0007 (no app service worker or offline cache) |
 
 ## Conventions

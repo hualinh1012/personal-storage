@@ -67,7 +67,7 @@ export function FileTable({ headers, isLoading, rows }: FileTableProps) {
           {headers.length > 0 && (
             <tr>
               {headers.map((h) => (
-                <th key={h.key} scope="col">
+                <th key={h.key} scope="col" aria-sort={h.type === "sort" ? (h.content.sortDirection ?? "none") : undefined}>
                   {renderHeader(h)}
                 </th>
               ))}
@@ -158,7 +158,7 @@ function renderHeader(h: Header): ReactNode {
     case "sort": {
       const { label, sortDirection, onSort } = h.content;
       return (
-        <button type="button" className="file-table__sort" onClick={onSort} aria-sort={sortDirection}>
+        <button type="button" className="file-table__sort" onClick={onSort}>
           {label}
           {sortDirection && <Icon name={sortDirection === "ascending" ? "arrow_upward" : "arrow_downward"} />}
         </button>

@@ -275,6 +275,7 @@ the alias records follow the new distribution, so the app's address stays the sa
 | Foundation | push to `main` touching `infra/foundation/**` | `terraform fmt -check`, `bootstrap.sh`: init (or first-run local state then migrate), import existing parameters, buckets and the boundary policy, apply |
 | App deploy | push to `main` excluding `infra/foundation/**` | `ci/pipeline.sh` (below) |
 | App destroy | manual, after an approval | `ci/destroy-app.sh`: build Lambdas, init, `terraform destroy` of `infra/` only |
+| Pull-request checks (GitHub Actions, no AWS access) | every pull request and push to `main` | `.github/workflows/ci.yml`: lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
 
 `ci/pipeline.sh`, in order:
 1. `ci/app-env.sh`: check Terraform and Node ≥ 22.12; `npm ci`, test and build the Lambdas (Terraform zips `dist/*.js`).
