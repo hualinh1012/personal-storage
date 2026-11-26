@@ -44,6 +44,8 @@ const checkboxOf = (row: Row) => row.content.find((c): c is CheckboxCell => c.ty
 /** A file row's name button (it opens the file): the labelled button; a folder's opens the folder instead. */
 const fileNameOf = (row: Row) =>
   row.content.find((c): c is ButtonCell => c.type === "button" && !!c.content.label && c.content.icon !== "folder" && !!c.content.onClick);
+/** Storage Browser's download column (header key; its cells are keyed `download-<id>`). */
+const DOWNLOAD_COLUMN = "download";
 /** The row's own download button (icon only). */
 const downloadOf = (row: Row) => row.content.find((c): c is ButtonCell => c.type === "button" && !c.content.label && c.content.icon === "download");
 
@@ -57,7 +59,7 @@ function openFile(store: OpenFileStore, row: Row, mode: "viewer" | "info") {
   fileNameOf(row)?.content.onClick?.();
 }
 
-export function FileTable({ headers, isLoading, rows }: FileTableProps) {
+export function FileTable({ headers: allHeaders, isLoading, rows }: FileTableProps) {
   const host = useContext(DriveHostContext);
   const openFiles = useOpenFileStore();
   // The page's files, in order, for the viewer's position and its Download.
@@ -75,6 +77,10 @@ export function FileTable({ headers, isLoading, rows }: FileTableProps) {
   const selected = rows.filter((r) => checkboxOf(r)?.content.checked);
   const selectable = rows.some((r) => checkboxOf(r));
   const rowMenus = onList && selectable;
+  // The folder list leaves out Storage Browser's download column: Download is in
+  // the ⋮ menu, the selection toolbar and the viewer (which still uses each row's handler).
+  const headers = onList ? allHeaders.filter((h) => h.key !== DOWNLOAD_COLUMN) : allHeaders;
+  const shownCells = (row: Row) => (onList ? row.content.filter((c) => c !== downloadOf(row) && !c.key.startsWith(`${DOWNLOAD_COLUMN}-`)) : row.content);
   const clearSelection = () => selected.forEach((r) => checkboxOf(r)?.content.onSelect?.());
   // Selects this row alone, for its ⋮ menu.
   const selectOnly = (row: FileTableProps["rows"][number]) => {
@@ -121,7 +127,7 @@ export function FileTable({ headers, isLoading, rows }: FileTableProps) {
                 const className = [row.active ? "file-table__row--active" : "", checked ? "file-table__row--selected" : ""].join(" ").trim() || undefined;
                 return (
                   <tr key={row.key} className={className} aria-selected={checkboxOf(row) ? checked : undefined} onClick={(e) => onRowClick(e, row)}>
-                    {row.content.map((cell) => (
+                    {shownCells(row).map((cell) => (
                       <td key={cell.key}>
                         {renderCell(cell === fileNameOf(row) ? withOpen(cell as ButtonCell, () => openFile(openFiles, row, "viewer")) : cell)}
                       </td>

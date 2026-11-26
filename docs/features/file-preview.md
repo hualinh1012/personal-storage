@@ -28,7 +28,8 @@ drawn by `FileViewer.tsx` (§5).
 - **The viewer** covers the screen. Its bar shows the name, size, date and position ("3 of 12"),
   **Download** and **Close**. **Previous** / **Next** (buttons at the sides, or ← and →) step
   through the files on the open page, skipping folders; **Esc** closes. Download is the row's own
-  download (Storage Browser's, with its progress), or the preview URL when the row has none. On a
+  download handler (Storage Browser's, with its progress; the list hides the row's download
+  button but keeps its handler), or the preview URL when the row has none. On a
   phone the arrows float over the file and Download shows its icon only.
 - **The info panel** (⋮ → View info, files only) sits beside the list like the old preview panel:
   name, folder, size, type and last modified, with **Open** (the viewer) and **Download**. On a
