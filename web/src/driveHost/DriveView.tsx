@@ -9,7 +9,9 @@ import type { Access } from "../access";
 import { canWriteSomewhere, driveLocation, locationPolicy } from "../locationPolicy";
 import { signOutSafely } from "../session";
 import { composeFeatures, type DriveFeature, type HostState, type ListHandler } from "./feature";
+import { AccountMenu } from "./AccountMenu";
 import { DriveHostContext } from "./hostContext";
+import { TopBarSearch, TopBarSearchSlot } from "./TopBarSearch";
 import { createHostedBrowser, storageBrowserListHandler, type CreateBrowser } from "./storageBrowser";
 
 type LocationValue = NonNullable<StorageBrowserValue["location"]>;
@@ -61,7 +63,8 @@ export function DriveView({
         custom: composed.customActions,
       },
       filePreview: composed.filePreview,
-      components: composed.components,
+      // The host's own look (the top bar's search) under the features' slots.
+      components: { SearchField: TopBarSearch, ...composed.components },
     });
     return { Browser: hosted.Browser, views: composed.views(hosted.parts) };
   }, [composed, setup, createBrowser]);
@@ -101,18 +104,25 @@ export function DriveView({
   // While one of them is open, the others wait.
   const busy = composed.topBar.some((b) => b.actionType === current.actionType);
   const notes = current.location && !current.actionType ? composed.notes(host) : [];
+  // The element Storage Browser's search box is portalled into (TopBarSearch).
+  const [searchSlot, setSearchSlot] = useState<HTMLElement | null>(null);
 
   return (
     <DriveHostContext.Provider value={host}>
+      <TopBarSearchSlot.Provider value={searchSlot}>
       <div className="drive">
         <header className="topbar">
-          <strong>Family Drive</strong>
+          <span className="brand">
+            <img className="brand__logo" src="/icons/favicon-32.png" alt="" width={32} height={32} />
+            <span className="brand__name">Family Drive</span>
+          </span>
+          <div className="topbar__search" ref={setSearchSlot} />
           {showTopBar &&
             composed.topBar.map((b) => (
               <button
                 key={b.actionType}
                 type="button"
-                className={b.primary ? "primary" : undefined}
+                className={b.primary ? "primary" : "outlined"}
                 disabled={!writable || busy}
                 onClick={() => openAction(b.actionType)}
               >
@@ -120,10 +130,7 @@ export function DriveView({
               </button>
             ))}
           <span className="spacer" />
-          <span>{email}</span>
-          <button className="link" onClick={signOutSafely}>
-            Sign out
-          </button>
+          <AccountMenu email={email} onSignOut={signOutSafely} />
         </header>
         <main className="browser">
           {notes.map((note) => (
@@ -140,6 +147,7 @@ export function DriveView({
           />
         </main>
       </div>
+      </TopBarSearchSlot.Provider>
     </DriveHostContext.Provider>
   );
 }

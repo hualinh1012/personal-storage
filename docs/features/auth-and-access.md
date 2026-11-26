@@ -14,7 +14,8 @@ allowlist or access levels.
   no self sign-up form.
 - Only Google accounts whose email is on the **allowlist** get in. Anyone else comes back to
   "You don't have access to this drive." with a **Sign out** link.
-- Once in, the top bar shows the person's email and **Sign out**.
+- Once in, the account button (the email's initial) at the right of the top bar opens a menu
+  with the person's email and **Sign out**.
 - Each person has an **access level**. It is three independent settings:
 
   | Setting | Values | What the person sees and can do |

@@ -1,17 +1,114 @@
+/* Theme (issue #13): Material Design 3, light, in the familiar Drive layout.
+   Our own rules read the --md-* tokens; Storage Browser (Amplify UI) reads
+   --amplify-* tokens, which are pointed at the same values below. */
+:root {
+  --md-primary: #0b57d0;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #d3e3fd;
+  --md-on-primary-container: #041e49;
+  --md-secondary-container: #c2e7ff;
+  --md-on-secondary-container: #001d35;
+  --md-surface: #f8fafd;
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f0f4f9;
+  --md-surface-container: #e9eef6;
+  --md-surface-container-high: #e1e5ea;
+  --md-on-surface: #1f1f1f;
+  --md-on-surface-variant: #444746;
+  --md-outline: #747775;
+  --md-outline-variant: #c4c7c5;
+  --md-error: #b3261e;
+  --md-success: #146c2e;
+  --md-hover: rgba(31, 31, 31, 0.08);
+  --md-pressed: rgba(31, 31, 31, 0.12);
+  --md-shape-full: 9999px;
+  --md-shape-large: 16px;
+  --md-shape-medium: 12px;
+  --md-shape-small: 8px;
+  --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-font: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+/* Amplify UI declares its tokens again on every [class*="amplify"] element, so
+   ours need the same reach and a higher specificity (whatever the CSS order). */
+html:root, :root [class*="amplify"] {
+  --amplify-fonts-default-static: var(--md-font);
+  --amplify-fonts-default-variable: var(--md-font);
+  --amplify-colors-primary-10: #ecf3fe;
+  --amplify-colors-primary-20: #d3e3fd;
+  --amplify-colors-primary-40: #a8c7fa;
+  --amplify-colors-primary-60: #4c8df6;
+  --amplify-colors-primary-80: #0b57d0;
+  --amplify-colors-primary-90: #0842a0;
+  --amplify-colors-primary-100: #062e6f;
+  --amplify-colors-font-primary: var(--md-on-surface);
+  --amplify-colors-font-secondary: var(--md-on-surface-variant);
+  --amplify-colors-font-tertiary: var(--md-on-surface-variant);
+  --amplify-colors-border-primary: var(--md-outline-variant);
+  --amplify-colors-border-secondary: var(--md-outline-variant);
+  --amplify-colors-border-tertiary: var(--md-outline-variant);
+  --amplify-colors-background-secondary: var(--md-surface-container-low);
+  --amplify-colors-background-tertiary: var(--md-surface-container);
+  --amplify-radii-small: var(--md-shape-small);
+  --amplify-radii-medium: var(--md-shape-medium);
+  --amplify-radii-large: var(--md-shape-large);
+  --amplify-components-button-border-radius: var(--md-shape-full);
+  --amplify-components-button-primary-background-color: var(--md-primary);
+  --amplify-components-fieldcontrol-border-radius: var(--md-shape-small);
+}
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, sans-serif; color: #1f2933; background: #f7f8fa; }
+body { margin: 0; font-family: var(--md-font); color: var(--md-on-surface); background: var(--md-surface); }
+/* A Material Symbols icon (theme/Icon.tsx). */
+.icon {
+  font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal;
+  font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap;
+  display: inline-block; direction: ltr; -webkit-font-smoothing: antialiased; user-select: none;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+.icon--filled { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; min-height: 60vh; padding: 1rem; text-align: center; }
-.topbar { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e4e7eb; }
 .spacer { flex: 1; }
 button { font: inherit; cursor: pointer; }
-button.primary { padding: 0.6rem 1.2rem; border: 0; border-radius: 6px; background: #1a73e8; color: #fff; }
-button.primary:disabled { opacity: 0.5; cursor: default; }
-.topbar button.primary { padding: 0.4rem 1rem; }
-button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-decoration: underline; }
+button.primary { padding: 0.625rem 1.5rem; border: 0; border-radius: var(--md-shape-full); background: var(--md-primary); color: var(--md-on-primary); font-weight: 500; }
+button.primary:hover:not(:disabled) { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15); }
+button.primary:disabled { opacity: 0.38; cursor: default; }
+button.link { background: none; border: 0; padding: 0; color: var(--md-primary); text-decoration: underline; }
+.icon-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: none; padding: 0; border: 0; border-radius: var(--md-shape-full); background: none; color: var(--md-on-surface-variant); }
+.icon-button:hover { background: var(--md-hover); }
+.icon-button:focus-visible, .menu__item:focus-visible, .account__avatar:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+
+/* Top bar: brand, the open folder's search (driveHost/TopBarSearch.tsx), account menu. */
+.topbar { display: flex; align-items: center; gap: 0.75rem; min-height: 64px; padding: 0.5rem 1rem; background: var(--md-surface); }
+.brand { display: inline-flex; align-items: center; gap: 0.5rem; flex: none; min-width: 200px; }
+.brand__logo { width: 32px; height: 32px; border-radius: var(--md-shape-small); }
+.brand__name { font-size: 1.375rem; color: var(--md-on-surface-variant); }
+.topbar__search { flex: 0 1 720px; min-width: 0; }
+.topbar button.primary, .topbar button.outlined { padding: 0.5rem 1.25rem; white-space: nowrap; }
+button.outlined { padding: 0.625rem 1.5rem; border: 1px solid var(--md-outline); border-radius: var(--md-shape-full); background: none; color: var(--md-primary); font-weight: 500; }
+button.outlined:hover:not(:disabled) { background: rgba(11, 87, 208, 0.08); }
+button.outlined:disabled { opacity: 0.38; cursor: default; }
+.search-box { display: flex; align-items: center; gap: 0.25rem; min-width: 0; padding: 0 0.25rem; border-radius: var(--md-shape-full); background: var(--md-surface-container); }
+.search-box:focus-within { background: var(--md-surface-container-lowest); box-shadow: var(--md-elevation-2); }
+.search-box--large { height: 48px; }
+.search-box__input { flex: 1; min-width: 0; height: 40px; border: 0; outline: 0; background: none; color: var(--md-on-surface); font: inherit; font-size: 1rem; }
+.search-box__input::placeholder { color: var(--md-on-surface-variant); }
+.account { position: relative; flex: none; }
+.account__avatar { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: var(--md-shape-full); background: var(--md-primary); color: var(--md-on-primary); font-weight: 500; }
+.account__avatar--large { width: 64px; height: 64px; font-size: 1.75rem; }
+.account__menu { right: 0; top: calc(100% + 0.5rem); min-width: 260px; }
+.account__identity { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1rem; border-bottom: 1px solid var(--md-outline-variant); }
+.account__email { overflow-wrap: anywhere; color: var(--md-on-surface); }
+/* A Material 3 menu: a raised surface of items with a leading icon. */
+.menu { position: absolute; z-index: 20; padding: 0.5rem 0; border-radius: var(--md-shape-small); background: var(--md-surface-container-lowest); box-shadow: var(--md-elevation-2); }
+.menu__item { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 48px; padding: 0 1rem; border: 0; background: none; color: var(--md-on-surface); text-align: left; }
+.menu__item:hover:not(:disabled) { background: var(--md-hover); }
+.menu__item:disabled { opacity: 0.38; cursor: default; }
+.menu__item .icon { color: var(--md-on-surface-variant); }
+
 /* Drive: app-style layout. The page never scrolls; the file list and the
    preview panel each scroll vertically on their own; nothing scrolls sideways. */
 .drive { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.browser { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.75rem 1rem; }
+.browser { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 1rem 1rem; padding: 0.75rem 1rem; border-radius: var(--md-shape-large); background: var(--md-surface-container-lowest); }
 .browser .amplify-storage-browser { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .browser .amplify-storage-browser__content-with-preview { flex: 1; min-height: 0; }
 .browser .amplify-storage-browser__drop-zone { min-width: 0; }
@@ -50,7 +147,12 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 /* Phones: wrap the toolbar so refresh and the actions menu (Upload, Create
    folder) stay on screen, and drop the Type / Last modified columns. */
 @media (max-width: 640px) {
-  .browser { padding: 0.5rem; }
+  .browser { margin: 0; padding: 0.5rem; border-radius: var(--md-shape-large) var(--md-shape-large) 0 0; }
+  /* The top bar wraps: brand and account on the first row, search below. */
+  .topbar { flex-wrap: wrap; row-gap: 0.25rem; padding: 0.5rem; }
+  .brand { min-width: 0; }
+  .topbar__search { order: 10; flex: 1 1 100%; }
+  .topbar__search:empty { display: none; }
   .browser .amplify-storage-browser__controls { flex-wrap: wrap; row-gap: 0.5rem; }
   .browser .amplify-storage-browser__search { flex: 1 1 100%; }
   .browser .amplify-storage-browser__table tr > :nth-child(3),
@@ -83,8 +185,6 @@ button.link { background: none; border: 0; padding: 0; color: #1a73e8; text-deco
 .google-import__reason { color: #52606d; font-size: 0.85rem; }
 .google-import__row--failed .google-import__reason { color: #b42318; }
 .google-import__row--done td:nth-child(3) { color: #067647; }
-.topbar button:not(.primary):not(.link) { padding: 0.4rem 1rem; border: 1px solid #c7ccd1; border-radius: 6px; background: #fff; }
-.topbar button:disabled { opacity: 0.5; cursor: default; }
 
 /* Text editor (issue #45): fills the browser area; the textarea scrolls, the page doesn't. */
 .edit-text { display: flex; flex-direction: column; min-height: 0; height: 100%; }

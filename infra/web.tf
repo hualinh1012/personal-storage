@@ -53,7 +53,8 @@ locals {
   csp = join("; ", [
     "default-src 'self'",
     "script-src 'self' https://accounts.google.com https://apis.google.com",
-    "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+    # Google Fonts: Roboto and Material Symbols (issue #13): CSS from fonts.googleapis.com, files from fonts.gstatic.com.
+    "style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com",
     join(" ", [
       "connect-src 'self'",
       local.files_bucket_origin,
@@ -65,7 +66,7 @@ locals {
     "frame-src https://docs.google.com https://accounts.google.com",
     "img-src 'self' data: blob: ${local.files_bucket_origin}",
     "media-src 'self' blob: ${local.files_bucket_origin}",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://fonts.gstatic.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
