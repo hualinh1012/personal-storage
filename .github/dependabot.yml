@@ -1,0 +1,56 @@
+# Weekly dependency update PRs. Each one is checked by CI (.github/workflows/ci.yml runs on
+# every pull request); merging one to main deploys like any other merge (CodePipeline).
+version: 2
+
+updates:
+  # The SHA-pinned actions in .github/workflows/. Dependabot bumps the SHA and the
+  # "# vX.Y.Z" comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Singapore
+    cooldown:
+      default-days: 7 # let a release settle before proposing it
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Singapore
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(web)
+    groups:
+      # Minor and patch updates in one PR; majors get a PR each.
+      web-minor-and-patch:
+        update-types: [minor, patch]
+        # Its own PR: an upgrade needs the manual re-check in web/CLAUDE.md.
+        exclude-patterns: ["@aws-amplify/ui-react-storage"]
+
+  - package-ecosystem: npm
+    directory: /functions/allowlist
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Singapore
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(lambdas)
+    groups:
+      lambdas-minor-and-patch:
+        update-types: [minor, patch]
