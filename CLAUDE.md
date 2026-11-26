@@ -28,7 +28,9 @@ npm run dev                    # Vite on http://localhost:5173 (needs web/public
                                # /playground.html?view=landing | ?view=denied: the sign-in and access-denied pages
                                # /playground.html?view=drive: the real drive screen (DriveView + every feature) with mock data,
                                #   including Import from Google Drive with fake Google (&google=off: not set up); one
-                               #   in-memory drive holds all state, so imports, moves, deletes and edits show everywhere
+                               #   in-memory drive holds all state, so imports, moves, deletes and edits show everywhere;
+                               #   mock-bucket requests via fetch, XMLHttpRequest and <img src> are all answered from it
+                               #   (installS3FetchStub in src/playground/mockDrive.ts)
                                #   &access=read | read%2Bpersonal | write | write%2Bpersonal%2Btrash: preview another
                                #   access level (default: everything, including the Deleted folder)
                                #   &count=fail: folder listings through the storage seam fail (fallback pager); Global/photos has 250 files
