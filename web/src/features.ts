@@ -1,6 +1,6 @@
 /**
  * The drive's features, in the order their actions appear in the ⋮ menu and
- * their buttons in the top bar. The app (pages/Drive.tsx) and the playground
+ * their items in the "+ New" menu. The app (pages/Drive.tsx) and the playground
  * both build the drive from this list; DriveView (src/driveHost) wires them.
  */
 import type { Access } from "./access";

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   type CreateStorageBrowserInput,
   type StorageBrowserEventValue,
@@ -6,11 +6,14 @@ import {
 } from "@aws-amplify/ui-react-storage/browser";
 import "@aws-amplify/ui-react-storage/styles.css";
 import type { Access } from "../access";
-import { canWriteSomewhere, driveLocation, locationPolicy } from "../locationPolicy";
+import { canWriteSomewhere, driveLocation, driveLocations, locationPolicy } from "../locationPolicy";
 import { signOutSafely } from "../session";
-import { composeFeatures, type DriveFeature, type HostState, type ListHandler } from "./feature";
+import { Icon } from "../theme/Icon";
+import { composeFeatures, type DriveFeature, type HostState, type ListHandler, type NewMenuItem } from "./feature";
 import { AccountMenu } from "./AccountMenu";
 import { DriveHostContext } from "./hostContext";
+import { NewMenu } from "./NewMenu";
+import { Sidebar } from "./Sidebar";
 import { TopBarSearch, TopBarSearchSlot } from "./TopBarSearch";
 import { createHostedBrowser, storageBrowserListHandler, type CreateBrowser } from "./storageBrowser";
 
@@ -26,13 +29,14 @@ export interface BrowserSetup {
  * The drive screen and the host for every drive feature (issue #40). It owns
  * Storage Browser: builds it from the features' actions, views, display text
  * and slots, keeps track of where the person is, and remounts it to open an
- * action from the top bar or to leave a feature's view. Features never see
+ * action from the "+ New" menu, to open a sidebar location or to leave a
+ * feature's view. It also draws the top bar and the sidebar. Features never see
  * Storage Browser's typings or the remount; they get `BrowserParts` and
  * `useDriveHost()` (where the person is, and `exitToFolder`).
  *
  * Storage Browser stays uncontrolled: in controlled mode it only reports
- * changes to its internal state, so an action opened from outside (a top-bar
- * button) never reports its Exit and the view gets stuck. Instead the host
+ * changes to its internal state, so an action opened from outside (a New menu
+ * item) never reports its Exit and the view gets stuck. Instead the host
  * tracks where the person is from onValueChange, and remounts the browser
  * (a new `key`) straight into an action's view, or back to the folder.
  */
@@ -73,18 +77,32 @@ export function DriveView({
   const [current, setCurrent] = useState<StorageBrowserValue>(home);
   const [mount, setMount] = useState<{ key: number; defaultValue: StorageBrowserValue }>(() => ({ key: 0, defaultValue: home() }));
   const onValueChange = (next: StorageBrowserEventValue) => setCurrent({ actionType: next.actionType, location: next.location });
-  // Opens one of the browser's action views for the current folder by remounting into it.
-  const openAction = (actionType: string) => {
+  // The picker a New menu item asked for, until the upload view takes it (HostState.takePick).
+  const pick = useRef<NewMenuItem["pick"]>(undefined);
+  const remount = (value: StorageBrowserValue) => {
     // A remount doesn't report its starting state, so record it ourselves;
     // Exit then reports the change back to no action.
-    setCurrent((c) => ({ ...c, actionType }));
-    setMount((m) => ({ key: m.key + 1, defaultValue: { location: current.location, actionType } }));
+    setCurrent(value);
+    setMount((m) => ({ key: m.key + 1, defaultValue: value }));
+  };
+  // Opens one of the browser's action views for the current folder by remounting into it.
+  const openAction = (item: NewMenuItem) => {
+    pick.current = item.pick;
+    remount({ location: current.location, actionType: item.actionType });
   };
   // Back to the folder's list. The remount also re-lists it, so a feature's changes show up.
   const exitToFolder = () => {
-    setCurrent((c) => ({ location: c.location }));
-    setMount((m) => ({ key: m.key + 1, defaultValue: { location: current.location } }));
+    pick.current = undefined;
+    remount({ location: current.location });
   };
+  // A sidebar location, at its top folder.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const openLocation = (target: LocationValue) => {
+    pick.current = undefined;
+    setDrawerOpen(false);
+    remount({ location: target });
+  };
+  const locations = useMemo(() => driveLocations(bucket, email, access), [bucket, email, access]);
 
   const location: LocationValue = current.location ?? driveLocation(bucket, access);
   const policy = locationPolicy(access, email, location.prefix);
@@ -95,57 +113,82 @@ export function DriveView({
     actionType: current.actionType,
     policy,
     exitToFolder,
+    takePick: (kind) => {
+      if (pick.current !== kind) return false;
+      pick.current = undefined;
+      return true;
+    },
   };
 
-  // Top-bar actions write, so they show only where the open location allows
-  // writing; Home (no location) shows them disabled when the person can write somewhere.
+  // New's items write, so it's enabled only where the open location allows
+  // writing; it's there (disabled elsewhere) when the person can write somewhere.
   const writable = !!current.location && policy.write;
-  const showTopBar = current.location ? writable : canWriteSomewhere(email, access);
-  // While one of them is open, the others wait.
-  const busy = composed.topBar.some((b) => b.actionType === current.actionType);
+  const showNew = composed.newMenu.length > 0 && (writable || canWriteSomewhere(email, access));
+  // While an action's view is open, New and the sidebar wait: leaving the view
+  // that way would drop its work (an import in progress).
+  const busy = !!current.actionType;
   const notes = current.location && !current.actionType ? composed.notes(host) : [];
   // The element Storage Browser's search box is portalled into (TopBarSearch).
   const [searchSlot, setSearchSlot] = useState<HTMLElement | null>(null);
+  const newMenu = (fab: boolean) =>
+    showNew && (
+      <NewMenu
+        fab={fab}
+        items={composed.newMenu}
+        disabled={!writable || busy}
+        disabledReason={busy ? "Close the open view first" : "You can't add files here"}
+        onPick={openAction}
+      />
+    );
 
   return (
     <DriveHostContext.Provider value={host}>
       <TopBarSearchSlot.Provider value={searchSlot}>
       <div className="drive">
         <header className="topbar">
+          <button
+            type="button"
+            className="icon-button topbar__menu"
+            aria-label="Main menu"
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen((o) => !o)}
+          >
+            <Icon name="menu" />
+          </button>
           <span className="brand">
             <img className="brand__logo" src="/icons/favicon-32.png" alt="" width={32} height={32} />
             <span className="brand__name">Family Drive</span>
           </span>
           <div className="topbar__search" ref={setSearchSlot} />
-          {showTopBar &&
-            composed.topBar.map((b) => (
-              <button
-                key={b.actionType}
-                type="button"
-                className={b.primary ? "primary" : "outlined"}
-                disabled={!writable || busy}
-                onClick={() => openAction(b.actionType)}
-              >
-                {b.label}
-              </button>
-            ))}
           <span className="spacer" />
           <AccountMenu email={email} onSignOut={signOutSafely} />
         </header>
-        <main className="browser">
-          {notes.map((note) => (
-            <p key={note} className="folder-note" role="note">
-              {note}
-            </p>
-          ))}
-          <Browser
-            key={mount.key}
-            defaultValue={mount.defaultValue}
-            views={views}
-            onValueChange={onValueChange}
-            displayText={composed.displayText}
+        <div className="drive__body">
+          <Sidebar
+            newMenu={newMenu(false)}
+            locations={locations}
+            currentPrefix={current.location?.prefix ?? null}
+            navigationDisabled={busy}
+            onOpen={openLocation}
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
           />
-        </main>
+          <main className="browser">
+            {notes.map((note) => (
+              <p key={note} className="folder-note" role="note">
+                {note}
+              </p>
+            ))}
+            <Browser
+              key={mount.key}
+              defaultValue={mount.defaultValue}
+              views={views}
+              onValueChange={onValueChange}
+              displayText={composed.displayText}
+            />
+          </main>
+        </div>
+        {newMenu(true)}
       </div>
       </TopBarSearchSlot.Provider>
     </DriveHostContext.Provider>

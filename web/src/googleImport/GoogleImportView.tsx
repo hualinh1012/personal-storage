@@ -70,7 +70,7 @@ function ItemsTable({ items }: { items: ImportItem[] }) {
 }
 
 /**
- * The ⋮ menu's and the top bar's "Import from Google Drive" screen, into the
+ * The ⋮ menu's and "+ New"'s "Import from Google Drive" screen, into the
  * open folder. Leaving goes through the host, whose remount re-lists the folder.
  */
 export function makeGoogleImportView(deps: GoogleImportDeps) {
