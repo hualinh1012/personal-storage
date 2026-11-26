@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "../theme/Icon";
+import { KIND_OF_ID, LOCATION_LABELS } from "./locationLabels";
 
 /** A location the sidebar links to: a Storage Browser location with an id from `driveLocations`. */
 export interface SidebarLocation {
@@ -7,11 +8,9 @@ export interface SidebarLocation {
   prefix: string;
 }
 
-/** How each of the drive's locations is named in the sidebar (GLOSSARY.md: shared drive, personal folder, Deleted folder). */
-const LABELS: Record<string, { label: string; icon: string }> = {
-  Global: { label: "Shared drive", icon: "folder_shared" },
-  Personal: { label: "My files", icon: "person" },
-  Deleted: { label: "Deleted", icon: "delete" },
+const labelOf = (id: string) => {
+  const kind = KIND_OF_ID[id];
+  return kind ? LOCATION_LABELS[kind] : { label: id, icon: "folder" };
 };
 
 /**
@@ -44,7 +43,7 @@ export function Sidebar<L extends SidebarLocation>({
         {newMenu}
         <ul className="sidebar__list">
           {locations.map((location) => {
-            const { label, icon } = LABELS[location.id] ?? { label: location.id, icon: "folder" };
+            const { label, icon } = labelOf(location.id);
             const current = location.prefix === currentPrefix;
             return (
               <li key={location.id}>

@@ -28,6 +28,10 @@ path lists the locations the person can open: `Global/`, their personal folder a
 | Delete (moves to `Deleted/`) | ⋮ menu | yes |
 | Import from Google Drive | ⋮ menu, or **+ New** | yes (see the import doc) |
 
+Actions that work on a selection (Copy, Download, Delete, Move, Edit) are also in each row's
+⋮ menu, which selects just that row, and in the toolbar that replaces the column headers while
+rows are selected. Clicking a row's empty space selects or deselects it; the name opens it.
+
 With `read` (and no personal folder), there is no **+ New** and the ⋮ menu offers only
 Download. Someone who can write elsewhere sees **+ New** disabled here.
 

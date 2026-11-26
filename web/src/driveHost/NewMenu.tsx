@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "../theme/Icon";
+import { useDismiss } from "../theme/useDismiss";
 import type { NewMenuItem } from "./feature";
 
 /**
@@ -23,18 +24,7 @@ export function NewMenu({
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  useDismiss(open, useCallback(() => setOpen(false), []), root);
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
