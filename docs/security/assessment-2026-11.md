@@ -172,6 +172,14 @@ that keeps the same headers and adds:
 Moving tokens out of `localStorage` isn't practical without a backend (ADR 0001); a CSP is the
 mitigation.
 
+**Update (2026-11-26):** #55 added the CSP and `Permissions-Policy` (`local.csp` in `infra/web.tf`,
+exact hosts instead of `*.amazonaws.com`; report-only while `csp_enforce` is `false`). The Drive-style
+UI (#13, [ADR 0015](../adr/0015-drive-look-material-3-with-google-fonts.md)) then widened it for
+Roboto and Material Symbols from Google Fonts: `https://fonts.googleapis.com` in `style-src` and
+`https://fonts.gstatic.com` in `font-src`. Both serve only stylesheets and font files, not scripts,
+so this doesn't add a way to run code in the app's origin; each page load does tell Google the
+visitor's IP address and the app's origin.
+
 ### S5. No detection or response (Medium / Medium)
 
 **Evidence:** neither stack defines a CloudTrail trail, S3 server access logging or data events,
