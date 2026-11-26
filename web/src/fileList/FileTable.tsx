@@ -33,6 +33,8 @@ export interface FileTableProps {
 }
 
 const B = "amplify-storage-browser";
+/** Placeholder rows while a page loads. */
+const SKELETON_ROWS = 6;
 
 type CheckboxCell = Extract<Cell, { type: "checkbox" }>;
 const checkboxOf = (row: FileTableProps["rows"][number]) => row.content.find((c): c is CheckboxCell => c.type === "checkbox");
@@ -75,7 +77,16 @@ export function FileTable({ headers, isLoading, rows }: FileTableProps) {
         </thead>
         <tbody>
           {isLoading
-            ? null
+            ? Array.from({ length: SKELETON_ROWS }, (_, i) => (
+                <tr key={`skeleton-${i}`} className="file-table__skeleton" aria-hidden="true">
+                  {headers.map((h) => (
+                    <td key={h.key}>
+                      <span className="skeleton" />
+                    </td>
+                  ))}
+                  {rowMenus && <td className="file-table__menu-cell" />}
+                </tr>
+              ))
             : rows.map((row) => {
                 const checked = !!checkboxOf(row)?.content.checked;
                 const className = [row.active ? "file-table__row--active" : "", checked ? "file-table__row--selected" : ""].join(" ").trim() || undefined;

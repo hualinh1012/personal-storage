@@ -13,6 +13,7 @@ import { ActionsStoreContext, createActionsStore, selectionActions } from "../sr
 import { Breadcrumb } from "../src/fileList/Breadcrumb";
 import { FileTable, type FileTableProps } from "../src/fileList/FileTable";
 import { driveIcon } from "../src/fileList/icons";
+import { listResultsText, StatusMessage } from "../src/fileList/StatusMessage";
 import { locationPolicy } from "../src/locationPolicy";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -166,6 +167,38 @@ describe("FileTable, ActionsMenu and Breadcrumb", () => {
     render(hostAt("Global/", "copy"), <FileTable {...listProps([true], () => {})} />);
     expect(container.querySelector('[role="toolbar"]')).toBeNull();
     expect(container.querySelector(".file-table__row-menu")).toBeNull();
+  });
+
+  it("shows placeholder rows while loading", () => {
+    render(hostAt("Global/"), <FileTable {...listProps([false, false], () => {})} isLoading />);
+    expect(container.querySelectorAll("tbody tr.file-table__skeleton")).toHaveLength(6);
+    expect(container.querySelector(".file-table__button")).toBeNull();
+  });
+
+  it("draws an empty folder as Drive's empty state, with the New hint only where the person can write", () => {
+    const empty = listResultsText.LocationDetailView.getListItemsResultMessage({ items: [] })!;
+    render(hostAt("Global/"), <StatusMessage {...empty} />);
+    expect(container.querySelector(".list-state")?.textContent).toContain("This folder is empty.");
+    expect(container.textContent).toContain("+ New");
+    render({ ...hostAt("Global/"), policy: locationPolicy({ globalWrite: false, personal: false, trash: false }, email, "Global/") }, <StatusMessage {...empty} />);
+    expect(container.textContent).not.toContain("+ New");
+  });
+
+  it("offers Try again on a failed listing, which re-lists the folder", () => {
+    const exitToFolder = vi.fn();
+    const failed = listResultsText.LocationDetailView.getListItemsResultMessage({ hasError: true })!;
+    render({ ...hostAt("Global/"), exitToFolder }, <StatusMessage {...failed} />);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("couldn't be loaded");
+    act(() => [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Try again"))!.click());
+    expect(exitToFolder).toHaveBeenCalled();
+  });
+
+  it("draws other messages as dismissible banners", () => {
+    const onDismiss = vi.fn();
+    render(hostAt("Global/", "upload"), <StatusMessage type="success" content="Uploaded" id="m1" onDismiss={onDismiss} />);
+    expect(container.querySelector(".banner--success")?.textContent).toContain("Uploaded");
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Dismiss"]')!.click());
+    expect(onDismiss).toHaveBeenCalledWith("m1");
   });
 
   it("names the location instead of Home and the bucket path in the breadcrumb", () => {
