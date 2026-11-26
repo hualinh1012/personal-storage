@@ -16,24 +16,27 @@ screen, the drive host or the drive storage.
   Drive's layout in Material Design 3, light only. Never Google's brand: no logos, product names
   or Google Sans. Roboto and Material Symbols come from Google Fonts.
 - **Top bar:** the menu button (phones), the app's name, the search box for the open folder, the
-  account menu (sign out).
+  account menu (sign out). The app's name is as wide as the sidebar (`--sidebar-width`), so the
+  search box starts where the file list does.
 - **Left sidebar:** **+ New**, then the locations the person can read (Shared drive, My files,
   Deleted). On a phone the sidebar is a drawer opened from the top bar's menu button, and **+
   New** is a floating action button.
 - **+ New:** New folder, File upload, Folder upload, Import from Google Drive. File and Folder
   upload open the picker straight away. Disabled where the open location lacks `write`; left out
   for people who can't write anywhere.
-- **File list:** Material icons per file type, row hover and selection. Clicking a row's empty
-  space selects or deselects it; the name opens it. While rows are selected, a toolbar replaces
+- **File list:** Material icons per file type, coloured by kind; folders are yellow so they stand
+  apart from plain (grey) files. Row hover and selection. Clicking a row's empty space selects or
+  deselects it; a folder's name opens it, a file's name opens it in the viewer
+  ([file-preview.md](file-preview.md)). A file row's ⋮ also offers **View info**. While rows are selected, a toolbar replaces
   the column headers and offers the same actions as the ⋮ menu. Each row's ⋮ selects only that
   row first. The breadcrumb shows the location's name instead of Home plus the bucket path.
 - **States:** placeholder rows while a folder loads; an empty folder shows Drive's empty state;
   a failed listing shows the error with **Try again**; other messages are banners.
-- **Layout:** the page never scrolls. The file list and the preview panel each scroll
-  vertically; nothing scrolls sideways.
-  - ≤ 1280px with the preview open: Type and Last modified hidden.
+- **Layout:** the page never scrolls. The file list and the info panel each scroll
+  vertically; nothing scrolls sideways. The viewer covers the whole screen.
+  - ≤ 1280px with the info panel open: Type and Last modified hidden.
   - ≤ 960px: Type hidden.
-  - Phones: Type and Last modified hidden; the preview takes the full width.
+  - Phones: Type and Last modified hidden; the info panel takes the full width.
 - **Pages outside the drive** (sign-in, access denied, App's loading and error): the app's icon
   and name over one Material card. The sign-in button is a plain filled button with no Google
   logo.
@@ -88,7 +91,9 @@ sequenceDiagram
 On the folder list, `ActionsMenu` (Storage Browser's `ActionsList` slot) publishes its items to
 `actionsStore.ts`. The selection toolbar and every row's ⋮ read the same store, so all three
 offer the same actions, except the toolbar and rows leave out **+ New**'s folder actions. A
-row's ⋮ selects only that row before showing them.
+row's ⋮ selects only that row before showing them. A file row's ⋮ adds **View info** first, the
+host's own item (`ExtraMenuItem`), which opens the file in the info panel through
+`driveHost/openFile.ts`.
 
 ## 5. Code map
 
@@ -100,6 +105,7 @@ row's ⋮ selects only that row before showing them.
 | Stable selection for custom views | `web/src/driveHost/stableItems.ts` (`useStableItems`) | |
 | Top bar, sidebar, New | `web/src/driveHost/TopBarSearch.tsx`, `Sidebar.tsx`, `NewMenu.tsx`, `AccountMenu.tsx`, `locationLabels.ts`, `uploadFeature.tsx` | `driveHost.test.tsx` |
 | File list | `web/src/fileList/FileTable.tsx`, `icons.ts`, `ActionsMenu.tsx`, `actionsStore.ts`, `Breadcrumb.tsx`, `StatusMessage.tsx` | `web/test/fileList.test.tsx` |
+| Opening a file: viewer or info panel | `web/src/driveHost/openFile.ts` (store, provided by `DriveView`), `web/src/preview/FileViewer.tsx` | `web/test/fileViewer.test.tsx` |
 | Theme | `web/src/styles.css` (tokens and layout), `web/src/theme/Icon.tsx`, `useDismiss.ts` | playground `?view=drive` |
 | Pages outside the drive | `web/src/pages/AuthCard.tsx`, `Landing.tsx`, `AccessDenied.tsx`, `web/src/App.tsx` | playground `?view=landing`, `?view=denied` |
 | Drive storage | `web/src/storage/driveStorage.ts` (interface, `DriveStorageError`, `isNotFound`), `s3Storage.ts`, `memoryStorage.ts` | `driveStorage.test.ts`, `driveStorage.s3.test.ts`, `s3Storage.test.ts` (contract: `web/test/driveStorageContract.ts`) |
@@ -134,8 +140,10 @@ row's ⋮ selects only that row before showing them.
 `StatusMessage` draws the folder list's empty folder (our `getListItemsResultMessage` text,
 merged under the features' `LocationDetailView` text in `DriveView`) as Drive's empty state, and a
 failed listing with **Try again** (`exitToFolder`, which re-lists). Storage Browser puts messages
-in its footer, so CSS (`:has(.list-state)`) lets the footer take the list's space. The preview
-panel is restyled (tonal, rounded, at most 45% / 420px).
+in its footer, so CSS (`:has(.list-state)`) lets the footer take the list's space. The info
+panel keeps Storage Browser's `__file-preview` class, so the list makes room for it as it did for
+the preview panel (tonal, rounded, at most 45% / 420px); the viewer is portalled to `<body>`, so
+the list keeps its full width under it.
 
 ### Drive host and features (#40)
 

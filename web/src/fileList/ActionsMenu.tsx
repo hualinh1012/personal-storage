@@ -20,8 +20,29 @@ export function ActionsMenu(props: ActionsState) {
   return <ActionsButton state={props} label="More actions" />;
 }
 
-/** A ⋮ button and its menu of actions. `onOpen` runs first (a row selects itself). */
-export function ActionsButton({ state, label, onOpen, className }: { state: ActionsState; label: string; onOpen?: () => void; className?: string }) {
+/** A menu item of the host's own, not one of Storage Browser's actions (a row's View info). */
+export interface ExtraMenuItem {
+  id: string;
+  label: string;
+  /** A Material Symbols icon name. */
+  icon: string;
+  onSelect(): void;
+}
+
+/** A ⋮ button and its menu of actions; `extra` items come first. `onOpen` runs first (a row selects itself). */
+export function ActionsButton({
+  state,
+  label,
+  onOpen,
+  className,
+  extra = [],
+}: {
+  state: ActionsState;
+  label: string;
+  onOpen?: () => void;
+  className?: string;
+  extra?: ExtraMenuItem[];
+}) {
   const [open, setOpen] = useState(false);
   // Fixed to the viewport next to the button, so the list's scrolling doesn't
   // clip it; above the button when there's more room there.
@@ -54,6 +75,12 @@ export function ActionsButton({ state, label, onOpen, className }: { state: Acti
       </button>
       {open && (
         <div className="menu actions-menu__menu" role="menu" aria-label={label} style={place}>
+          {extra.map((item) => (
+            <button key={item.id} type="button" role="menuitem" className="menu__item" onClick={() => (setOpen(false), item.onSelect())}>
+              <Icon name={item.icon} />
+              {item.label}
+            </button>
+          ))}
           <ActionMenuItems items={items} onSelect={(type) => (setOpen(false), state.onActionSelect?.(type))} />
         </div>
       )}

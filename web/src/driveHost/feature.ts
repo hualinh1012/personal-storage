@@ -40,6 +40,9 @@ export interface HostState {
   takePick(kind: "files" | "folder"): boolean;
 }
 
+/** What a folder note is decided from: where the person is, without the host's functions. */
+export type NoteHost = Pick<HostState, "email" | "access" | "location" | "actionType" | "policy">;
+
 /**
  * An item in the "+ New" menu: opens one of the browser's actions for the open
  * folder. It needs `write` there. `pick` opens the upload view's file or
@@ -74,7 +77,7 @@ export interface DriveFeature {
   /** Items in the "+ New" menu. */
   newMenu?: NewMenuItem[];
   /** A note above the file list, or null. */
-  note?(host: HostState): string | null;
+  note?(host: NoteHost): string | null;
 }
 
 /** Everything the features add, merged. Pure, so it's tested without React. */
@@ -87,7 +90,7 @@ export interface ComposedFeatures {
   filePreview?: unknown;
   newMenu: NewMenuItem[];
   views(parts: BrowserParts): Record<string, ComponentType>;
-  notes(host: HostState): string[];
+  notes(host: NoteHost): string[];
 }
 
 /** Merges features, refusing two that claim the same action, view, slot or New menu item. */

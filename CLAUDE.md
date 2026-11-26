@@ -40,7 +40,7 @@ npm run dev                    # Vite on http://localhost:5173 (needs web/public
                                #   Global/linh/shopping list.txt (BOM + CRLF) is editable with Edit in the ⋮ menu
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
-npm run lint                   # oxlint (.oxlintrc.json); warnings don't fail it
+npm run lint                   # oxlint (.oxlintrc.json), --deny-warnings: any warning fails it
 
 # Single test file / single test
 npm test -- test/allowlist.test.ts
