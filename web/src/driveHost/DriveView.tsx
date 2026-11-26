@@ -14,7 +14,7 @@ import { listResultsText, StatusMessage } from "../fileList/StatusMessage";
 import { canWriteSomewhere, driveLocation, driveLocations, locationPolicy } from "../locationPolicy";
 import { signOutSafely } from "../session";
 import { Icon } from "../theme/Icon";
-import { composeFeatures, type DriveFeature, type HostState, type ListHandler, type NewMenuItem } from "./feature";
+import { composeFeatures, type DriveFeature, type HostState, type ListHandler, type NewMenuItem, type NoteHost } from "./feature";
 import { AccountMenu } from "./AccountMenu";
 import { DriveHostContext } from "./hostContext";
 import { createOpenFileStore, OpenFileContext } from "./openFile";
@@ -129,12 +129,16 @@ export function DriveView({
 
   const location: LocationValue = current.location ?? driveLocation(bucket, access);
   const policy = locationPolicy(access, email, location.prefix);
-  const host: HostState = {
+  // Where the person is: what notes are decided from, and the base of HostState.
+  const where: NoteHost = {
     email,
     access,
     location: current.location ? { prefix: location.prefix, path: location.path ?? "" } : null,
     actionType: current.actionType,
     policy,
+  };
+  const host: HostState = {
+    ...where,
     exitToFolder,
     takePick: (kind) => {
       if (pick.current !== kind) return false;
@@ -150,7 +154,7 @@ export function DriveView({
   // While an action's view is open, New and the sidebar wait: leaving the view
   // that way would drop its work (an import in progress).
   const busy = !!current.actionType;
-  const notes = current.location && !current.actionType ? composed.notes(host) : [];
+  const notes = current.location && !current.actionType ? composed.notes(where) : [];
   // The element Storage Browser's search box is portalled into (TopBarSearch).
   const [searchSlot, setSearchSlot] = useState<HTMLElement | null>(null);
   // What the ⋮ menu offers, for the selection toolbar and the rows' menus.

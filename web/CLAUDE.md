@@ -64,7 +64,10 @@ are in the docs: the screen, drive host and drive storage in
 ## Checking a change
 
 - `npm run lint`, `npm test`, then `npm run build` (type-checks). CI runs the same.
-- Lint warnings (`react/refs`, `react/set-state-in-effect`, `react/exhaustive-deps`) mark code
-  that does this on purpose today. Don't "fix" one without reading why (ADR 0016); don't add new ones.
+- Lint is clean and warnings fail it. `react/refs`, `react/set-state-in-effect` and
+  `react/exhaustive-deps` are errors: state that follows a prop is adjusted while rendering, a
+  callback an effect shouldn't depend on is a `useEffectEvent`. The one allowed exception is
+  `useStableItems` (`// oxlint-disable-next-line react/refs`, with its reason); a new exception
+  names the rule and says why on the line above.
 - UI changes: the playground (`npm run dev`, `/playground.html?view=drive`), with `&access=read`
   for the read-only screen. Its options are listed in the root `CLAUDE.md`.

@@ -35,23 +35,24 @@ export function MarkdownView({ source }: { source: string }) {
   );
 }
 
-type State = { kind: "loading" } | { kind: "error" } | { kind: "ready"; source: string };
+type State = { kind: "loading" } | { kind: "error"; url: string } | { kind: "ready"; url: string; source: string };
 
 /** Storage Browser renderer for the "markdown" preview type. */
 export default function MarkdownPreview({ url }: FilePreviewProps) {
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [fetched, setFetched] = useState<State>({ kind: "loading" });
+  // A result for another file (the previous one) means this one is still loading.
+  const state: State = fetched.kind !== "loading" && fetched.url === url ? fetched : { kind: "loading" };
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ kind: "loading" });
     fetch(url, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();
       })
-      .then((source) => setState({ kind: "ready", source }))
+      .then((source) => setFetched({ kind: "ready", url, source }))
       .catch(() => {
-        if (!controller.signal.aborted) setState({ kind: "error" });
+        if (!controller.signal.aborted) setFetched({ kind: "error", url });
       });
     return () => controller.abort();
   }, [url]);

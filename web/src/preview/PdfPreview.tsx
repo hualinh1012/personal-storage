@@ -18,10 +18,13 @@ export default function PdfPreview({ url }: FilePreviewProps) {
   const box = useRef<HTMLDivElement>(null);
   const options = useMemo(() => ({ enableXfa: false }), []);
 
-  useEffect(() => {
+  // Another file starts again at page 1 (adjusted while rendering, not in an effect).
+  const [shownUrl, setShownUrl] = useState(url);
+  if (shownUrl !== url) {
+    setShownUrl(url);
     setPage(1);
     setPages(0);
-  }, [url]);
+  }
 
   // Start each page at its top, not where the previous page was scrolled to.
   useEffect(() => {

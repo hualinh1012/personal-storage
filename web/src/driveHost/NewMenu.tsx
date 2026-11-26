@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Icon } from "../theme/Icon";
 import { useDismiss } from "../theme/useDismiss";
 import type { NewMenuItem } from "./feature";
@@ -25,9 +25,13 @@ export function NewMenu({
   const root = useRef<HTMLDivElement>(null);
 
   useDismiss(open, useCallback(() => setOpen(false), []), root);
-  useEffect(() => {
+  // Closes when it becomes disabled (an action's view opened). Adjusted while
+  // rendering, React's pattern for state that follows a prop, not in an effect.
+  const [wasDisabled, setWasDisabled] = useState(disabled);
+  if (disabled !== wasDisabled) {
+    setWasDisabled(disabled);
     if (disabled) setOpen(false);
-  }, [disabled]);
+  }
 
   return (
     <div className={fab ? "new-menu new-menu--fab" : "new-menu"} ref={root}>
