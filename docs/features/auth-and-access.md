@@ -82,6 +82,14 @@ tags (`use_defaults = false`, so nothing else is tagged):
 A missing or unexpected tag fails every condition that tests it, so the fallback is read-only
 `Global/`.
 
+**Adding a flag** touches every layer, in this order:
+
+1. `FLAGS` in `functions/allowlist/src/access.ts` (the parser) and the claim it becomes;
+2. `access_flags` in `infra/foundation_inputs.tf` (the preconditions);
+3. the principal tag mapping and an IAM condition in `infra/identity.tf`;
+4. `web/src/access.ts` and `web/src/locationPolicy.ts`, plus the policy's table test
+   (`web/test/locationPolicy.test.ts`), checked by hand against `infra/identity.tf`.
+
 ### The authenticated role's statements
 
 `aws_iam_role_policy.authenticated` (inline policy `drive-access` on `family-drive-authenticated`):
