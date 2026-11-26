@@ -1,6 +1,8 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+It holds what every change needs. Area rules are in `web/CLAUDE.md` and `infra/CLAUDE.md`; detail
+is in `docs/`. Use **Before you change…** below to find what to read first.
 
 ## What this is
 
@@ -53,155 +55,103 @@ terraform -chdir=infra/foundation init -backend=false && terraform -chdir=infra/
 bash ci/tf-init.sh                                 # real init of infra/ against the S3 state bucket (needs AWS creds)
 ```
 
-There is no linter configured.
+There is no linter configured. The Lambdas run on `nodejs22.x`; the web build and tests need
+Node ≥ 22.12.
 
-## Architecture
+## Architecture in brief
 
-### Request path (no backend)
-1. The browser loads the React SPA from CloudFront. The web bucket is private and only CloudFront can read it, through Origin Access Control.
-2. The SPA signs in with Cognito managed login, using Google as the only identity provider.
+Full design: [`docs/architecture/system-design.md`](docs/architecture/system-design.md).
+
+1. The browser loads the React SPA from CloudFront (private web bucket, Origin Access Control).
+2. The SPA signs in with Cognito managed login; Google is the only identity provider.
 3. An Identity Pool exchanges the Cognito token for temporary AWS credentials.
-4. The SPA uses those credentials to talk **directly to S3**, through AWS's Storage Browser component.
+4. The SPA talks **directly to S3** with them, through AWS's Storage Browser component and our
+   own `DriveStorage` (`web/src/storage/`).
 
-The Identity Pool's authenticated role (`infra/identity.tf`) is the security boundary. It
-allows S3 access only to `files-bucket/Global/*` (the shared drive) and to the caller's own
-personal folder `Personal/${aws:PrincipalTag/email}/*`, and listing only for those prefixes.
-The Identity Pool maps the ID token's `email` claim to that session tag
-(`aws_cognito_identity_pool_provider_principal_tag`). Folders are keyed by email, not
-identity ID, so they survive recreating the app stack ([ADR 0009](docs/adr/0009-personal-folders-keyed-by-email.md)).
-The SPA builds the prefix lower-cased (`personalPrefix()` in `web/src/locationPolicy.ts`); IAM compares
-it with the raw claim, which Google sends lower-case.
+**IAM is the security boundary** (`infra/identity.tf`). The authenticated role allows only
+`Global/*` (everyone reads; writing needs the session tag `global_access` = `write`), the
+caller's own `Personal/${aws:PrincipalTag/email}/*` (needs `personal` = `yes`) and `Deleted/`
+(writers may only `PutObject` into their part; `trash` = `yes` lists, reads and purges). Tags come
+from ID-token claims the pre token generation trigger adds; a missing tag fails the condition,
+so the fallback is read-only. Folders are keyed by email
+([ADR 0009](docs/adr/0009-personal-folders-keyed-by-email.md)). Every app role has the
+permissions boundary `family-drive-boundary` (#53).
 
-Per-person access levels ([ADR 0010](docs/adr/0010-per-person-access-levels-in-ssm.md)) use the
-same mechanism. Everyone can list and read `Global/`; writes there need the session tag
-`global_access` = `write`, and every personal-folder statement needs `personal` = `yes`. Both
-tags come from ID-token claims the pre token generation trigger adds. A missing tag fails the
-condition, so the fallback is read-only. The SPA reads the same claims (`web/src/access.ts`)
-only to hide what IAM would refuse, and **one module answers "who can do what where"**:
-`web/src/locationPolicy.ts` (#38) turns `Access`, email and a prefix into the location's kind
-(shared / personal / deleted / other), its capabilities (`read`, `write`, `move`,
-`manageDeleted`) and Storage Browser permissions. Home, the sidebar, "+ New", every action's `hide`
-(`hideUnless(...)`, since `hide` only gets permissions) and Restore's `canWriteAt` read it; never
-re-derive access from permission strings or flags elsewhere. Its table test
-(`web/test/locationPolicy.test.ts`) is checked by hand against `infra/identity.tf`: change both together.
+The SPA only hides what IAM would refuse, and **one module answers "who can do what where"**:
+`web/src/locationPolicy.ts`. Never re-derive access elsewhere. Its table test is checked by hand
+against `infra/identity.tf`: change both together.
 
-The Deleted folder ([ADR 0011](docs/adr/0011-delete-moves-to-a-deleted-folder.md)) adds a
-third tag, `trash`. Writers may `PutObject` into the matching part of `Deleted/`
-(`Deleted/Global/*`, `Deleted/Personal/<own email>/*`) but not list or read it; only
-`trash` = `yes` lists, reads and deletes there, including every version.
+**Allowlist** (`functions/allowlist/`): pure rules in `allowlist.ts` (case-insensitive, trims,
+requires `email_verified`, empty list denies everyone), used by two Cognito triggers. Pre
+token generation runs on every sign-in and refresh, so removing an email takes effect. Both deny
+by throwing `Error("ACCESS_DENIED")`, and `web/src/authErrors.ts` matches the same string to show
+the access-denied page: **keep the string identical in both places.** Access levels are the SSM
+JSON `String` `/family-drive/access`; adding a flag touches every layer
+([checklist](docs/features/auth-and-access.md#id-token-claims-and-principal-tags)).
 
-Every IAM role the app stack creates sets `permissions_boundary = local.permissions_boundary`
-([#53](https://github.com/hualinh1012/personal-storage/issues/53)): the managed policy `family-drive-boundary`
-(`infra/foundation/boundary.tf`, retained) allows only S3 on the files bucket's `Global/`, `Personal/` and
-`Deleted/` and the trigger Lambdas' logs, and the app pipeline policy only creates or changes a
-`family-drive-*` role that has it. A new permission outside that needs the boundary widened first (foundation).
+**Two Terraform stacks:** `infra/foundation/` is retained (`prevent_destroy`, data and SSM) and
+applied only through `bootstrap.sh`; `infra/` is the disposable app stack and finds foundation
+resources by name. Rules in [`infra/CLAUDE.md`](infra/CLAUDE.md).
 
-### Allowlist enforcement spans three places
-- `functions/allowlist/src/allowlist.ts` holds the pure logic: case-insensitive matching, ignores surrounding whitespace, requires `email_verified`, and an empty list denies everyone.
-- Two Cognito triggers use it:
-  - **Pre sign-up** allows only `PreSignUp_ExternalProvider`.
-  - **Pre token generation** runs on every sign-in and token refresh, so removing an email takes effect.
-- Both triggers deny by throwing `Error("ACCESS_DENIED")`. Cognito puts that text in the redirect's `error_description`, and `web/src/authErrors.ts` matches the same string to show the access-denied page. **Keep the string identical in both places.**
-- The allowlist reaches the Lambdas as env `ALLOWED_EMAILS`. It's built in Terraform from the SSM parameter `/family-drive/allowed_emails` (StringList).
-- Access levels: SSM `/family-drive/access` is a **JSON `String`** (not StringList: JSON has commas), e.g. `{"a@x.com": {"global": "write", "personal": true, "trash": true}}`. Unlisted allowlisted emails get read-only `Global/`, no personal folder and no Deleted folder.
-  - `functions/allowlist/src/access.ts` parses it (lower-cased keys; rejects bad JSON, unknown keys, bad values and the same email twice in different case) and turns it into string claims `global_access` (`read`/`write`), `personal` and `trash` (`yes`/`no`).
-  - Terraform (`infra/foundation_inputs.tf`) checks the same rules in preconditions, plus that every email is allowlisted, then passes the value as written (trimmed) to pre token generation as env `ACCESS_LEVELS`; the parser normalizes it, so Terraform has no copy of the flags that could drop one (#41).
-  - Adding a flag means: the parser's `FLAGS`, Terraform's `access_flags`, a claim, a principal tag mapping, an IAM condition, `web/src/access.ts` and `web/src/locationPolicy.ts` (plus its test table).
+**Config flow:** Terraform outputs → `scripts/write-config.sh` → `web/public/config.json`
+(git-ignored, never hard-coded) → `loadConfig()` → `toAmplifyOutputs()`, built by hand: Amplify JS
+is only a client library, with no Amplify backend tooling.
 
-### Two Terraform stacks
-- **`infra/foundation/` is retained.** It holds the state bucket, the files bucket (with versioning and lifecycle rules), the SSM parameters and the app roles' permissions boundary. Every resource has `prevent_destroy`.
-  - Files under `Global/` and `Personal/` move to Intelligent-Tiering via lifecycle; `Deleted/` stays Standard. Never add an `aws_s3_bucket_intelligent_tiering_configuration` or a Glacier class: archived objects break download, preview, Move and Delete ([ADR 0013](docs/adr/0013-files-in-intelligent-tiering-without-archive-tiers.md)).
-  - Apply it only through `infra/foundation/bootstrap.sh`. The first run uses local state and then migrates it into the bucket it just created. The script also imports pre-existing parameters, buckets and the boundary policy.
-  - The hand-set SSM parameters are created with a `CHANGE_ME` placeholder and `ignore_changes` on their value, so Terraform never overwrites real values. `deleted_retention_days` and the custom domain's three (`custom_domain`, `certificate_arn`, `hosted_zone_id`) are Terraform-owned instead: set the foundation variables in `main.tf`, never the parameters.
-- **`infra/` is the app stack and is disposable:** Cognito, the Lambdas, the Identity Pool, CloudFront, the web bucket, and the files bucket's CORS rule.
-  - It finds foundation resources **by naming convention through data sources** (`infra/foundation_inputs.tf`), not through remote state.
-  - A `terraform_data` precondition stops the plan while the SSM values are placeholders or not email addresses, or `access` is invalid.
-- Both stacks keep state in `family-drive-tfstate-<account>`: the app under `family-drive/`, the foundation under `foundation/`.
-- `archive_file` in `infra/auth.tf` zips `functions/allowlist/dist/*.js`, so the Lambdas must be built first.
+**CI/CD** (AWS CodePipeline): `ci/pipeline.sh` tests, builds, applies `infra/` and runs
+`scripts/deploy.sh`; `ci/destroy-app.sh` (manual pipeline) destroys the app stack only; the
+foundation pipeline runs `bootstrap.sh`. **A new AWS resource type adds its actions to the
+matching `ci/iam/*-policy.json`**, or the pipeline fails with AccessDenied.
 
-### Config flow into the SPA
-1. Terraform outputs.
-2. `scripts/write-config.sh` turns them into `web/public/config.json`, which is git-ignored and never hard-coded.
-3. `web/src/config.ts` `loadConfig()` reads that file at runtime.
-4. `toAmplifyOutputs()` builds an Amplify Gen 2–shaped outputs object by hand. The project uses Amplify JS only as a client library, with no Amplify backend tooling.
+## Before you change…
 
-`local.app_url` (`infra/storage.tf`) is `https://<custom domain>` when the foundation variables `custom_domain`, `certificate_arn` (us-east-1) and `hosted_zone_id` are set (written to SSM, read by name), else the distribution's `cloudfront.net` address ([ADR 0014](docs/adr/0014-custom-domain-as-foundation-variables.md)). It's the only trusted origin, so it drives Cognito's URLs, the files bucket's CORS and `config.json`; `infra/web.tf` adds the alias, certificate and Route 53 `A`/`AAAA` records.
+Read these first. Every change also follows the
+[Architecture Contract](docs/architecture/architecture-contract.md), whose checklist goes in the
+PR description.
 
-The OAuth redirect URIs (`origin + "/"`) must match the user pool client's callback and logout URLs in `infra/auth.tf` (`${app_url}/`, plus `http://localhost:5173/` only when `dev_origin` is set). `dev_origin` is empty in production (#57): local development against the real backend sets it in `infra/terraform.tfvars` and applies from that machine; the next pipeline run removes it again.
+| Area | Code | Read |
+|---|---|---|
+| Sign-in, allowlist, access flags, IAM | `functions/allowlist/`, `infra/auth.tf`, `infra/identity.tf`, `web/src/access.ts`, `web/src/locationPolicy.ts` | [auth-and-access.md](docs/features/auth-and-access.md), ADR 0003, 0009, 0010 |
+| Personal folders | `web/src/locationPolicy.ts`, `infra/identity.tf` | [personal-folders.md](docs/features/personal-folders.md), ADR 0009 |
+| Drive screen, look, sidebar, **+ New**, file list, drive host, drive storage | `web/src/driveHost/`, `web/src/fileList/`, `web/src/theme/`, `web/src/storage/`, `web/src/styles.css` | [drive-ui.md](docs/features/drive-ui.md), [`web/CLAUDE.md`](web/CLAUDE.md), ADR 0002, 0015 |
+| Upload, download, Copy, Move, Edit, pager | `web/src/move/`, `web/src/edit/`, `web/src/pagination/` | [global-drive.md](docs/features/global-drive.md) |
+| Delete, Restore, Deleted folder, auto-empty | `web/src/trash/`, `infra/foundation/files.tf` | [deleted-folder.md](docs/features/deleted-folder.md), ADR 0011, 0012 |
+| File preview | `web/src/preview/` | [file-preview.md](docs/features/file-preview.md) |
+| Import from Google Drive | `web/src/googleImport/` | [google-import.md](docs/features/google-import.md), ADR 0008 |
+| Buckets, versioning, lifecycle, storage classes | `infra/foundation/` | [storage-and-retention.md](docs/features/storage-and-retention.md), ADR 0004, 0013 |
+| CloudFront, CSP, custom domain, CORS | `infra/web.tf`, `infra/storage.tf` | [system-design.md](docs/architecture/system-design.md), ADR 0014, [security assessment](docs/security/assessment-2026-11.md) |
+| Pipelines, deploy, pipeline IAM | `ci/`, `scripts/` | [system-design.md §5](docs/architecture/system-design.md#5-deployment-design), [deployment.md](docs/deployment.md), [`infra/CLAUDE.md`](infra/CLAUDE.md) |
+| PWA, manifest, icons | `web/public/`, `web/index.html` | ADR 0007 (no app service worker or offline cache) |
 
-### CI/CD (AWS CodePipeline, Commands actions)
-- **`ci/pipeline.sh`** deploys the app. It tests and builds the Lambdas, runs the web tests, runs plan and apply on `infra/`, then runs `scripts/deploy.sh`, which builds the SPA, uploads it (hashed assets cached forever, `index.html`/`config.json` with `no-cache`) and invalidates CloudFront.
-- **`ci/destroy-app.sh`** destroys the app stack only. It runs from a separate pipeline that's manual-only.
-- **`infra/foundation/bootstrap.sh`** runs from the foundation pipeline with `AUTO_APPROVE=1`.
-- **`ci/app-env.sh`** is shared setup that both app scripts source.
-- **`ci/iam/*-policy.json`** are the least-privilege policies for the pipeline roles. **When adding a new AWS resource type to either stack, add its actions to the matching policy**, or the pipeline fails with AccessDenied.
-  - The foundation's is inline. The app's is two customer-managed policies, `app-pipeline-policy.json` (pipeline, state, S3, CloudFront, Route 53, Lambdas) and `app-pipeline-identity-policy.json` (Cognito, app roles, the boundary rules), applied by `ci/iam/attach-app-policies.sh <role>`: a role's inline policies share a 10,240-character limit with the starter template's own. Keep each managed file under 6,144 non-whitespace characters.
+## Conventions
 
-## Conventions and gotchas
-
-- Look ([ADR 0015](docs/adr/0015-drive-look-material-3-with-google-fonts.md), #13): Google Drive's layout in Material Design 3, light only, never Google's brand (no logos, product names or Google Sans). `web/src/styles.css` starts with the `--md-*` tokens our rules use and points Amplify UI's `--amplify-*` tokens at them (declared on `html:root, :root [class*="amplify"]`, since Amplify re-declares its tokens on every amplify element). Icons are `<Icon name="…">` (`web/src/theme/Icon.tsx`, Material Symbols ligatures).
-  - The top bar's search is Storage Browser's `SearchField` slot (`driveHost/TopBarSearch.tsx`), portalled into the top bar on the folder list and Home, inline inside action views (Copy's destination picker). The host adds it under the features' slots.
-  - The file list (`web/src/fileList/`) is more host slots: `DataTable` → `FileTable.tsx` (every view's table: Material Symbols per Storage Browser icon name via `icons.ts`, row hover/selection, a click on a row's empty space toggles it), `ActionsList` → `ActionsMenu.tsx` (the ⋮ menu), `Navigation` → `Breadcrumb.tsx` (location name instead of Home + bucket path) and `Title` (hidden on the folder list). On the folder list the ⋮ menu publishes its items to `actionsStore.ts`, so the selection toolbar and each row's ⋮ (which selects only that row first) offer the same actions, minus "+ New"'s folder actions. Amplify unsets `display` on anything with an `amplify*` class: the table keeps `amplify-storage-browser__table` (the phone/Restore column rules use it), so its table display is restored in CSS; cells carry no amplify classes.
-  - Pages outside the drive (sign-in, access denied, App's loading and error) share `pages/AuthCard.tsx`: the app's icon and name over one Material card. The sign-in button is a plain filled button (no Google logo, ADR 0015).
-  - States (#13, slice 4): `FileTable` draws placeholder rows while loading; the `Message` slot (`fileList/StatusMessage.tsx`) draws the folder list's empty folder (our `getListItemsResultMessage` text, merged under the features' `LocationDetailView` text in `DriveView`) as Drive's empty state and a failed listing with **Try again** (`exitToFolder`, which re-lists); other messages are banners. Storage Browser puts messages in its footer, so CSS (`:has(.list-state)`) lets the footer take the list's space. The preview panel is restyled (tonal, rounded, at most 45%/420px); while it's open, screens ≤ 1280px also hide Type and Last modified.
-- Drive layout (`web/src/styles.css`): the page never scrolls; the file list and preview panel each scroll vertically, nothing scrolls sideways; narrow desktops (≤ 960px) hide Type; phones hide Type/Last modified and show the preview full-width. These rules target Storage Browser's `amplify-storage-browser__*` classes, so re-check `?view=drive` in the playground after upgrading `@aws-amplify/ui-react-storage`.
-- Left sidebar (`driveHost/Sidebar.tsx`, #13): "+ New" (`NewMenu.tsx`), then the locations from `driveLocations()` (Shared drive, My files, Deleted; what Home lists), replacing navigating through Home. Phones: a drawer from the top bar's menu button, and New as a floating action button. New and the sidebar are disabled while an action's view is open (leaving it that way would drop its work).
-- The "+ New" menu holds the features' `newMenu` items: New folder, File upload, Folder upload (`driveHost/uploadFeature.tsx`; Upload is also in Storage Browser's ⋮ menu), Import from Google Drive. New is disabled where the open location lacks `write` and left out for people who can't write anywhere. Keep `StorageBrowser` **uncontrolled**: with `value`/`onValueChange` it only reports changes to its internal state, so a view opened from outside never reports its Exit. An item (and a sidebar location) remounts the browser (`key`) with `defaultValue` `{ location, actionType }` instead. File/Folder upload set a `pick` the upload view's Add files / Add folder slots take once (`HostState.takePick`) to open the picker straight away; the click on the item still counts as the user's gesture.
-- **Move** is a custom Storage Browser action (`web/src/move/`): `moveFile.ts` holds the rules (no overwrite, delete the original only after a successful copy, reasons for failures) over the drive storage; `moveAction.ts` makes the action from a `DriveStorage`; `MoveView.tsx` reuses `CopyView`'s parts (Storage Browser's Copy view is hard-wired to the copy action). Copy's destination label is overridden to the neutral "Destination" for that reason.
-- **Drive host and features** (`web/src/driveHost/`, #40): every feature that plugs into Storage Browser (preview, pager, Upload, Move, Google import, Edit, the Deleted folder) is one `DriveFeature` value (`feature.ts`: its actions, views, display text, list wrapper, component slots, New menu items, folder note), built in the feature's own `feature.ts`. `web/src/features.ts` lists them in menu order; `pages/Drive.tsx` (the app) and the playground both pass that list to `DriveView`, which owns Storage Browser and has no feature-specific code.
-  - `storageBrowser.ts` is the only place that knows Storage Browser's internal shapes: `Task`, `ProcessState`, `CopyViewParts`, `DeleteViewParts`, `BrowserParts` and every cast against its typings (`createHostedBrowser`). Re-check it after upgrading `@aws-amplify/ui-react-storage`. It also holds the shared `failureLines`.
-  - Views get Storage Browser's parts from `views(parts)` and where the person is (open location, action, policy, `exitToFolder`) from `useDriveHost()`; their own dependencies (storage, Google) come from the feature factory's arguments, not React contexts. `composeFeatures` refuses two features that claim the same action, view, slot or New menu item (action type plus `pick`).
-  - `DriveView` takes `createBrowser` so `web/test/driveHost.test.tsx` (jsdom) renders it with a fake browser and checks the remount on opening and leaving a view.
-- A view that runs a custom action over another view's selection (Move over Copy's, Restore and Delete permanently over Delete's) must pass `useStableItems(tasks)` (`web/src/driveHost/stableItems.ts`) to `useAction`, never `tasks.map(...)`: the tasks array is new every render and `useAction` resets on new items, so it loops ("Maximum update depth exceeded").
-- **Delete never deletes outside `Deleted/`** (`web/src/trash/`, ADR 0011). `makeTrashActions` replaces the built-in Delete's handler with "move to Deleted" (shown where the location has `write` + `delete`) and adds Restore, Delete permanently and Empty Deleted (shown where it has `delete` without `write`, i.e. only `Deleted/`).
-  - `paths.ts` maps keys to `Deleted/<path>/<name> (deleted <local time> <4 random>)<ext>` and back; `trash.ts` holds the rules (copy before delete, never restore over a file, purge every version) over the drive storage (`TrashOps` is a `Pick` of `DriveStorage`).
-  - Auto-empty ([ADR 0012](docs/adr/0012-deleted-folder-auto-empties-after-30-days.md)): lifecycle rules on `Deleted/` in `infra/foundation/files.tf` expire files `deleted_retention_days` (30, foundation `main.tf`) after deletion, plus noncurrent versions after 1 day and leftover delete markers. The foundation writes the number to SSM `/family-drive/deleted_retention_days` (Terraform-owned, no `ignore_changes`); the app stack reads it, `write-config.sh` puts it in `config.json` as `deletedRetentionDays`, and `trash/retention.ts` turns it into the note shown in `Deleted/`.
-  - `TrashViews.tsx`: Restore and Delete permanently reuse `DeleteView`'s parts (like Move), always confirm, and list reasons for failures; Empty Deleted is its own screen (`drive-screen` CSS), getting its storage from the feature and its exit from the host. Storage Browser's Delete table hard-codes "Deleted" in its Progress column, so the Restore view hides that column in CSS.
-- **Import from Google Drive** (`web/src/googleImport/`) runs entirely in the browser (no backend, ADR 0001). It's a custom Storage Browser action plus a "+ New" menu item (same remount trick as Upload); `GoogleImportView` gets the open folder and its exit from `useDriveHost()`, and exiting remounts the browser, which re-lists the folder.
-  - Google sign-in (GIS token client) and Picker load lazily when the view opens. The token asks for `drive.readonly` ([ADR 0008](docs/adr/0008-google-drive-import-scope.md): `drive.file` can't see inside picked folders), lives only in `google.ts` memory and is sent only to Google; `driveClient.ts` is the only code calling the Drive API.
-  - Pure, tested modules hold the rules: `plan.ts` (keys, `(n)` names, re-run skips, conversion targets, 500 MB cut-off; never overwrites), `listing.ts`/`prepare.ts` (recursive folder walk), `queue.ts` (3 at a time, cancel), `retry.ts`, `importFile.ts`. Google is injected through `deps.ts` (the playground fakes it) and S3 is the drive storage.
-  - Gated by config: `googleImportConfig()` in `web/src/config.ts` returns null while the SSM values (`/family-drive/google_api_key`, `/family-drive/google_project_number`) are `CHANGE_ME`, and the view says it isn't set up. They're deliberately not in the deploy precondition. The CSP (`infra/web.tf`, `local.csp`) allows `accounts.google.com`, `apis.google.com`, `docs.google.com` and `www.googleapis.com` for this; keep them when touching it.
-- **Edit text files** (`web/src/edit/`, issue #45): a custom ⋮ action for exactly one `.txt` file up to 1 MB, hidden without `write`. `EditTextView` finds the selection through `useView("Delete")` (like Restore) and gets its storage from the feature and its exit from `useDriveHost()`; exiting remounts the browser, which re-lists the folder.
-  - `text.ts` holds the rules (UTF-8 only, refuses invalid bytes; keeps a BOM and CRLF/LF on save); `textFile.ts` opens/saves over the drive storage (`read`/`write`). Saving is last-write-wins on purpose (owner's choice: family app); versioning is the undo.
-  - More types (Markdown, CSV) are extensions in `EDITABLE_EXTENSIONS` plus whatever the view needs.
-- **Drive storage** (`web/src/storage/`, #39): every S3 call our own features make (Move, Deleted folder, Edit, the pager's count, Google import) goes through one `DriveStorage` interface. Storage Browser's own list/upload/download/copy handlers and the Amplify auth adapter are outside it; no code of ours calls Amplify Storage.
-  - `s3Storage.ts` is the app's adapter: `@aws-sdk/client-s3` for everything (owner's decision on #39), loaded on first call so it stays out of the main bundle, credentials from `fetchAuthSession`, multipart above 8 MB. `toStorageError` turns every SDK failure into one `DriveStorageError` (`kind` NotFound/AccessDenied/Aborted/Other) keeping S3's wording as the reason users see; `isNotFound` is the one not-found rule.
-  - `memoryStorage.ts` is a versioned in-memory bucket: the tests' fake and the playground's single source of state.
-  - `web/test/driveStorageContract.ts` is the contract both adapters pass: `driveStorage.test.ts` runs it in memory; `driveStorage.s3.test.ts` runs it against a real bucket when `DRIVE_STORAGE_S3_BUCKET` and AWS credentials are set (use a scratch bucket). New S3 operations go into the interface, both adapters and the contract.
-- **Pager** (`web/src/pagination/`) replaces Storage Browser's (`components.Pagination`) to show `Page X of N · M items`, since S3 never reports a prefix's size.
-  - `folderTracker.ts` wraps the `listLocationItems` handler. A first-page listing (open folder, Refresh, back from any action) triggers a recount (`countFolder.ts`: `listFolder` on the drive storage); stale counts are dropped. It tells search (page size ≠ 100) and Copy's destination listings (`exclude`) apart from the file list by their options.
-  - `rows.ts` holds the pure rules: `countRows` mirrors Storage Browser's `parseResult` (subfolders + files, minus the folder's own placeholder and dot keys). Jumping forward re-paginates until enough rows are loaded (Storage Browser fetches one page per call). Repeated tokens get an empty page, and "done fetching" is reported on a later task so the pager never paginates with a stale token.
-  - Falls back to visited pages + Next while counting, when the count fails and during search. Re-check after upgrading `@aws-amplify/ui-react-storage`.
-- **Security headers** (`infra/web.tf`, #55): a custom CloudFront response headers policy keeps the managed security headers and adds a Content Security Policy (exact hosts: the files bucket, this region's Cognito endpoints and hosted domain, the Google hosts; `'unsafe-inline'` for styles only) and a `Permissions-Policy`. It also allows Google Fonts (`fonts.googleapis.com` styles, `fonts.gstatic.com` fonts) for Roboto and Material Symbols ([ADR 0015](docs/adr/0015-drive-look-material-3-with-google-fonts.md)). `csp_enforce` (default `false`) sends the CSP as `Content-Security-Policy-Report-Only`. A new external host the browser loads or calls (fetch, script, iframe, image, media) must be added to `local.csp`. It applies only behind CloudFront: `npm run dev` and the playground aren't affected.
-- Storage Browser's download service worker (`public/amplify-storage-download/download-sw.js`) is copied from the package by `npm run copy-sw` (runs before dev/build, git-ignored) and deployed with `no-cache`. Without it, downloads fall back to in-memory blobs.
-
-- Installable as a PWA: `public/manifest.webmanifest` + head tags in `index.html`, icons in `public/icons/` generated by `web/scripts/make-icons.mjs` (committed PNGs). There is deliberately **no app service worker / offline cache** — it would fight the `no-cache` entry points. `scripts/deploy.sh` uploads the manifest (as `application/manifest+json`) and icons with `no-cache`, since their names aren't hashed.
-
-- In bash scripts, never write `export X="$(cmd)"`. `export` hides a failing command even under `set -e`. Assign first, then export.
+- In bash scripts, never write `export X="$(cmd)"`. `export` hides a failing command even under
+  `set -e`. Assign first, then export.
 - `.gitattributes` forces LF for `*.sh`, so scripts keep working after a Windows checkout.
-- Terraform: `>= 1.10`, AWS provider `~> 6.0`. The S3 backend uses `use_lockfile`, and the bucket name is passed as `-backend-config`.
-- The Lambdas run on `nodejs22.x` (esbuild targets node22). The web build and tests need Node ≥ 22.12.
-- `web/src/pages/Drive.tsx` builds the drive storage, the Google import deps and the feature list, and renders `DriveView` (which creates Storage Browser, `@aws-amplify/ui-react-storage/browser`) with the Amplify auth adapter, opened at the `Global/` prefix via `driveLocation()` in `web/src/locationPolicy.ts`. Home lists only the locations the person can read (`Global/`, their own folder, `Deleted/`): `listDriveLocations()` replaces the adapter's `listLocations` (Amplify's own paths can only use the identity ID). Create the browser after `Amplify.configure` (the adapter reads the storage config when built), never at module level.
-- File preview (the panel beside the list) uses Storage Browser's `filePreview` option. Image, video and text use its built-in viewers; extra types are entries in `web/src/preview/registry.ts` (extensions/content types → viewer component). One limit, `MAX_PREVIEW_BYTES` (50 MB, in **bytes** despite the library docs saying KB), applies to every type; the "too big" wording is `previewDisplayText`, passed to `StorageBrowser` as `displayText`. PDF uses `react-pdf` (PDF.js), loaded lazily through `PdfPreviewLazy.tsx` so it stays out of the main bundle; it fetches the bytes because the pre-signed URL is `Content-Disposition: attachment` (an iframe would download), and `scripts/deploy.sh` uploads `.mjs` (the PDF.js worker) as `text/javascript`. Markdown: `MarkdownPreview.tsx` renders with `react-markdown` + `remark-gfm` (tables, checklists) using `skipHtml`, the default URL sanitising and images shown as links — keep those when touching it, since rendered files run in every family member's browser.
+- Secrets never go in the repository: values go to SSM or the environment's secrets.
 
 ## Docs
 
-`docs/` holds project documentation. Setup from scratch is the step-by-step
-`docs/guides/setup-from-scratch.md` (accounts, pipelines, IAM policies, SSM values, Google OAuth, local
-development); update it when a setup step changes. `docs/deployment.md` covers operating it (day-to-day,
-troubleshooting, the end-to-end checklist).
-
 The project uses Matt Pocock's skills (`mattpocock-skills`), not superpowers (turned off in
 `.claude/settings.json`). Docs follow their layout:
-- **`docs/architecture/`**: the TOGAF-style architecture (`architecture-definition.md`, `architecture-requirements.md`) and the **Architecture Contract** (`architecture-contract.md`): the rules every change follows and the conformance checklist to copy into each PR description.
-- **`docs/architecture/system-design.md`**: the cross-cutting design (components and which file implements each, request path, trust boundaries, config flow, deployment). Update it when a component, the config flow or the pipelines change.
-- **`docs/features/`**: one technical doc per feature (e.g. `auth-and-access.md`), with the same
-  sections each. Update a feature's doc in the same PR as any change to that feature.
+- **`docs/architecture/`**: the TOGAF-style architecture (`architecture-definition.md`,
+  `architecture-requirements.md`), the **Architecture Contract** (`architecture-contract.md`) and
+  `system-design.md` (components and which file implements each, request path, trust boundaries,
+  config flow, deployment). Update `system-design.md` when a component, the config flow or the
+  pipelines change.
+- **`docs/features/`**: one technical doc per feature, with the same sections each. Update a
+  feature's doc in the same PR as any change to that feature.
 - **`docs/adr/`**: architecture decisions (`NNNN-slug.md`). Read the ones touching an area
   before changing it, and say so explicitly if a change contradicts one.
-- **`GLOSSARY.md`** at the root: the project's terms (locations and their kinds, access flags, capabilities).
+- **`docs/guides/setup-from-scratch.md`**: setup step by step; update it when a setup step
+  changes. **`docs/deployment.md`**: operating it (day-to-day, troubleshooting, the end-to-end
+  checklist).
+- **`GLOSSARY.md`** at the root: the project's terms (locations and their kinds, access flags,
+  capabilities).
+- **`CLAUDE.md` files** hold rules, not explanations: put the explanation in the matching doc
+  and keep a one-line rule or pointer here. A rule for one area goes in that area's `CLAUDE.md`.
 - **Specs and plans are tickets in the issue tracker**, not files in `docs/`.
-- **`docs/agents/`**: where issues live and how they're labelled, written by `/setup-matt-pocock-skills`.
+- **`docs/agents/`**: where issues live and how they're labelled, written by
+  `/setup-matt-pocock-skills`.
 
 ## Agent skills
 

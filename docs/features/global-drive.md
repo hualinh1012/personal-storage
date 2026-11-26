@@ -277,6 +277,46 @@ sequenceDiagram
   controlled browser never reports the Exit of a view opened from outside, so the view would
   get stuck.
 
+The screen around the list (look, slots, sidebar, **+ New**), the drive host and the drive
+storage are in [drive-ui.md](drive-ui.md).
+
+### Pager
+
+Storage Browser's pager is replaced (`components.Pagination`) to show `Page X of N · M items`,
+since S3 never reports a prefix's size.
+
+- `folderTracker.ts` wraps the `listLocationItems` handler. A first-page listing (open folder,
+  Refresh, back from any action) triggers a recount (`countFolder.ts`: `listFolder` on the drive
+  storage); stale counts are dropped. It tells search (page size ≠ 100) and Copy's destination
+  listings (`exclude`) apart from the file list by their options.
+- `rows.ts` holds the pure rules. `countRows` mirrors Storage Browser's `parseResult`
+  (subfolders + files, minus the folder's own placeholder and dot keys).
+- Jumping forward re-paginates until enough rows are loaded, since Storage Browser fetches one
+  page per call. Repeated tokens get an empty page, and "done fetching" is reported on a later
+  task, so the pager never paginates with a stale token.
+- It falls back to visited pages + Next while counting, when the count fails and during search.
+  Re-check `rows.ts` after upgrading `@aws-amplify/ui-react-storage`.
+
+### Move
+
+- `moveFile.ts` holds the rules: no overwrite, delete the original only after a successful copy,
+  reasons for failures. `moveAction.ts` makes the action from a `DriveStorage`.
+- `MoveView.tsx` reuses `CopyView`'s parts, because Storage Browser's Copy view is hard-wired to
+  the copy action. For the same reason Copy's destination label is overridden to the neutral
+  "Destination".
+
+### Edit
+
+- A custom ⋮ action for exactly one `.txt` file up to 1 MB, hidden without `write`.
+  `EditTextView` finds the selection through `useView("Delete")` (like Restore), gets its storage
+  from the feature and its exit from `useDriveHost()`; exiting remounts the browser, which
+  re-lists the folder.
+- `text.ts` holds the rules: UTF-8 only, refuses invalid bytes, keeps a BOM and CRLF/LF on save.
+  `textFile.ts` opens and saves over the drive storage (`read`/`write`).
+- Saving is last-write-wins on purpose (owner's choice: a family app); versioning is the undo.
+- More types (Markdown, CSV) are extensions in `EDITABLE_EXTENSIONS` plus whatever the view
+  needs.
+
 ## 6. Configuration
 
 | Kind | Name | Used for |
