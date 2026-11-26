@@ -9,7 +9,7 @@ Keep this file in step with the code: change it in the same PR as any change to 
 
 ## 1. Purpose and user-facing behaviour
 
-- **Where:** **Import from Google Drive** in the top bar, or in the ⋮ menu. It's offered only
+- **Where:** **Import from Google Drive** in **+ New**, or in the ⋮ menu. It's offered only
   where the open location allows writing: `Global/` for people with `global` = `write`, and the
   person's own folder. Files land in the open folder ("Family Drive" or "My files" in the view).
 - **Choosing:** **Choose from Google Drive** asks Google for access (a popup, the first time and
@@ -64,7 +64,7 @@ ordinary upload can. From `aws_iam_role_policy.authenticated` in `infra/identity
 
 | UI | Source | Enforced by |
 |---|---|---|
-| Action and top-bar button hidden without `write` on the location | `googleImportActionConfig.hide` (`hideUnless("write")`), `locationPolicy().write` in `web/src/driveHost/DriveView.tsx`, both from `web/src/locationPolicy.ts` | the write statements above |
+| Action hidden, and **+ New** disabled, without `write` on the location | `googleImportActionConfig.hide` (`hideUnless("write")`), `locationPolicy().write` in `web/src/driveHost/DriveView.tsx`, both from `web/src/locationPolicy.ts` | the write statements above |
 | Destination is always the open folder | the open location from `useDriveHost()` (`makeGoogleImportView`) | the same; a forged key outside the allowed prefixes gets `AccessDenied` |
 
 ### Google side
@@ -183,12 +183,12 @@ All under `web/src/googleImport/`; tests in `web/test/googleImport.test.ts`.
 | `summary.ts` | Status labels, "3 copied, 1 skipped · 12 MB" | yes |
 | `leaveWarning.ts` | `beforeunload` prompt while running | yes |
 
-Wiring elsewhere: `web/src/googleImport/feature.ts` (custom action, view, top-bar button; the
+Wiring elsewhere: `web/src/googleImport/feature.ts` (custom action, view, **+ New** menu item; the
 destination, label and `exitToFolder` come from the drive host), `web/src/config.ts`
 (`googleImportConfig()`), `web/src/playground/mockGoogleImport.ts`.
 
-The top-bar button uses the same remount trick as Upload: `openAction(GOOGLE_IMPORT_ACTION)`
-remounts Storage Browser into the view, and `onExit` remounts it on the folder, which re-lists it.
+The **+ New** item uses the same remount trick as Upload: the host's `openAction` remounts
+Storage Browser into the view for `GOOGLE_IMPORT_ACTION`, and `onExit` remounts it on the folder, which re-lists it.
 
 ## 6. Configuration
 

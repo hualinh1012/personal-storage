@@ -136,7 +136,7 @@ describe("Storage Browser locations", () => {
     ]);
   });
 
-  it("says whether the top bar's write buttons belong on Home", () => {
+  it("says whether \"+ New\" belongs on the drive screen", () => {
     expect(canWriteSomewhere(ME, NONE)).toBe(false);
     expect(canWriteSomewhere(ME, TRASH)).toBe(false);
     expect(canWriteSomewhere(ME, WRITE)).toBe(true);

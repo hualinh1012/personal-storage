@@ -33,13 +33,24 @@ export interface HostState {
   policy: LocationPolicy;
   /** Closes any action view and shows the folder again, re-listing it. */
   exitToFolder(): void;
+  /**
+   * True once if the person opened the open view from a New menu item with
+   * this `pick` (File upload, Folder upload), so the view opens that picker.
+   */
+  takePick(kind: "files" | "folder"): boolean;
 }
 
-/** A top-bar button that opens one of the browser's actions for the open folder. It needs `write` there. */
-export interface TopBarAction {
+/**
+ * An item in the "+ New" menu: opens one of the browser's actions for the open
+ * folder. It needs `write` there. `pick` opens the upload view's file or
+ * folder picker straight away (File upload, Folder upload).
+ */
+export interface NewMenuItem {
   label: string;
+  /** A Material Symbols icon name. */
+  icon: string;
   actionType: string;
-  primary?: boolean;
+  pick?: "files" | "folder";
 }
 
 export interface DriveFeature {
@@ -60,8 +71,8 @@ export interface DriveFeature {
   components?: Record<string, ComponentType<never>>;
   /** Storage Browser's `filePreview` option. */
   filePreview?: unknown;
-  /** Buttons in the top bar. */
-  topBar?: TopBarAction[];
+  /** Items in the "+ New" menu. */
+  newMenu?: NewMenuItem[];
   /** A note above the file list, or null. */
   note?(host: HostState): string | null;
 }
@@ -74,12 +85,12 @@ export interface ComposedFeatures {
   wrapList(handler: ListHandler): ListHandler;
   components: Record<string, ComponentType<never>>;
   filePreview?: unknown;
-  topBar: TopBarAction[];
+  newMenu: NewMenuItem[];
   views(parts: BrowserParts): Record<string, ComponentType>;
   notes(host: HostState): string[];
 }
 
-/** Merges features, refusing two that claim the same action, view, slot or top-bar action. */
+/** Merges features, refusing two that claim the same action, view, slot or New menu item. */
 export function composeFeatures(features: readonly DriveFeature[]): ComposedFeatures {
   const claimed = new Map<string, string>();
   const claim = (kind: string, id: string, feature: DriveFeature) => {
@@ -94,7 +105,7 @@ export function composeFeatures(features: readonly DriveFeature[]): ComposedFeat
     displayText: {},
     wrapList: (h) => h,
     components: {},
-    topBar: [],
+    newMenu: [],
     views: () => ({}),
     notes: () => [],
   };
@@ -115,9 +126,9 @@ export function composeFeatures(features: readonly DriveFeature[]): ComposedFeat
       claim("component", slot, f);
       composed.components[slot] = component;
     }
-    for (const button of f.topBar ?? []) {
-      claim("top-bar action", button.actionType, f);
-      composed.topBar.push(button);
+    for (const item of f.newMenu ?? []) {
+      claim("New menu item", item.pick ? `${item.actionType} (${item.pick})` : item.actionType, f);
+      composed.newMenu.push(item);
     }
     if (f.filePreview !== undefined) {
       if (filePreviewOwner) throw new Error(`Features "${filePreviewOwner}" and "${f.name}" both define filePreview.`);

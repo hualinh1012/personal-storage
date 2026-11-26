@@ -105,10 +105,37 @@ button.outlined:disabled { opacity: 0.38; cursor: default; }
 .menu__item:disabled { opacity: 0.38; cursor: default; }
 .menu__item .icon { color: var(--md-on-surface-variant); }
 
+.button--with-icon { display: inline-flex; align-items: center; gap: 0.5rem; }
+.button--with-icon .icon { font-size: 18px; }
+
 /* Drive: app-style layout. The page never scrolls; the file list and the
    preview panel each scroll vertically on their own; nothing scrolls sideways. */
 .drive { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.browser { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 1rem 1rem; padding: 0.75rem 1rem; border-radius: var(--md-shape-large); background: var(--md-surface-container-lowest); }
+.drive__body { flex: 1; min-height: 0; display: flex; }
+.browser { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin: 0 1rem 1rem 0; padding: 0.75rem 1rem; border-radius: var(--md-shape-large); background: var(--md-surface-container-lowest); }
+
+/* Sidebar (driveHost/Sidebar.tsx): "+ New", then the drive's locations. A drawer on phones. */
+.topbar__menu { display: none; }
+.sidebar { flex: none; width: 256px; display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 1rem 1rem 0.75rem; background: var(--md-surface); }
+/* The list scrolls, not the sidebar, so the New menu isn't clipped. */
+.sidebar__list { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
+.sidebar__item { display: flex; align-items: center; gap: 0.75rem; width: 100%; height: 32px; padding: 0 0.75rem 0 1rem; border: 0; border-radius: var(--md-shape-full); background: none; color: var(--md-on-surface); font-size: 0.875rem; text-align: left; }
+.sidebar__item .icon { font-size: 20px; color: var(--md-on-surface-variant); }
+.sidebar__item:hover:not(:disabled) { background: var(--md-hover); }
+.sidebar__item:disabled { opacity: 0.5; cursor: default; }
+.sidebar__item--current, .sidebar__item--current:hover:not(:disabled) { background: var(--md-secondary-container); color: var(--md-on-secondary-container); font-weight: 500; }
+.sidebar__item--current .icon { color: var(--md-on-secondary-container); }
+.sidebar__item:focus-visible { outline: 2px solid var(--md-primary); outline-offset: -2px; }
+.scrim { display: none; }
+/* "+ New" (driveHost/NewMenu.tsx): a large rounded button; a floating action button on phones. */
+.new-menu { position: relative; align-self: flex-start; }
+.new-button { display: inline-flex; align-items: center; gap: 0.75rem; height: 56px; padding: 0 1.25rem 0 1rem; border: 0; border-radius: var(--md-shape-large); background: var(--md-surface-container-lowest); color: var(--md-on-surface); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15); }
+.new-button:hover:not(:disabled) { background: var(--md-surface-container-low); box-shadow: var(--md-elevation-2); }
+.new-button:disabled, .fab:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.new-button:focus-visible, .fab:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+.new-menu__menu { left: 0; top: 0; min-width: 240px; }
+.new-menu--fab { display: none; }
+.fab { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border: 0; border-radius: var(--md-shape-large); background: var(--md-primary-container); color: var(--md-on-primary-container); box-shadow: var(--md-elevation-2); }
 .browser .amplify-storage-browser { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .browser .amplify-storage-browser__content-with-preview { flex: 1; min-height: 0; }
 .browser .amplify-storage-browser__drop-zone { min-width: 0; }
@@ -153,6 +180,15 @@ button.outlined:disabled { opacity: 0.38; cursor: default; }
   .brand { min-width: 0; }
   .topbar__search { order: 10; flex: 1 1 100%; }
   .topbar__search:empty { display: none; }
+  /* The sidebar becomes a drawer over the page; New becomes a floating action button. */
+  .topbar__menu { display: inline-flex; }
+  .sidebar { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; width: min(300px, 85vw); padding-top: 1rem; border-radius: 0 var(--md-shape-large) var(--md-shape-large) 0; background: var(--md-surface-container-low); transform: translateX(-100%); visibility: hidden; transition: transform 0.2s ease, visibility 0.2s; }
+  .sidebar--open { transform: none; visibility: visible; }
+  .sidebar .new-menu { display: none; }
+  .sidebar__item { height: 48px; font-size: 1rem; }
+  .scrim { display: block; position: fixed; z-index: 25; inset: 0; background: rgba(0, 0, 0, 0.32); }
+  .new-menu--fab { display: block; position: fixed; z-index: 20; right: 1rem; bottom: 1rem; }
+  .new-menu--fab .new-menu__menu { left: auto; top: auto; right: 0; bottom: calc(100% + 0.5rem); }
   .browser .amplify-storage-browser__controls { flex-wrap: wrap; row-gap: 0.5rem; }
   .browser .amplify-storage-browser__search { flex: 1 1 100%; }
   .browser .amplify-storage-browser__table tr > :nth-child(3),
