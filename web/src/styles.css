@@ -160,7 +160,7 @@ table.file-table th, table.file-table td { display: table-cell; }
 .file-table td { height: 48px; padding: 0 0.5rem; border-bottom: 1px solid var(--md-outline-variant); background: none; vertical-align: middle; color: var(--md-on-surface-variant); }
 /* Only names wrap; dates, sizes and types stay on one line. */
 .browser table.file-table th, .browser table.file-table td { white-space: nowrap; overflow-wrap: normal; }
-.browser table.file-table .file-table__button, .browser table.file-table .file-table__text { white-space: normal; overflow-wrap: anywhere; }
+.browser table.file-table .file-table__button, .browser table.file-table .file-table__text { white-space: normal; overflow-wrap: break-word; word-break: break-word; }
 .file-table tbody tr { cursor: default; }
 .file-table tbody tr:hover td { background: var(--md-hover); }
 .file-table tbody tr.file-table__row--selected td, .file-table tbody tr.file-table__row--active td { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
@@ -202,6 +202,36 @@ table.file-table th, table.file-table td { display: table-cell; }
 .breadcrumb__link:hover { background: var(--md-hover); }
 .breadcrumb__item:first-child .breadcrumb__link, .breadcrumb__item:first-child .breadcrumb__current { margin-left: -0.75rem; }
 .browser .amplify-storage-browser__controls { align-items: center; }
+/* Empty folder and failed listing (fileList/StatusMessage.tsx). Storage Browser
+   puts its message in the footer, under the list; while one shows, the footer
+   takes the list's free space and centres it. */
+.browser .amplify-storage-browser:has(> .amplify-storage-browser__footer .list-state) > .amplify-storage-browser__content-with-preview { flex: none; height: auto; }
+.browser .amplify-storage-browser:has(> .amplify-storage-browser__footer .list-state) .amplify-storage-browser__data-table { height: auto; }
+.browser .amplify-storage-browser__footer:has(.list-state) { flex: 1; display: flex; align-items: center; justify-content: center; }
+.list-state { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2rem 1rem; text-align: center; color: var(--md-on-surface-variant); }
+.list-state__icon { font-size: 96px; color: var(--md-outline-variant); }
+.list-state--error .list-state__icon { color: var(--md-error); opacity: 0.6; }
+.list-state__title { margin: 0; font-size: 1.375rem; color: var(--md-on-surface); }
+.list-state__hint { margin: 0; }
+.list-state button { margin-top: 0.5rem; }
+/* Other messages: a tonal banner. */
+.banner { display: flex; align-items: center; gap: 0.75rem; margin: 0.5rem 0; padding: 0.5rem 0.5rem 0.5rem 1rem; border-radius: var(--md-shape-medium); background: var(--md-surface-container-low); color: var(--md-on-surface); }
+.banner__content { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.banner--info .icon { color: var(--md-primary); }
+.banner--success { background: #e6f4ea; } .banner--success .icon { color: var(--md-success); }
+.banner--warning { background: #fef7e0; } .banner--warning .icon { color: #b06000; }
+.banner--error { background: #fce8e6; } .banner--error .icon { color: var(--md-error); }
+/* Loading: placeholder rows (fileList/FileTable.tsx). */
+.skeleton { display: block; height: 12px; width: 70%; border-radius: var(--md-shape-full); background: linear-gradient(90deg, var(--md-surface-container) 0%, var(--md-surface-container-low) 50%, var(--md-surface-container) 100%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; }
+.file-table__skeleton td:first-child .skeleton { width: 18px; height: 18px; border-radius: 4px; }
+.file-table__skeleton:hover td { background: none; }
+@keyframes skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+/* Preview (Storage Browser's file preview) as Drive's details pane: a tonal, rounded panel beside the list. */
+.browser .amplify-storage-browser__content-with-preview { gap: 1rem; }
+.browser table.file-table .file-table__button:not(.icon-button) { min-width: 9rem; }
+.browser .amplify-storage-browser__content-with-preview .amplify-storage-browser__file-preview { flex: 0 1 min(45%, 420px); min-width: 0; }
+.browser .amplify-storage-browser__file-preview { border: 0; border-radius: var(--md-shape-large); background: var(--md-surface-container-low); padding: 0.5rem 1rem 1rem; }
 /* Our pager (web/src/pagination/Pager.tsx) in place of Storage Browser's. */
 .pager { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 .pager-button { min-width: 2rem; height: 2rem; padding: 0 0.4rem; border: 0; border-radius: 1rem; background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -227,9 +257,14 @@ table.file-table th, table.file-table td { display: table-cell; }
 .playground-list .active { font-weight: 600; }
 .playground-panel { flex: 1; background: #fff; border: 1px solid #e4e7eb; border-radius: 6px; padding: 0.5rem 1rem; min-height: 60vh; }
 .markdown-preview ul.contains-task-list { list-style: none; padding-left: 1rem; }
-/* Narrow desktops: drop the Type column first (the icon says it). */
+/* Narrow desktops: drop the Type column first (the icon says it), and Last
+   modified too while a preview shares the width. */
 @media (max-width: 960px) {
   .browser .amplify-storage-browser__table tr > :nth-child(3) { display: none; }
+}
+@media (max-width: 1280px) {
+  .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__table tr > :nth-child(3),
+  .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__table tr > :nth-child(4) { display: none; }
 }
 /* Phones: wrap the toolbar so refresh and the actions menu (Upload, Create
    folder) stay on screen, and drop the Type / Last modified columns. */

@@ -10,6 +10,7 @@ import { ActionsMenu } from "../fileList/ActionsMenu";
 import { ActionsStoreContext, createActionsStore } from "../fileList/actionsStore";
 import { Breadcrumb, Title } from "../fileList/Breadcrumb";
 import { FileTable } from "../fileList/FileTable";
+import { listResultsText, StatusMessage } from "../fileList/StatusMessage";
 import { canWriteSomewhere, driveLocation, driveLocations, locationPolicy } from "../locationPolicy";
 import { signOutSafely } from "../session";
 import { Icon } from "../theme/Icon";
@@ -62,6 +63,14 @@ export function DriveView({
   createBrowser?: CreateBrowser;
 }) {
   const composed = useMemo(() => composeFeatures(features), [features]);
+  // The host's own wording (the empty-folder text StatusMessage draws), under the features'.
+  const displayText = useMemo(
+    () => ({
+      ...composed.displayText,
+      LocationDetailView: { ...listResultsText.LocationDetailView, ...composed.displayText.LocationDetailView },
+    }),
+    [composed],
+  );
   const { Browser, views } = useMemo(() => {
     const list = setup.listLocationItems ?? storageBrowserListHandler;
     const hosted = createBrowser({
@@ -79,6 +88,7 @@ export function DriveView({
         ActionsList: ActionsMenu,
         Navigation: Breadcrumb,
         Title,
+        Message: StatusMessage,
         ...composed.components,
       },
     });
@@ -199,7 +209,7 @@ export function DriveView({
               defaultValue={mount.defaultValue}
               views={views}
               onValueChange={onValueChange}
-              displayText={composed.displayText}
+              displayText={displayText}
             />
           </main>
         </div>
