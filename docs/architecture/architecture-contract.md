@@ -46,7 +46,7 @@ Copy into the PR description and tick what applies; explain any box left unticke
 ### Architecture conformance
 - [ ] Ticket linked; it was `ready-for-agent` / `ready-for-human` (or the owner asked for it)
 - [ ] Respects ADRs: none contradicted, or a new ADR is included
-- [ ] Tests: `npm test` in `functions/allowlist` and `web` pass; new rules have tests
+- [ ] Checks: the CI workflow is green (lint, type-check, tests, build, Terraform fmt/validate); new rules have tests
 - [ ] Terraform: `terraform fmt -check -recursive infra` and `validate` pass (if `infra/` changed)
 - [ ] IAM: permissions changed only in `infra/identity.tf`; UI hiding matches through `web/src/locationPolicy.ts` and its test table (if access changed)
 - [ ] Pipeline policy: new AWS actions added to `ci/iam/`, re-attach noted for the owner (if resources changed)
