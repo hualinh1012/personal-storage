@@ -13,7 +13,9 @@ allowlist or access levels.
 - The landing page has one button, **Sign in with Google**. There is no username/password and
   no self sign-up form.
 - Only Google accounts whose email is on the **allowlist** get in. Anyone else comes back to
-  "You don't have access to this drive." with a **Sign out** link.
+  "You don't have access to this drive." with a **Sign out** button. Both pages are one card
+  with the app's icon (`web/src/pages/AuthCard.tsx`); the playground shows them at
+  `?view=landing` and `?view=denied`.
 - Once in, the account button (the email's initial) at the right of the top bar opens a menu
   with the person's email and **Sign out**.
 - Each person has an **access level**. It is three independent settings:
