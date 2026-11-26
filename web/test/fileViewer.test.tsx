@@ -122,6 +122,10 @@ describe("opening files from the list and the viewer", () => {
     const onDownload = vi.fn();
     render(<FileTable {...rows(onOpen, onDownload)} />);
     expect(store.getFiles().map((f) => f.id)).toEqual(["id-1", "id-2"]);
+    // No download column on the folder list (Download is in ⋮, the toolbar and the viewer)…
+    expect(container.querySelectorAll("th")).toHaveLength(3); // checkbox, name, the ⋮ column
+    expect(container.querySelector('[aria-label="download"]')).toBeNull();
+    expect([...container.querySelectorAll("tbody tr")].map((r) => r.children.length)).toEqual([3, 3, 3]);
 
     store.setMode("info");
     act(() => [...container.querySelectorAll(".file-table__name")].find((n) => n.textContent === "p1.jpg")!.closest("button")!.click());

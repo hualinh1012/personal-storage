@@ -27,7 +27,8 @@ screen, the drive host or the drive storage.
 - **File list:** Material icons per file type, coloured by kind; folders are yellow so they stand
   apart from plain (grey) files. Row hover and selection. Clicking a row's empty space selects or
   deselects it; a folder's name opens it, a file's name opens it in the viewer
-  ([file-preview.md](file-preview.md)). A file row's ⋮ also offers **View info**. While rows are selected, a toolbar replaces
+  ([file-preview.md](file-preview.md)). A file row's ⋮ also offers **View info**. There's no download column: Download is in
+  the ⋮ menu, the selection toolbar and the viewer. While rows are selected, a toolbar replaces
   the column headers and offers the same actions as the ⋮ menu. Each row's ⋮ selects only that
   row first. The breadcrumb shows the location's name instead of Home plus the bucket path.
 - **States:** placeholder rows while a folder loads; an empty folder shows Drive's empty state;
