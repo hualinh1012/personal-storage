@@ -276,6 +276,7 @@ the alias records follow the new distribution, so the app's address stays the sa
 | App deploy | push to `main` excluding `infra/foundation/**` | `ci/pipeline.sh` (below) |
 | App destroy | manual, after an approval | `ci/destroy-app.sh`: build Lambdas, init, `terraform destroy` of `infra/` only |
 | Pull-request checks (GitHub Actions, no AWS access) | every pull request and push to `main` | `.github/workflows/ci.yml`: lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
+| Dependency updates (Dependabot) | weekly, Monday 09:00 Singapore | `.github/dependabot.yml`: one PR for the pinned actions, and per package (`web`, `functions/allowlist`) one grouped minor/patch PR plus one per major (`@aws-amplify/ui-react-storage` always alone: it needs the manual re-check in `web/CLAUDE.md`). Each is checked by the pull-request checks; merging one deploys like any merge |
 
 `ci/pipeline.sh`, in order:
 1. `ci/app-env.sh`: check Terraform and Node ≥ 22.12; `npm ci`, test and build the Lambdas (Terraform zips `dist/*.js`).
