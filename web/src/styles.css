@@ -303,7 +303,8 @@ table.file-table th, table.file-table td { display: table-cell; }
   .browser .amplify-storage-browser__table tr > :nth-child(4) { display: none; }
   /* While a preview is open it takes the whole width; its Close button returns to the list. */
   .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__drop-zone { display: none; }
-  .browser .amplify-storage-browser__file-preview { flex: 1 1 100%; width: 100%; }
+  /* Same selector as the desktop panel width (min(45%, 420px)) so this one wins on phones. */
+  .browser .amplify-storage-browser__content-with-preview .amplify-storage-browser__file-preview { flex: 1 1 100%; width: 100%; margin-left: 0; }
   /* Copy/Move/Upload summary: let the status counts wrap instead of running off screen. */
   .browser .amplify-storage-browser__summary,
   .browser .amplify-storage-browser__status-display { flex-wrap: wrap; row-gap: 0.25rem; }
