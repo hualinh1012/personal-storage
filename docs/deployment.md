@@ -169,7 +169,7 @@ Tests: `npm test --prefix functions/allowlist` and `npm test --prefix web`.
 
 Run after a deploy, ideally in a private window.
 
-- [ ] An allowlisted Google account signs in and lands in the drive, with its email in the top bar.
+- [ ] An allowlisted Google account signs in and lands in the drive, with its email in the account menu (top right).
 - [ ] A Google account not on the list sees "You don't have access to this drive." and can sign out.
 - [ ] A file placed under `Global/` in S3 shows up in the list (name, last modified, size).
 - [ ] Upload a small file and a large one (over 100 MB); both appear when done.
@@ -199,7 +199,7 @@ Run after a deploy, ideally in a private window.
 - [ ] Import from Google Drive while your personal folder is open: the files land there.
 - [ ] **Access levels**, with `access` set to A = `write` + personal, B = `read`, C = `read` + personal:
   - A sees Upload, Import, and Create folder/Delete/Move in the ⋮ menu in `Global/`, and has a personal folder.
-  - B's Home lists only `Global/`; there the top bar has no Upload/Import and the ⋮ menu offers only Download.
+  - B's sidebar lists only **Shared drive**; there is no **+ New** and the ⋮ menu offers only Download.
   - C sees the same read-only `Global/`, but in `Personal/<C's email>/` can upload, move and delete.
   - Signed in as B or C, a direct upload or delete under `Global/` (e.g. `uploadData`/`remove` from `aws-amplify/storage` in the console) fails with AccessDenied; as B, so does listing `Personal/<B's email>/`. Or check with the IAM policy simulator, setting `aws:PrincipalTag/global_access` and `aws:PrincipalTag/personal`.
   - An allowlisted email with no entry behaves like B.
@@ -210,7 +210,7 @@ Run after a deploy, ideally in a private window.
 
 **Import from Google Drive** (needs [setup step 10](guides/setup-from-scratch.md#step-10-optional-google-drive-import); use a test folder in Family Drive):
 
-- [ ] From the top bar, import a few ordinary files (a photo, a PDF): Google asks for consent the first time, the Picker opens on **My Drive**, and the files appear in the open folder after **Done**.
+- [ ] From **+ New**, import a few ordinary files (a photo, a PDF): Google asks for consent the first time, the Picker opens on **My Drive**, and the files appear in the open folder after **Done**.
 - [ ] From the ⋮ menu, import a nested folder (a folder with a subfolder and an empty folder): the structure is recreated, the empty folder included.
 - [ ] Import a Google Doc and a Google Sheet: they arrive as `.pdf` and `.xlsx` and open. A Google Form is listed as not supported.
 - [ ] Run the same imports again: everything is "Already imported" and nothing new appears. Put a different file with the same name as an imported one in Google Drive and import it: it lands as `name (1).ext`.

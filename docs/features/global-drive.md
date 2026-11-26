@@ -15,19 +15,25 @@ path lists the locations the person can open: `Global/`, their personal folder a
 
 | Operation | Where | Needs `global` = `write` |
 |---|---|---|
-| Browse folders, search the current folder | file list, search box | no |
+| Switch between the shared drive, own folder and Deleted folder | left sidebar (a drawer on phones) | no |
+| Browse folders, search the current folder | file list, search box in the top bar | no |
 | Pager: `Page X of N · M items` | under the list | no |
 | Preview (photos, video, text, Markdown, PDF) | click a file name: panel beside the list | no (see the preview doc) |
 | Download one file, or several as a `.zip` | ⋮ menu | no |
-| Upload files or folders | ⋮ menu, or **Upload** in the top bar | yes |
-| Create folder | ⋮ menu | yes |
+| Upload files or folders | ⋮ menu, or **File upload** / **Folder upload** in **+ New** | yes |
+| Create folder | ⋮ menu, or **New folder** in **+ New** | yes |
 | Copy | ⋮ menu | yes |
 | Move (files only; never overwrites) | ⋮ menu | yes |
 | Edit a `.txt` file up to 1 MB | ⋮ menu, exactly one file selected | yes |
 | Delete (moves to `Deleted/`) | ⋮ menu | yes |
-| Import from Google Drive | ⋮ menu, or the top-bar button | yes (see the import doc) |
+| Import from Google Drive | ⋮ menu, or **+ New** | yes (see the import doc) |
 
-With `read`, the top bar has no Upload/Import buttons and the ⋮ menu offers only Download.
+Actions that work on a selection (Copy, Download, Delete, Move, Edit) are also in each row's
+⋮ menu, which selects just that row, and in the toolbar that replaces the column headers while
+rows are selected. Clicking a row's empty space selects or deselects it; the name opens it.
+
+With `read` (and no personal folder), there is no **+ New** and the ⋮ menu offers only
+Download. Someone who can write elsewhere sees **+ New** disabled here.
 
 The page never scrolls; the file list and the preview panel scroll on their own. On a phone
 the Type and Last modified columns are hidden and a preview takes the full width. The drive
@@ -78,7 +84,8 @@ app: versioning stays the backstop against raw-credential misuse.
 | `Global/` location has permissions `["get", "list"]` without write, `["delete", "get", "list", "write"]` with it | `driveLocation()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` |
 | Storage Browser hides Upload, Create folder, Copy and Delete for a location without `write`/`delete` | Storage Browser's own action configs | same |
 | Move, Edit and Delete hide without `write` (Move and Delete also need `delete`) | `hide` in `moveAction.ts`, `editAction.ts`, `trash/actions.ts` | same |
-| Top-bar Upload/Import shown only where the open location has `write` | `locationPolicy().write`, `canWriteSomewhere()`, `showTopBar` in `web/src/driveHost/DriveView.tsx` | same |
+| **+ New** enabled only where the open location has `write`, left out for people who can't write anywhere | `locationPolicy().write`, `canWriteSomewhere()`, `showNew` in `web/src/driveHost/DriveView.tsx` | same |
+| Sidebar lists only readable locations | `driveLocations()` in `web/src/locationPolicy.ts` | the list statements above |
 | Home lists only `Global/` (plus own folder/`Deleted/`) | `listDriveLocations()` | `ListDriveFolder` only matches `Global/`; listing the bucket root is denied |
 
 ## 4. Flows
@@ -121,7 +128,7 @@ sequenceDiagram
     participant SB as Storage Browser UploadView
     participant S3
 
-    U->>D: Upload (top bar)
+    U->>D: + New → File upload
     D->>SB: remount (key+1) with defaultValue {location, actionType: "upload"}
     U->>SB: choose files/folder, Upload
     loop each file, 4 at a time
@@ -227,7 +234,7 @@ sequenceDiagram
 
 | Area | Files | Tests |
 |---|---|---|
-| Drive screen, Storage Browser setup | `web/src/pages/Drive.tsx` (`Drive` builds the adapter, the drive storage and the feature list from `web/src/features.ts`); `web/src/driveHost/DriveView.tsx` (creates the browser from the features, the top bar, remount/exit) | `web/test/driveHost.test.tsx` (fake browser), playground |
+| Drive screen, Storage Browser setup | `web/src/pages/Drive.tsx` (`Drive` builds the adapter, the drive storage and the feature list from `web/src/features.ts`); `web/src/driveHost/DriveView.tsx` (creates the browser from the features, the top bar, sidebar and **+ New**, remount/exit); `Sidebar.tsx`, `NewMenu.tsx`, `TopBarSearch.tsx`, `AccountMenu.tsx`, `uploadFeature.tsx` beside it | `web/test/driveHost.test.tsx` (fake browser), playground |
 | Locations and permissions | `web/src/locationPolicy.ts` (`driveLocation`, `locationPolicy`, `listDriveLocations`), `web/src/config.ts` (`toAmplifyOutputs`) | `web/test/locationPolicy.test.ts`, `web/test/config.test.ts` |
 | App start and `Amplify.configure` | `web/src/App.tsx`, `web/src/main.tsx` | |
 | Move | `web/src/move/moveFile.ts` (rules), `moveAction.ts` (wiring), `MoveView.tsx` (view) | `web/test/moveFile.test.ts`, `web/test/moveView.test.ts` |
@@ -265,8 +272,8 @@ sequenceDiagram
   permanently use `DeleteView`'s. They must pass `useStableItems(tasks)` to `useAction`
   (a new array each render resets it and loops).
 - The browser stays **uncontrolled** (`defaultValue`, never `value`). It reports where the
-  person is through `onValueChange`. The top-bar buttons remount it (`key` + 1) straight into
-  an action view, and `exitToFolder()` remounts it on the folder, which also re-lists it. A
+  person is through `onValueChange`. The **+ New** menu items remount it (`key` + 1) straight
+  into an action view, a sidebar location remounts it on that location, and `exitToFolder()` remounts it on the folder, which also re-lists it. A
   controlled browser never reports the Exit of a view opened from outside, so the view would
   get stuck.
 

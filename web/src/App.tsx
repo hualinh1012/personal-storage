@@ -7,6 +7,7 @@ import type { Access } from "./access";
 import { isAccessDeniedRedirect } from "./authErrors";
 import Landing from "./pages/Landing";
 import AccessDenied from "./pages/AccessDenied";
+import { AuthCard } from "./pages/AuthCard";
 import Drive from "./pages/Drive";
 import { parseRetentionDays } from "./trash/retention";
 
@@ -63,9 +64,20 @@ export default function App() {
 
   switch (state.kind) {
     case "loading":
-      return <main className="center">Loading…</main>;
+      return (
+        <main className="auth-page" aria-busy="true">
+          <span className="spinner" role="status" aria-label="Loading" />
+        </main>
+      );
     case "error":
-      return <main className="center">Something went wrong: {state.message}</main>;
+      return (
+        <AuthCard icon="error" title="Something went wrong">
+          <p className="auth-card__text">{state.message}</p>
+          <button className="outlined auth-card__action" onClick={() => window.location.reload()}>
+            Try again
+          </button>
+        </AuthCard>
+      );
     case "denied":
       return <AccessDenied />;
     case "landing":

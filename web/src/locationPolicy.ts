@@ -150,11 +150,20 @@ function homeLocations(email: string, access: Access) {
  * derive paths from the identity ID.
  */
 export function listDriveLocations(bucket: string, email: string, access: Access) {
-  const items = homeLocations(email, access).map(({ id, prefix, policy }) => ({ id, ...storageLocation(bucket, prefix, policy) }));
+  const items = driveLocations(bucket, email, access);
   return async () => ({ items, nextToken: undefined });
 }
 
-/** Whether the person can write in any location on Home (the top bar shows Upload and Import, disabled, there). */
+/**
+ * The locations the person can read, in Home's order, as Storage Browser
+ * locations: what Home lists and the sidebar links to (issue #13). `id` is
+ * "Global", "Personal" or "Deleted".
+ */
+export function driveLocations(bucket: string, email: string, access: Access) {
+  return homeLocations(email, access).map(({ id, prefix, policy }) => ({ id, ...storageLocation(bucket, prefix, policy) }));
+}
+
+/** Whether the person can write in any location ("+ New" is shown, disabled where they can't write). */
 export function canWriteSomewhere(email: string, access: Access): boolean {
   return homeLocations(email, access).some((l) => l.policy.write);
 }

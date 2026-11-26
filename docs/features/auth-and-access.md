@@ -13,7 +13,9 @@ allowlist or access levels.
 - The landing page has one button, **Sign in with Google**. There is no username/password and
   no self sign-up form.
 - Only Google accounts whose email is on the **allowlist** get in. Anyone else comes back to
-  "You don't have access to this drive." with a **Sign out** link.
+  "You don't have access to this drive." with a **Sign out** button. Both pages are one card
+  with the app's icon (`web/src/pages/AuthCard.tsx`); the playground shows them at
+  `?view=landing` and `?view=denied`.
 - Once in, the account button (the email's initial) at the right of the top bar opens a menu
   with the person's email and **Sign out**.
 - Each person has an **access level**. It is three independent settings:
@@ -111,7 +113,7 @@ The role's trust policy (`data.aws_iam_policy_document.authenticated_assume`) le
 | UI behaviour | Source | IAM rule that actually stops it |
 |---|---|---|
 | `Global/` gets Storage Browser permissions `["get", "list"]` without `write`, which hides Upload, Create folder, Delete, Copy, Move and Import there | `driveLocation()` / `locationPolicy()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` needs `global_access` = `write` |
-| Top-bar Upload/Import hidden without a writable location | `showTopBar` in `web/src/driveHost/DriveView.tsx` | same |
+| **+ New** left out without a writable location, disabled where the open one isn't writable | `showNew` in `web/src/driveHost/DriveView.tsx` | same |
 | Home lists `Personal/<email>/` only with `personal` | `listDriveLocations()` | `ListOwnPersonalFolder`, `ManageOwnPersonalObjects` |
 | Home lists `Deleted/` only with `trash` | `listDriveLocations()` | `ListDeletedFolder`, `ManageDeletedObjects` |
 | Home never lists other people's folders | `listDriveLocations()` (replaces the adapter's `listLocations`) | No statement allows `Personal/<someone else>/` |

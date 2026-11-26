@@ -105,10 +105,50 @@ button.outlined:disabled { opacity: 0.38; cursor: default; }
 .menu__item:disabled { opacity: 0.38; cursor: default; }
 .menu__item .icon { color: var(--md-on-surface-variant); }
 
+.button--with-icon { display: inline-flex; align-items: center; gap: 0.5rem; }
+.button--with-icon .icon { font-size: 18px; }
+
+/* Pages outside the drive (pages/AuthCard.tsx): sign-in, access denied, loading, errors. */
+.auth-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; background: var(--md-surface); }
+.auth-card { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; width: min(100%, 448px); padding: 2.5rem 2rem 2rem; border-radius: 28px; background: var(--md-surface-container-lowest); text-align: center; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15); }
+.auth-card__logo { width: 64px; height: 64px; border-radius: var(--md-shape-large); }
+.auth-card__brand { margin: 0; font-size: 1.375rem; color: var(--md-on-surface-variant); }
+.auth-card__icon { font-size: 40px; color: var(--md-on-surface-variant); }
+.auth-card__title { margin: 0.5rem 0 0; font-size: 1.5rem; font-weight: 400; color: var(--md-on-surface); }
+.auth-card__text { margin: 0; color: var(--md-on-surface-variant); line-height: 1.5; overflow-wrap: anywhere; }
+.auth-card__action { margin-top: 1rem; }
+.spinner { width: 48px; height: 48px; border: 4px solid var(--md-primary-container); border-top-color: var(--md-primary); border-radius: 50%; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+
 /* Drive: app-style layout. The page never scrolls; the file list and the
    preview panel each scroll vertically on their own; nothing scrolls sideways. */
 .drive { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.browser { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 1rem 1rem; padding: 0.75rem 1rem; border-radius: var(--md-shape-large); background: var(--md-surface-container-lowest); }
+.drive__body { flex: 1; min-height: 0; display: flex; }
+.browser { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin: 0 1rem 1rem 0; padding: 0.75rem 1rem; border-radius: var(--md-shape-large); background: var(--md-surface-container-lowest); }
+
+/* Sidebar (driveHost/Sidebar.tsx): "+ New", then the drive's locations. A drawer on phones. */
+.topbar__menu { display: none; }
+.sidebar { flex: none; width: 256px; display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 1rem 1rem 0.75rem; background: var(--md-surface); }
+/* The list scrolls, not the sidebar, so the New menu isn't clipped. */
+.sidebar__list { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
+.sidebar__item { display: flex; align-items: center; gap: 0.75rem; width: 100%; height: 32px; padding: 0 0.75rem 0 1rem; border: 0; border-radius: var(--md-shape-full); background: none; color: var(--md-on-surface); font-size: 0.875rem; text-align: left; }
+.sidebar__item .icon { font-size: 20px; color: var(--md-on-surface-variant); }
+.sidebar__item:hover:not(:disabled) { background: var(--md-hover); }
+.sidebar__item:disabled { opacity: 0.5; cursor: default; }
+.sidebar__item--current, .sidebar__item--current:hover:not(:disabled) { background: var(--md-secondary-container); color: var(--md-on-secondary-container); font-weight: 500; }
+.sidebar__item--current .icon { color: var(--md-on-secondary-container); }
+.sidebar__item:focus-visible { outline: 2px solid var(--md-primary); outline-offset: -2px; }
+.scrim { display: none; }
+/* "+ New" (driveHost/NewMenu.tsx): a large rounded button; a floating action button on phones. */
+.new-menu { position: relative; align-self: flex-start; }
+.new-button { display: inline-flex; align-items: center; gap: 0.75rem; height: 56px; padding: 0 1.25rem 0 1rem; border: 0; border-radius: var(--md-shape-large); background: var(--md-surface-container-lowest); color: var(--md-on-surface); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15); }
+.new-button:hover:not(:disabled) { background: var(--md-surface-container-low); box-shadow: var(--md-elevation-2); }
+.new-button:disabled, .fab:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.new-button:focus-visible, .fab:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+.new-menu__menu { left: 0; top: 0; min-width: 240px; }
+.new-menu--fab { display: none; }
+.fab { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border: 0; border-radius: var(--md-shape-large); background: var(--md-primary-container); color: var(--md-on-primary-container); box-shadow: var(--md-elevation-2); }
 .browser .amplify-storage-browser { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .browser .amplify-storage-browser__content-with-preview { flex: 1; min-height: 0; }
 .browser .amplify-storage-browser__drop-zone { min-width: 0; }
@@ -119,6 +159,92 @@ button.outlined:disabled { opacity: 0.38; cursor: default; }
 /* File names are buttons that default to nowrap; let long names wrap instead of widening the table. */
 .browser .amplify-storage-browser__table td .amplify-button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .browser .amplify-storage-browser__file-preview { height: 100%; max-height: none; overflow-x: hidden; overflow-y: auto; }
+/* File list (fileList/FileTable.tsx): Drive's rows. No outer border, thin
+   dividers, hover and selection colours, a type icon before each name. */
+.browser .amplify-storage-browser__data-table { border: 0; border-radius: 0; }
+/* Amplify unsets `display` on anything with an amplify-* class; the table keeps them, so restore the table layout. */
+table.file-table { display: table; }
+table.file-table > thead { display: table-header-group; }
+table.file-table > tbody { display: table-row-group; }
+table.file-table tr { display: table-row; }
+table.file-table th, table.file-table td { display: table-cell; }
+.file-table { border-collapse: separate; border-spacing: 0; font-size: 0.875rem; color: var(--md-on-surface); }
+.file-table thead th { position: sticky; top: 0; z-index: 1; height: 48px; padding: 0 0.5rem; border-bottom: 1px solid var(--md-outline-variant); background: var(--md-surface-container-lowest); color: var(--md-on-surface); font-weight: 500; text-align: left; }
+.file-table td { height: 48px; padding: 0 0.5rem; border-bottom: 1px solid var(--md-outline-variant); background: none; vertical-align: middle; color: var(--md-on-surface-variant); }
+/* Only names wrap; dates, sizes and types stay on one line. */
+.browser table.file-table th, .browser table.file-table td { white-space: nowrap; overflow-wrap: normal; }
+.browser table.file-table .file-table__button, .browser table.file-table .file-table__text { white-space: normal; overflow-wrap: break-word; word-break: break-word; }
+.file-table tbody tr { cursor: default; }
+.file-table tbody tr:hover td { background: var(--md-hover); }
+.file-table tbody tr.file-table__row--selected td, .file-table tbody tr.file-table__row--active td { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+.file-table th:first-child, .file-table td:first-child { padding-left: 0.75rem; }
+.file-table__checkbox { width: 18px; height: 18px; margin: 0; accent-color: var(--md-primary); cursor: pointer; }
+.file-table__sort { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; margin-left: -0.5rem; border: 0; border-radius: var(--md-shape-full); background: none; color: inherit; font: inherit; font-weight: 500; }
+.file-table__sort:hover { background: var(--md-hover); }
+.file-table__sort .icon { font-size: 18px; }
+.file-table__button { display: inline-flex; align-items: center; gap: 1rem; max-width: 100%; padding: 0; border: 0; background: none; color: var(--md-on-surface); font: inherit; font-weight: 500; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.file-table__button:hover:not(:disabled) .file-table__name { text-decoration: underline; }
+.file-table__button:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; border-radius: 4px; }
+.file-table__button.icon-button { width: 40px; gap: 0; color: var(--md-on-surface-variant); }
+.file-table__text { display: inline-flex; align-items: center; gap: 0.75rem; overflow-wrap: anywhere; }
+.file-icon { font-size: 24px; flex: none; }
+.file-icon--folder { color: var(--md-on-surface-variant); }
+.file-icon--image, .file-icon--video, .file-icon--pdf { color: #d93025; }
+.file-icon--document, .file-icon--text { color: #1a73e8; }
+.file-icon--sheet { color: #188038; }
+.file-icon--slides { color: #e37400; }
+.file-icon--audio { color: #9334e6; }
+.file-icon--archive, .file-icon--file { color: var(--md-on-surface-variant); }
+.file-table__menu-cell { width: 48px; text-align: right; }
+.file-table__row-menu { display: inline-block; position: relative; }
+/* The ⋮ menus (fileList/ActionsMenu.tsx); placed (fixed) by the component. */
+.actions-menu { position: relative; }
+.actions-menu__menu { min-width: 220px; max-height: calc(100vh - 16px); overflow-y: auto; }
+/* Drive's bar while rows are selected: count, clear, the actions as buttons. */
+.selection-toolbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; min-height: 48px; margin-bottom: 0.25rem; padding: 0.25rem 0.5rem; border-radius: var(--md-shape-full); background: var(--md-surface-container); }
+.selection-toolbar__count { font-weight: 500; margin-right: 0.5rem; }
+.selection-toolbar__actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.selection-toolbar .menu__item { width: auto; min-height: 36px; padding: 0 0.75rem; border-radius: var(--md-shape-full); font-size: 0.875rem; }
+.selection-toolbar .menu__item .icon { font-size: 20px; }
+/* Breadcrumb (fileList/Breadcrumb.tsx): Drive's large folder path. */
+.breadcrumb__list { display: flex; flex-wrap: wrap; align-items: center; margin: 0 0 0.25rem; padding: 0; list-style: none; }
+.breadcrumb__item { display: inline-flex; align-items: center; min-width: 0; }
+.breadcrumb__separator { color: var(--md-on-surface-variant); }
+.breadcrumb__link, .breadcrumb__current { padding: 0.25rem 0.75rem; border-radius: var(--md-shape-full); font-size: 1.375rem; line-height: 1.75rem; color: var(--md-on-surface); overflow-wrap: anywhere; }
+.breadcrumb__link { border: 0; background: none; font-family: inherit; color: var(--md-on-surface-variant); }
+.breadcrumb__link:hover { background: var(--md-hover); }
+.breadcrumb__item:first-child .breadcrumb__link, .breadcrumb__item:first-child .breadcrumb__current { margin-left: -0.75rem; }
+.browser .amplify-storage-browser__controls { align-items: center; }
+/* Empty folder and failed listing (fileList/StatusMessage.tsx). Storage Browser
+   puts its message in the footer, under the list; while one shows, the footer
+   takes the list's free space and centres it. */
+.browser .amplify-storage-browser:has(> .amplify-storage-browser__footer .list-state) > .amplify-storage-browser__content-with-preview { flex: none; height: auto; }
+.browser .amplify-storage-browser:has(> .amplify-storage-browser__footer .list-state) .amplify-storage-browser__data-table { height: auto; }
+.browser .amplify-storage-browser__footer:has(.list-state) { flex: 1; display: flex; align-items: center; justify-content: center; }
+.list-state { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2rem 1rem; text-align: center; color: var(--md-on-surface-variant); }
+.list-state__icon { font-size: 96px; color: var(--md-outline-variant); }
+.list-state--error .list-state__icon { color: var(--md-error); opacity: 0.6; }
+.list-state__title { margin: 0; font-size: 1.375rem; color: var(--md-on-surface); }
+.list-state__hint { margin: 0; }
+.list-state button { margin-top: 0.5rem; }
+/* Other messages: a tonal banner. */
+.banner { display: flex; align-items: center; gap: 0.75rem; margin: 0.5rem 0; padding: 0.5rem 0.5rem 0.5rem 1rem; border-radius: var(--md-shape-medium); background: var(--md-surface-container-low); color: var(--md-on-surface); }
+.banner__content { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.banner--info .icon { color: var(--md-primary); }
+.banner--success { background: #e6f4ea; } .banner--success .icon { color: var(--md-success); }
+.banner--warning { background: #fef7e0; } .banner--warning .icon { color: #b06000; }
+.banner--error { background: #fce8e6; } .banner--error .icon { color: var(--md-error); }
+/* Loading: placeholder rows (fileList/FileTable.tsx). */
+.skeleton { display: block; height: 12px; width: 70%; border-radius: var(--md-shape-full); background: linear-gradient(90deg, var(--md-surface-container) 0%, var(--md-surface-container-low) 50%, var(--md-surface-container) 100%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; }
+.file-table__skeleton td:first-child .skeleton { width: 18px; height: 18px; border-radius: 4px; }
+.file-table__skeleton:hover td { background: none; }
+@keyframes skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+/* Preview (Storage Browser's file preview) as Drive's details pane: a tonal, rounded panel beside the list. */
+.browser .amplify-storage-browser__content-with-preview { gap: 1rem; }
+.browser table.file-table .file-table__button:not(.icon-button) { min-width: 9rem; }
+.browser .amplify-storage-browser__content-with-preview .amplify-storage-browser__file-preview { flex: 0 1 min(45%, 420px); min-width: 0; }
+.browser .amplify-storage-browser__file-preview { border: 0; border-radius: var(--md-shape-large); background: var(--md-surface-container-low); padding: 0.5rem 1rem 1rem; }
 /* Our pager (web/src/pagination/Pager.tsx) in place of Storage Browser's. */
 .pager { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 .pager-button { min-width: 2rem; height: 2rem; padding: 0 0.4rem; border: 0; border-radius: 1rem; background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -144,6 +270,15 @@ button.outlined:disabled { opacity: 0.38; cursor: default; }
 .playground-list .active { font-weight: 600; }
 .playground-panel { flex: 1; background: #fff; border: 1px solid #e4e7eb; border-radius: 6px; padding: 0.5rem 1rem; min-height: 60vh; }
 .markdown-preview ul.contains-task-list { list-style: none; padding-left: 1rem; }
+/* Narrow desktops: drop the Type column first (the icon says it), and Last
+   modified too while a preview shares the width. */
+@media (max-width: 960px) {
+  .browser .amplify-storage-browser__table tr > :nth-child(3) { display: none; }
+}
+@media (max-width: 1280px) {
+  .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__table tr > :nth-child(3),
+  .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__table tr > :nth-child(4) { display: none; }
+}
 /* Phones: wrap the toolbar so refresh and the actions menu (Upload, Create
    folder) stay on screen, and drop the Type / Last modified columns. */
 @media (max-width: 640px) {
@@ -153,6 +288,15 @@ button.outlined:disabled { opacity: 0.38; cursor: default; }
   .brand { min-width: 0; }
   .topbar__search { order: 10; flex: 1 1 100%; }
   .topbar__search:empty { display: none; }
+  /* The sidebar becomes a drawer over the page; New becomes a floating action button. */
+  .topbar__menu { display: inline-flex; }
+  .sidebar { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; width: min(300px, 85vw); padding-top: 1rem; border-radius: 0 var(--md-shape-large) var(--md-shape-large) 0; background: var(--md-surface-container-low); transform: translateX(-100%); visibility: hidden; transition: transform 0.2s ease, visibility 0.2s; }
+  .sidebar--open { transform: none; visibility: visible; }
+  .sidebar .new-menu { display: none; }
+  .sidebar__item { height: 48px; font-size: 1rem; }
+  .scrim { display: block; position: fixed; z-index: 25; inset: 0; background: rgba(0, 0, 0, 0.32); }
+  .new-menu--fab { display: block; position: fixed; z-index: 20; right: 1rem; bottom: 1rem; }
+  .new-menu--fab .new-menu__menu { left: auto; top: auto; right: 0; bottom: calc(100% + 0.5rem); }
   .browser .amplify-storage-browser__controls { flex-wrap: wrap; row-gap: 0.5rem; }
   .browser .amplify-storage-browser__search { flex: 1 1 100%; }
   .browser .amplify-storage-browser__table tr > :nth-child(3),

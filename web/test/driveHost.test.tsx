@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * The drive host (issue #40) with a fake Storage Browser: features plug in
- * without touching DriveView, and opening an action from the top bar or
+ * without touching DriveView, and opening an action from "+ New" or the sidebar, or
  * leaving a feature's view remounts the browser at the open folder.
  */
 import { act, useState, type ComponentType } from "react";
@@ -19,7 +19,7 @@ const access: Access = { globalWrite: true, personal: true, trash: true };
 const list: ListHandler = async () => ({ items: [] });
 
 describe("composeFeatures", () => {
-  it("merges actions, display text per view, slots, top-bar buttons and notes in feature order", async () => {
+  it("merges actions, display text per view, slots, New menu items and notes in feature order", async () => {
     const calls: string[] = [];
     const wrap = (name: string) => (h: ListHandler): ListHandler => (input) => (calls.push(name), h(input));
     const composed = composeFeatures([
@@ -30,21 +30,27 @@ describe("composeFeatures", () => {
         customActions: { two: {} },
         displayText: { CopyView: { y: 2 }, DeleteView: { z: 3 } },
         wrapList: wrap("b"),
-        topBar: [{ label: "Two", actionType: "two" }],
+        newMenu: [{ label: "Two", icon: "add", actionType: "two" }],
         note: (host) => (host.actionType ? null : "a note"),
       },
     ]);
     expect(Object.keys(composed.customActions)).toEqual(["one", "two"]);
     expect(composed.defaultActions).toEqual({ delete: "custom delete" });
     expect(composed.displayText).toEqual({ CopyView: { x: 1, y: 2 }, DeleteView: { z: 3 } });
-    expect(composed.topBar.map((b) => b.actionType)).toEqual(["two"]);
+    expect(composed.newMenu.map((b) => b.actionType)).toEqual(["two"]);
     expect(composed.notes({} as never)).toEqual(["a note"]);
     await composed.wrapList(list)({ config: {}, prefix: "Global/" });
     // The last feature's wrapper is outermost.
     expect(calls).toEqual(["b", "a"]);
   });
 
-  it("refuses two features that claim the same action, slot, top-bar action or view", () => {
+  it("refuses two features that claim the same action, slot, New menu item or view", () => {
+    const upload = (pick?: "files" | "folder") => ({ label: "Up", icon: "upload", actionType: "upload", pick });
+    expect(() => composeFeatures([{ name: "a", newMenu: [upload("files")] }, { name: "b", newMenu: [upload("files")] }])).toThrow(
+      'Features "a" and "b" both define New menu item "upload (files)".',
+    );
+    // One action may have an item per picker.
+    expect(composeFeatures([{ name: "a", newMenu: [upload("files"), upload("folder")] }]).newMenu).toHaveLength(2);
     expect(() => composeFeatures([{ name: "a", customActions: { x: {} } }, { name: "b", defaultActions: { x: {} } }])).toThrow(
       'Features "a" and "b" both define action "x".',
     );
@@ -93,6 +99,15 @@ describe("DriveView", () => {
   });
 
   const button = (label: string) => [...container.querySelectorAll("button")].find((b) => b.textContent === label)!;
+  const newButton = () => container.querySelector<HTMLButtonElement>(".new-button");
+  // Icons are ligature text, so an item's text is its icon name and then its label.
+  const pickNew = (label: string) => {
+    act(() => newButton()!.click());
+    const item = [...container.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((b) => b.textContent?.endsWith(label))!;
+    act(() => item.click());
+  };
+  const sidebarItem = (label: string) =>
+    [...container.querySelectorAll<HTMLButtonElement>(".sidebar__item")].find((b) => b.textContent?.endsWith(label));
 
   it("builds the browser from the features and gives their views the browser's parts", () => {
     const { create, record, parts } = fakeBrowser();
@@ -110,7 +125,7 @@ describe("DriveView", () => {
     expect(container.textContent).toContain("list of Global/");
   });
 
-  it("opens a top-bar action for the open folder by remounting, and exits back to that folder's list", () => {
+  it("opens a New menu item for the open folder by remounting, and exits back to that folder's list", () => {
     const { create, record } = fakeBrowser();
     function ThingView() {
       const host = useDriveHost();
@@ -124,7 +139,7 @@ describe("DriveView", () => {
       name: "thing",
       customActions: { thing: { viewName: "ThingView" } },
       views: () => ({ ThingView }),
-      topBar: [{ label: "Do thing", actionType: "thing" }],
+      newMenu: [{ label: "Do thing", icon: "add", actionType: "thing" }],
       note: (host) => (host.policy.kind === "shared" ? "Shared note" : null),
     };
     act(() => root.render(<DriveView email="a@x.com" access={access} bucket="b" setup={{ config: {} as never, listLocationItems: list }} features={[feature]} createBrowser={create} />));
@@ -132,11 +147,13 @@ describe("DriveView", () => {
     expect(container.querySelector(".folder-note")?.textContent).toBe("Shared note");
 
     const listed = record.renders.at(-1)!;
-    act(() => button("Do thing").click());
+    pickNew("Do thing");
     const opened = record.renders.at(-1)!;
     expect(opened.mount).toBe(listed.mount + 1);
     expect(opened.defaultValue).toMatchObject({ actionType: "thing", location: { prefix: "Global/photos/" } });
-    expect(button("Do thing").disabled).toBe(true);
+    // New and the sidebar wait while a view is open.
+    expect(newButton()!.disabled).toBe(true);
+    expect(sidebarItem("Shared drive")!.disabled).toBe(true);
     // No note over an action's view.
     expect(container.querySelector(".folder-note")).toBeNull();
 
@@ -146,15 +163,61 @@ describe("DriveView", () => {
     expect(back.defaultValue.actionType).toBeUndefined();
     expect(back.defaultValue.location?.prefix).toBe("Global/photos/");
     expect(container.textContent).toContain("list of Global/photos/");
-    expect(button("Do thing").disabled).toBe(false);
+    expect(newButton()!.disabled).toBe(false);
   });
 
-  it("hides top-bar actions in a read-only location", () => {
+  it("hands a New menu item's picker to the view it opens, once", () => {
+    const { create } = fakeBrowser();
+    const taken: string[] = [];
+    function UploadView() {
+      const host = useDriveHost();
+      // Both of the upload view's buttons ask; only the picked one gets it, and only once.
+      for (const kind of ["files", "folder", "folder"] as const) if (host.takePick(kind)) taken.push(kind);
+      return null;
+    }
+    const feature: DriveFeature = {
+      name: "upload",
+      customActions: { up: { viewName: "UploadView" } },
+      views: () => ({ UploadView }),
+      newMenu: [
+        { label: "File upload", icon: "upload", actionType: "up", pick: "files" },
+        { label: "Folder upload", icon: "upload", actionType: "up", pick: "folder" },
+      ],
+    };
+    act(() => root.render(<DriveView email="a@x.com" access={access} bucket="b" setup={{ config: {} as never, listLocationItems: list }} features={[feature]} createBrowser={create} />));
+    pickNew("Folder upload");
+    expect(taken).toEqual(["folder"]);
+  });
+
+  it("lists the readable locations in the sidebar and opens one at its top folder", () => {
     const { create, record } = fakeBrowser();
-    const feature: DriveFeature = { name: "thing", topBar: [{ label: "Do thing", actionType: "thing" }] };
+    act(() => root.render(<DriveView email="a@x.com" access={access} bucket="b" setup={{ config: {} as never, listLocationItems: list }} features={[]} createBrowser={create} />));
+    const labels = [...container.querySelectorAll(".sidebar__item")].map((b) => b.textContent);
+    expect(labels).toEqual(["folder_sharedShared drive", "personMy files", "deleteDeleted"]);
+    expect(sidebarItem("Shared drive")!.getAttribute("aria-current")).toBe("page");
+
+    const before = record.renders.at(-1)!;
+    act(() => sidebarItem("My files")!.click());
+    const opened = record.renders.at(-1)!;
+    expect(opened.mount).toBe(before.mount + 1);
+    expect(opened.defaultValue.location).toMatchObject({ id: "Personal", prefix: "Personal/a@x.com/" });
+    expect(sidebarItem("My files")!.getAttribute("aria-current")).toBe("page");
+
+    // Read-only people see only the shared drive.
+    act(() => root.render(<DriveView email="a@x.com" access={{ globalWrite: false, personal: false, trash: false }} bucket="b" setup={{ config: {} as never, listLocationItems: list }} features={[]} createBrowser={create} />));
+    expect(container.querySelectorAll(".sidebar__item")).toHaveLength(1);
+  });
+
+  it("disables New in a read-only location and leaves it out for people who can't write anywhere", () => {
+    const { create, record } = fakeBrowser();
+    const feature: DriveFeature = { name: "thing", newMenu: [{ label: "Do thing", icon: "add", actionType: "thing" }] };
+    const sharedReadOnly: Access = { globalWrite: false, personal: true, trash: false };
+    act(() => root.render(<DriveView email="a@x.com" access={sharedReadOnly} bucket="b" setup={{ config: {} as never, listLocationItems: list }} features={[feature]} createBrowser={create} />));
+    act(() => record.navigate("Global/photos/"));
+    expect(newButton()!.disabled).toBe(true);
+
     const readOnly: Access = { globalWrite: false, personal: false, trash: false };
     act(() => root.render(<DriveView email="a@x.com" access={readOnly} bucket="b" setup={{ config: {} as never, listLocationItems: list }} features={[feature]} createBrowser={create} />));
-    act(() => record.navigate("Global/photos/"));
-    expect(button("Do thing")).toBeUndefined();
+    expect(newButton()).toBeNull();
   });
 });
