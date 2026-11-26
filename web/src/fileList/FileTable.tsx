@@ -1,5 +1,6 @@
-import { useContext, type MouseEvent, type ReactNode } from "react";
+import { useContext, useLayoutEffect, type MouseEvent, type ReactNode } from "react";
 import { DriveHostContext } from "../driveHost/hostContext";
+import { useOpenFileStore, type ListedFile, type OpenFileStore } from "../driveHost/openFile";
 import { Icon } from "../theme/Icon";
 import { ActionMenuItems, ActionsButton } from "./ActionsMenu";
 import { selectionActions, useActions, useActionsStore } from "./actionsStore";
@@ -36,11 +37,39 @@ const B = "amplify-storage-browser";
 /** Placeholder rows while a page loads. */
 const SKELETON_ROWS = 6;
 
+type Row = FileTableProps["rows"][number];
 type CheckboxCell = Extract<Cell, { type: "checkbox" }>;
-const checkboxOf = (row: FileTableProps["rows"][number]) => row.content.find((c): c is CheckboxCell => c.type === "checkbox");
+type ButtonCell = Extract<Cell, { type: "button" }>;
+const checkboxOf = (row: Row) => row.content.find((c): c is CheckboxCell => c.type === "checkbox");
+/** A file row's name button (it opens the file): the labelled button; a folder's opens the folder instead. */
+const fileNameOf = (row: Row) =>
+  row.content.find((c): c is ButtonCell => c.type === "button" && !!c.content.label && c.content.icon !== "folder" && !!c.content.onClick);
+/** The row's own download button (icon only). */
+const downloadOf = (row: Row) => row.content.find((c): c is ButtonCell => c.type === "button" && !c.content.label && c.content.icon === "download");
+
+/**
+ * A file's name opens it in the viewer popup; the row's ⋮ menu also offers
+ * View info (the panel with its details). Both go through Storage Browser's
+ * own "open file" (the name button's onClick); the store says which way to show it.
+ */
+function openFile(store: OpenFileStore, row: Row, mode: "viewer" | "info") {
+  store.setMode(mode);
+  fileNameOf(row)?.content.onClick?.();
+}
 
 export function FileTable({ headers, isLoading, rows }: FileTableProps) {
   const host = useContext(DriveHostContext);
+  const openFiles = useOpenFileStore();
+  // The page's files, in order, for the viewer's position and its Download.
+  useLayoutEffect(() => {
+    openFiles.setFiles(
+      rows.flatMap((r): ListedFile[] => {
+        if (!fileNameOf(r)) return [];
+        const download = downloadOf(r)?.content.onClick;
+        return [{ id: r.key, download }];
+      }),
+    );
+  });
   // The open folder's file list (not Home, not an action's view): rows get a ⋮ menu and the toolbar.
   const onList = !!host?.location && !host.actionType;
   const selected = rows.filter((r) => checkboxOf(r)?.content.checked);
@@ -94,12 +123,18 @@ export function FileTable({ headers, isLoading, rows }: FileTableProps) {
                   <tr key={row.key} className={className} aria-selected={checkboxOf(row) ? checked : undefined} onClick={(e) => onRowClick(e, row)}>
                     {row.content.map((cell) => (
                       <td key={cell.key}>
-                        {renderCell(cell)}
+                        {renderCell(cell === fileNameOf(row) ? withOpen(cell as ButtonCell, () => openFile(openFiles, row, "viewer")) : cell)}
                       </td>
                     ))}
                     {rowMenus && (
                       <td className="file-table__menu-cell">
-                        {checkboxOf(row) && <RowMenu name={nameOf(row)} onOpen={() => selectOnly(row)} />}
+                        {checkboxOf(row) && (
+                          <RowMenu
+                            name={nameOf(row)}
+                            onOpen={() => selectOnly(row)}
+                            onViewInfo={fileNameOf(row) ? () => openFile(openFiles, row, "info") : undefined}
+                          />
+                        )}
                       </td>
                     )}
                   </tr>
@@ -111,6 +146,8 @@ export function FileTable({ headers, isLoading, rows }: FileTableProps) {
   );
 }
 
+const withOpen = (cell: ButtonCell, onClick: () => void): ButtonCell => ({ ...cell, content: { ...cell.content, onClick } });
+
 /** The row's name, for its ⋮ button's label. */
 function nameOf(row: FileTableProps["rows"][number]): string {
   for (const c of row.content) {
@@ -120,11 +157,12 @@ function nameOf(row: FileTableProps["rows"][number]): string {
   return "item";
 }
 
-function RowMenu({ name, onOpen }: { name: string; onOpen(): void }) {
+function RowMenu({ name, onOpen, onViewInfo }: { name: string; onOpen(): void; onViewInfo?: () => void }) {
   const actions = useActions();
   const { folderActions } = useActionsStore();
   const state = { ...actions, items: selectionActions(actions, folderActions) };
-  return <ActionsButton state={state} label={`Actions for ${name}`} onOpen={onOpen} className="file-table__row-menu" />;
+  const extra = onViewInfo ? [{ id: "view-info", label: "View info", icon: "info", onSelect: onViewInfo }] : [];
+  return <ActionsButton state={state} label={`Actions for ${name}`} onOpen={onOpen} className="file-table__row-menu" extra={extra} />;
 }
 
 /** Drive's bar over the list while rows are selected: the count, clear, and the actions as buttons. */

@@ -26,6 +26,8 @@
   --md-shape-medium: 12px;
   --md-shape-small: 8px;
   --md-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  /* The sidebar's width; the top bar's brand takes the same, so the search lines up with the file list. */
+  --sidebar-width: 256px;
   --md-font: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 /* Amplify UI declares its tokens again on every [class*="amplify"] element, so
@@ -79,7 +81,8 @@ button.link { background: none; border: 0; padding: 0; color: var(--md-primary);
 
 /* Top bar: brand, the open folder's search (driveHost/TopBarSearch.tsx), account menu. */
 .topbar { display: flex; align-items: center; gap: 0.75rem; min-height: 64px; padding: 0.5rem 1rem; background: var(--md-surface); }
-.brand { display: inline-flex; align-items: center; gap: 0.5rem; flex: none; min-width: 200px; }
+/* Brand: the sidebar's width minus the top bar's padding and gap, so the search starts where the file list does. */
+.brand { display: inline-flex; align-items: center; gap: 0.5rem; flex: none; width: calc(var(--sidebar-width) - 1rem - 0.75rem); }
 .brand__logo { width: 32px; height: 32px; border-radius: var(--md-shape-small); }
 .brand__name { font-size: 1.375rem; color: var(--md-on-surface-variant); }
 .topbar__search { flex: 0 1 720px; min-width: 0; }
@@ -134,7 +137,7 @@ button.outlined:disabled { opacity: 0.38; cursor: default; }
 
 /* Sidebar (driveHost/Sidebar.tsx): "+ New", then the drive's locations. A drawer on phones. */
 .topbar__menu { display: none; }
-.sidebar { flex: none; width: 256px; display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 1rem 1rem 0.75rem; background: var(--md-surface); }
+.sidebar { flex: none; width: var(--sidebar-width); display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 1rem 1rem 0.75rem; background: var(--md-surface); }
 /* The list scrolls, not the sidebar, so the New menu isn't clipped. */
 .sidebar__list { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
 .sidebar__item { display: flex; align-items: center; gap: 0.75rem; width: 100%; height: 32px; padding: 0 0.75rem 0 1rem; border: 0; border-radius: var(--md-shape-full); background: none; color: var(--md-on-surface); font-size: 0.875rem; text-align: left; }
@@ -193,7 +196,8 @@ table.file-table th, table.file-table td { display: table-cell; }
 .file-table__button.icon-button { width: 40px; gap: 0; color: var(--md-on-surface-variant); }
 .file-table__text { display: inline-flex; align-items: center; gap: 0.75rem; overflow-wrap: anywhere; }
 .file-icon { font-size: 24px; flex: none; }
-.file-icon--folder { color: var(--md-on-surface-variant); }
+/* Folders stand apart from files (whose plain icon is grey): a folder yellow. */
+.file-icon--folder { color: #e8a600; }
 .file-icon--image, .file-icon--video, .file-icon--pdf { color: #d93025; }
 .file-icon--document, .file-icon--text { color: #1a73e8; }
 .file-icon--sheet { color: #188038; }
@@ -250,6 +254,40 @@ table.file-table th, table.file-table td { display: table-cell; }
 .browser table.file-table .file-table__button:not(.icon-button) { min-width: 9rem; }
 .browser .amplify-storage-browser__content-with-preview .amplify-storage-browser__file-preview { flex: 0 1 min(45%, 420px); min-width: 0; }
 .browser .amplify-storage-browser__file-preview { border: 0; border-radius: var(--md-shape-large); background: var(--md-surface-container-low); padding: 0.5rem 1rem 1rem; }
+/* View info (preview/FileViewer.tsx InfoPanel): the file's details in the panel beside the list. */
+.file-info { display: flex; flex-direction: column; gap: 1rem; }
+.file-info__header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.file-info__title { margin: 0; font-size: 1.125rem; font-weight: 400; color: var(--md-on-surface); }
+.file-info__list { display: flex; flex-direction: column; gap: 0.75rem; margin: 0; }
+.file-info__item dt { font-size: 0.75rem; color: var(--md-on-surface-variant); }
+.file-info__item dd { margin: 0.125rem 0 0; color: var(--md-on-surface); overflow-wrap: anywhere; }
+.file-info__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+a.button-link { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.5rem; border-radius: var(--md-shape-full); background: var(--md-primary); color: var(--md-on-primary); font-weight: 500; text-decoration: none; }
+a.button-link .icon { font-size: 18px; }
+
+/* Viewer (preview/FileViewer.tsx): an opened file full screen over the drive, with Previous/Next at the sides. */
+.viewer { position: fixed; z-index: 50; inset: 0; display: flex; flex-direction: column; background: #202124; color: #fff; }
+.viewer__bar { display: flex; align-items: center; gap: 0.75rem; min-height: 64px; padding: 0.5rem 1rem; }
+.viewer__bar .icon-button { color: #fff; }
+.viewer__title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.viewer__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
+.viewer__meta { font-size: 0.8125rem; color: rgba(255, 255, 255, 0.72); }
+.viewer__stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0 0.5rem 1rem; }
+.viewer__content { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
+.viewer__nav { flex: none; width: 48px; height: 48px; background: rgba(0, 0, 0, 0.4); color: #fff; }
+.viewer__nav .icon { font-size: 32px; }
+.viewer__nav:hover:not(:disabled) { background: rgba(0, 0, 0, 0.6); }
+.viewer__nav:disabled { visibility: hidden; }
+.viewer__media { display: block; flex: 0 1 auto; min-width: 0; max-width: 100%; max-height: 100%; object-fit: contain; }
+.viewer__sheet { flex: 0 1 900px; min-width: 0; align-self: stretch; overflow: auto; padding: 1.5rem; border-radius: var(--md-shape-medium); background: var(--md-surface-container-lowest); color: var(--md-on-surface); }
+.viewer__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.875rem; }
+.viewer__spinner { border-color: rgba(255, 255, 255, 0.24); border-top-color: #fff; }
+.viewer__message { flex: 0 1 420px; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; text-align: center; }
+.viewer__message p { margin: 0; }
+.viewer__message-icon { font-size: 64px; color: rgba(255, 255, 255, 0.72); }
+.viewer__message-title { font-size: 1.125rem; }
+.viewer__message button.outlined { margin-top: 0.5rem; border-color: rgba(255, 255, 255, 0.72); color: #fff; }
+
 /* Our pager (web/src/pagination/Pager.tsx) in place of Storage Browser's. */
 .pager { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 .pager-button { min-width: 2rem; height: 2rem; padding: 0 0.4rem; border: 0; border-radius: 1rem; background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -290,7 +328,7 @@ table.file-table th, table.file-table td { display: table-cell; }
   .browser { margin: 0; padding: 0.5rem; border-radius: var(--md-shape-large) var(--md-shape-large) 0 0; }
   /* The top bar wraps: brand and account on the first row, search below. */
   .topbar { flex-wrap: wrap; row-gap: 0.25rem; padding: 0.5rem; }
-  .brand { min-width: 0; }
+  .brand { width: auto; min-width: 0; }
   .topbar__search { order: 10; flex: 1 1 100%; }
   .topbar__search:empty { display: none; }
   /* The sidebar becomes a drawer over the page; New becomes a floating action button. */
@@ -310,6 +348,15 @@ table.file-table th, table.file-table td { display: table-cell; }
   .browser .amplify-storage-browser__content-with-preview:has(.amplify-storage-browser__file-preview) .amplify-storage-browser__drop-zone { display: none; }
   /* Same selector as the desktop panel width (min(45%, 420px)) so this one wins on phones. */
   .browser .amplify-storage-browser__content-with-preview .amplify-storage-browser__file-preview { flex: 1 1 100%; width: 100%; margin-left: 0; }
+  /* Viewer: Previous/Next float over the file; Download shows its icon only. */
+  .viewer__bar { padding: 0.5rem; }
+  .viewer__stage { position: relative; padding: 0 0 0.5rem; }
+  .viewer__nav { position: absolute; z-index: 1; top: 50%; transform: translateY(-50%); }
+  .viewer__nav--prev { left: 0.5rem; }
+  .viewer__nav--next { right: 0.5rem; }
+  .viewer__download-text { display: none; }
+  .viewer__bar button.primary { padding: 0.625rem; }
+  .viewer__sheet { padding: 1rem; border-radius: 0; }
   /* Copy/Move/Upload summary: let the status counts wrap instead of running off screen. */
   .browser .amplify-storage-browser__summary,
   .browser .amplify-storage-browser__status-display { flex-wrap: wrap; row-gap: 0.25rem; }

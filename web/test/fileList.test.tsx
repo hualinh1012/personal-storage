@@ -160,7 +160,8 @@ describe("FileTable, ActionsMenu and Breadcrumb", () => {
     // Row 0 is deselected and row 2 selected.
     expect(onSelect.mock.calls.map(([i]) => i)).toEqual([0, 2]);
     const menu = container.querySelector('[role="menu"][aria-label="Actions for file 2"]')!;
-    expect([...menu.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(["Copy"]);
+    // A file row also offers View info (the details panel); see fileViewer.test.tsx.
+    expect([...menu.querySelectorAll('[role="menuitem"]')].map((b) => b.lastChild?.textContent)).toEqual(["View info", "Copy"]);
   });
 
   it("has no row menus or toolbar inside an action's view", () => {
