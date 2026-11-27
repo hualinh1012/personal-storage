@@ -26,6 +26,11 @@ No pipeline starts on a push by itself or has an approval stage: GitHub Actions 
 commit its checks passed, signed in with OIDC ([ADR 0017](adr/0017-github-actions-starts-codepipeline-with-oidc.md)).
 Approve a waiting run under **Actions → the run → Review deployments**.
 
+**Moving an existing deployment to this setup** (#92): run `bash ci/github-triggers-wizard.sh` from the
+repository root, with the AWS CLI signed in as an administrator and `gh` as the repository owner. It walks
+through every step in order (trigger roles, repository variables, environments, the destroy pipeline,
+stripping the old pipelines, the first deploy), runs what it can, and checks the console changes.
+
 **"Run the app pipeline"** (used throughout this page) means **Actions → Deploy → Run workflow**, target
 `app`, then approve. **"Run the foundation pipeline"** is the same with target `foundation`;
 `foundation-then-app` runs both in order. To roll back, give an older commit of `main` as `ref`.
