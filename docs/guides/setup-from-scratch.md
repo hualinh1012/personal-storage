@@ -135,7 +135,10 @@ OIDC, so no AWS key is stored in GitHub ([ADR 0017](../adr/0017-github-actions-s
 4. GitHub → **Settings → Actions → General → Fork pull request workflows from outside collaborators**:
    **Require approval for all external contributors**.
 
-**Check:** the three roles exist in IAM, each with trust naming `repo:<owner>/<name>:environment:<env>`.
+**Check:** the three roles exist in IAM, each with a trust naming the subject the script printed:
+`repo:<owner>@<id>/<name>@<id>:environment:<env>` with GitHub's immutable subjects (or
+`repo:<owner>/<name>:environment:<env>` without them). The script reads it from
+`gh api repos/<owner>/<name>/actions/oidc/customization/sub --jq .sub_claim_prefix`.
 The three environments each show one required reviewer.
 
 ## Step 4. Foundation: buckets and settings
@@ -183,7 +186,7 @@ one in the file, replace it first; if your artifact bucket isn't named `codepipe
 
 ### 4.3 Run it
 
-Creating the pipeline starts its first run at once; that is this step. Later runs: **Actions → Deploy →
+Creating the pipeline starts its first run at once; that is this step. Later runs: **Actions → Deploy app →
 Run workflow**, target `foundation`, then approve (or push a change under `infra/foundation/`).
 
 What `bootstrap.sh` does:
@@ -323,7 +326,7 @@ own roles. Keep each app policy file under 6,144 non-whitespace characters.
 ### 7.3 Run it
 
 Creating the pipeline starts its first run at once. If that run fails because step 7.2 wasn't done yet,
-run it again: **Actions → Deploy → Run workflow**, target `app`, then approve. From now on every push to
+run it again: **Actions → Deploy app → Run workflow**, target `application`, then approve. From now on every push to
 `main` (except docs-only ones) asks for that approval. `ci/pipeline.sh`:
 1. checks Terraform and Node; tests and builds the allowlist Lambdas; runs the web tests;
 2. `terraform fmt -check`, `init` against the state bucket, `plan`, `apply` in `infra/`;

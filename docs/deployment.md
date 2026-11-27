@@ -31,9 +31,9 @@ repository root, with the AWS CLI signed in as an administrator and `gh` as the 
 through every step in order (trigger roles, repository variables, environments, the destroy pipeline,
 stripping the old pipelines, the first deploy), runs what it can, and checks the console changes.
 
-**"Run the app pipeline"** (used throughout this page) means **Actions → Deploy → Run workflow**, target
-`app`, then approve. **"Run the foundation pipeline"** is the same with target `foundation`;
-`foundation-then-app` runs both in order. To roll back, give an older commit of `main` as `ref`.
+**"Run the app pipeline"** (used throughout this page) means **Actions → Deploy app → Run workflow**, target
+`application`, then approve. **"Run the foundation pipeline"** is the same with target `foundation`;
+`foundation-then-application` runs both in order. To roll back, give an older commit of `main` as `ref`.
 
 Both stacks keep their state in `s3://family-drive-tfstate-084519186805`:
 - the foundation at `foundation/terraform.tfstate`;
@@ -71,7 +71,7 @@ Keep them in place:
 
 **Add or remove a family member:**
 1. Edit `/family-drive/allowed_emails` in SSM.
-2. Re-run the app pipeline (**Actions → Deploy → Run workflow**, then approve).
+2. Re-run the app pipeline (**Actions → Deploy app → Run workflow**, then approve).
 3. While the OAuth consent screen is in **Testing** (always, once Google Drive import is set up), also add or
    remove them under **Google Auth Platform → Audience → Test users**. Google blocks sign-in for anyone not listed.
 
@@ -152,11 +152,12 @@ re-run `ci/iam/github-trigger-roles.sh` with the same name (see the script's hea
 | Delete fails with "Couldn't move it to Deleted (AccessDenied…)" | The app stack wasn't re-applied after this change (no `Deleted/` statements or `trash` tag mapping) | Re-run the app pipeline. |
 | Restore says the file "was in <email>'s personal folder, which only they can write to" | Trash managers can't write into other people's personal folders | Give that person `trash` for a moment, or move it back in the console (strip ` (deleted …)` from the name). |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
-| Deploy job fails at "Configure AWS credentials": `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The role's trust doesn't match: the environment name differs, the job has no `environment`, the repository was renamed or transferred, or the role doesn't exist yet | Check the environment names (`foundation`, `app`, `destroy`) and re-run `bash ci/iam/github-trigger-roles.sh` (`REPO=owner/name` if the repository moved). |
+| Deploy job fails at "Configure AWS credentials": `The web identity token provided could not be validated` | AWS doesn't trust GitHub's tokens: no OIDC provider for `token.actions.githubusercontent.com` in the account, or its audiences lack `sts.amazonaws.com` | IAM → Identity providers: create it (or add the audience). `github-trigger-roles.sh` creates it when it's missing. |
+| Deploy job fails at "Configure AWS credentials": `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The role's trust doesn't match the token's subject: trust written as `repo:owner/name:…` while the repository sends immutable subjects (`repo:owner@id/name@id:…`), the environment name differs, the repository was renamed or transferred, or the role doesn't exist yet | Re-run `bash ci/iam/github-trigger-roles.sh` with `gh` signed in: it reads the subject prefix from GitHub (`REPO=owner/name` if the repository moved). Check the environment names (`foundation`, `app`, `destroy`). |
 | Deploy job fails at "Configure AWS credentials": role ARN `arn:aws:iam:::role/…` | The repository variable `AWS_ACCOUNT_ID` isn't set | Set it under **Settings → Secrets and variables → Actions → Variables**. |
 | `AccessDenied … codepipeline:StartPipelineExecution` | The pipeline's name differs from the one the role was made for | Set `FOUNDATION_PIPELINE` / `DEPLOY_PIPELINE` / `DESTROY_PIPELINE` to the console names and re-run `github-trigger-roles.sh` with the same names. |
 | `start-pipeline-execution`: `InvalidParameter`/`ActionNotFound` for the source revision | The pipeline's source action isn't named `Source` | Rename the action to `Source` in the console, or add `SOURCE_ACTION: <name>` to the env of the `start-pipeline.sh` steps in the workflows. |
-| Deploy run waits forever at "Waiting for review" | Nobody approved the environment | **Actions → the run → Review deployments → Approve**. A newer push waits behind it (concurrency group `aws-app`): approve or reject the older run first. |
+| Deploy app run waits forever at "Waiting for review" | Nobody approved the environment | **Actions → the run → Review deployments → Approve**. A newer push waits behind it (concurrency group `aws-app`): approve or reject the older run first. |
 | A push to `main` deployed nothing | It changed only `docs/**` or Markdown files (`paths-ignore`), or its checks failed | Run the app pipeline by hand if needed. |
 | The pipeline started on a push by itself, as well as from GitHub | Its push trigger is still on | Remove the trigger in the pipeline's settings (setup guide step 4.1 / 7.1). |
 | `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the app policies (`bash ci/iam/attach-app-policies.sh <app-pipeline-role>`). |

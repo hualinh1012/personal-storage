@@ -488,7 +488,7 @@ pause
 stage "Merge the pull request and approve the first deploy"
 PR_URL="$(gh pr list --search 'GitHub Actions starts the CodePipelines in:title' --state all --json url --jq '.[0].url' 2>/dev/null || true)"
 [[ -n "$PR_URL" ]] || PR_URL="https://github.com/$REPO/pulls"
-say "Merging is a push to main: Deploy runs the checks, then waits for you in 'app'."
+say "Merging is a push to main: Deploy app runs the checks, then waits for you in 'app'."
 open_url "$PR_URL"
 step "Merge the pull request (skip this if it's already merged)."
 pause "Merged? Press Enter"
@@ -506,8 +506,8 @@ if [[ -n "$RUN_ID" ]]; then
     SKIPPED+=("first deploy: see https://github.com/$REPO/actions/runs/$RUN_ID")
   fi
 else
-  warn "No Deploy run found on main yet."
-  SKIPPED+=("first deploy: Actions → Deploy → Run workflow (target app), then approve")
+  warn "No Deploy app run found on main yet."
+  SKIPPED+=("first deploy: Actions → Deploy app → Run workflow (target application), then approve")
 fi
 pause
 
@@ -562,7 +562,7 @@ pause "Done? Press Enter"
 finish
 say "From now on:"
 step "Deploy: merge to main, then approve 'app' (and 'foundation' first when it changed)."
-step "Run by hand or roll back: Actions → Deploy → Run workflow."
+step "Run by hand or roll back: Actions → Deploy app → Run workflow."
 step "Destroy: Actions → Destroy app → Run workflow, type destroy-family-drive, approve."
 note "Optional: a small change under infra/foundation/ asks for two approvals, foundation then app."
 printf '\n'
