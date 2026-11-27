@@ -40,7 +40,7 @@ npm run dev                    # Vite on http://localhost:5173 (needs web/public
                                #   Global/linh/shopping list.txt (BOM + CRLF) is editable with Edit in the ⋮ menu
 npm test                       # vitest
 npm run build                  # tsc --noEmit + vite build
-npm run lint                   # oxlint (.oxlintrc.json); warnings don't fail it
+npm run lint                   # oxlint (.oxlintrc.json), --deny-warnings: any warning fails it
 
 # Single test file / single test
 npm test -- test/allowlist.test.ts
@@ -101,7 +101,9 @@ resources by name. Rules in [`infra/CLAUDE.md`](infra/CLAUDE.md).
 is only a client library, with no Amplify backend tooling.
 
 **Pull-request checks** (GitHub Actions, `.github/workflows/ci.yml`, no AWS access): lint,
-type-check, test and build both packages, Terraform `fmt -check` and offline `validate`.
+type-check, test and build both packages, Terraform `fmt -check` and offline `validate`. Dependabot
+(`.github/dependabot.yml`) opens weekly update PRs for the pinned actions and both packages; the
+same checks run on each.
 
 **CI/CD:** GitHub Actions decides when, CodePipeline deploys
 ([ADR 0017](docs/adr/0017-github-actions-starts-codepipeline-with-oidc.md)). `deploy.yml` runs `ci.yml`,

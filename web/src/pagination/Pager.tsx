@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useSyncExternalStore } from "react";
+import { useContext, useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
 import { DriveHostContext } from "../driveHost/hostContext";
 import type { FolderState, FolderTracker } from "./folderTracker";
 import { jumpStep, pageCount, pageLinks } from "./rows";
@@ -45,23 +45,25 @@ function PagerView({
   // views (Home, Copy's destination picker) page through their own items.
   const tracked = listPrefix !== null && state.prefix === listPrefix;
   const total = totalFor(state, listPrefix);
-  const [target, setTarget] = useState<number>();
-
-  // Drop a jump in progress when the folder is re-listed or a page fails to load.
+  // A jump to a later page, with the listing it started on: re-listing the
+  // folder or a page failing to load (a new listing) drops it.
   const listing = `${state.prefix}|${state.mode}|${state.failures}`;
-  useEffect(() => setTarget(undefined), [listing]);
+  const [jump, setJump] = useState<{ target: number; listing: string }>();
 
-  // A jump to a later page: Storage Browser fetches one page per paginate call,
-  // so keep asking for the target until it has the rows to show it.
+  // Storage Browser fetches one page per paginate call, so keep asking for the
+  // target until it has the rows to show it. Done once it does.
   const { loadedRows, hasMore, fetching } = state;
+  const step = jump && jump.listing === listing && page !== undefined ? jumpStep({ target: jump.target, page, loadedRows, hasMore, fetching }) : "done";
+  const target = step === "done" ? undefined : jump?.target;
+  // A finished (or dropped) jump is forgotten at once, adjusted while rendering:
+  // kept, it would jump again when Refresh or a re-list goes back to page 1.
+  if (jump && step === "done") setJump(undefined);
+  // onPaginate is a new function on every render of the list; as an Effect
+  // Event it isn't a dependency, so each step follows a change in what's loaded.
+  const paginate = useEffectEvent((p: number) => onPaginate?.(p));
   useEffect(() => {
-    if (target === undefined || page === undefined) return;
-    const step = jumpStep({ target, page, loadedRows, hasMore, fetching });
-    if (step === "paginate") onPaginate?.(target);
-    if (step === "done") setTarget(undefined);
-    // onPaginate is a new function on every render of the list; leaving it out
-    // keeps each step tied to a change in what's loaded.
-  },[target, page, loadedRows, hasMore, fetching]);
+    if (step === "paginate" && target !== undefined) paginate(target);
+  }, [step, target, page, loadedRows]);
 
   if (!page) return null;
   const known = total !== undefined;
@@ -72,8 +74,11 @@ function PagerView({
 
   const go = (p: number) => {
     if (p === page || busy) return;
-    if (p > page && tracked) setTarget(p);
-    else onPaginate?.(p);
+    if (p > page && tracked) setJump({ target: p, listing });
+    else {
+      setJump(undefined);
+      onPaginate?.(p);
+    }
   };
 
   return (

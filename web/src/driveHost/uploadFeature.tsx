@@ -1,4 +1,4 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useEffectEvent } from "react";
 import { Icon } from "../theme/Icon";
 import type { DriveFeature } from "./feature";
 import { DriveHostContext } from "./hostContext";
@@ -36,10 +36,12 @@ export const uploadFeature: DriveFeature = {
 
 function AddButton({ kind, icon, label, isDisabled, onAdd }: AddProps & { kind: "files" | "folder"; icon: string; onAdd?: () => void }) {
   const host = useContext(DriveHostContext);
-  useEffect(() => {
+  // Once, when the upload view opens: an Effect Event reads the latest props
+  // without making them dependencies.
+  const takePick = useEffectEvent(() => {
     if (host?.takePick(kind)) onAdd?.();
-    // Once, when the upload view opens.
-  }, []);
+  });
+  useEffect(() => takePick(), []);
   return (
     <button type="button" className="outlined button--with-icon" disabled={isDisabled} onClick={onAdd}>
       <Icon name={icon} />

@@ -1,6 +1,8 @@
 # File preview
 
-Clicking a file name opens a preview panel beside the file list. This is the technical
+Clicking a file name opens it full screen in the **viewer**, a popup over the drive with
+**Previous** / **Next** through the folder's files. A row's ⋮ → **View info** opens the **info
+panel** beside the list instead: the file's details, **Open** and **Download**. This is the technical
 reference for someone changing this code or infrastructure. It applies wherever the drive shows
 files: `Global/`, personal folders and `Deleted/`.
 
@@ -10,19 +12,28 @@ Keep this file in step with the code: change it in the same PR as any change to 
 
 | Kind | Recognised by | Viewer |
 |---|---|---|
-| Photos | `image/*`, or `.jpg .jpeg .png .gif .webp .svg .bmp .tif(f) .ico .heic .heif .avif` | Storage Browser's built-in image viewer (`<img>`) |
-| Videos | `video/*`, or `.mp4 .mov .webm .m4v .mkv .avi .wmv .flv .mpg .mpeg .3gp .ogv` | built-in video viewer (`<video>`, streamed) |
-| Text | `text/*`, JSON/XML/CSV/YAML/TOML types, or `.txt .csv .log .json .xml .yaml .yml .ini .conf .cfg` | built-in text viewer |
+| Photos | `image/*`, or `.jpg .jpeg .png .gif .webp .svg .bmp .tif(f) .ico .heic .heif .avif` | `<img>`, fitted to the screen |
+| Videos | `video/*`, or `.mp4 .mov .webm .m4v .mkv .avi .wmv .flv .mpg .mpeg .3gp .ogv` | `<video>` with controls, streamed |
+| Text | `text/*`, JSON/XML/CSV/YAML/TOML types, or `.txt .csv .log .json .xml .yaml .yml .ini .conf .cfg` | plain text on a white sheet |
 | Markdown | `.md`, `.markdown`, or `text/markdown`, `text/x-markdown` | ours: formatted, with tables, checklists and strikethrough; raw HTML ignored; images shown as links |
 | PDF | `.pdf` or `application/pdf` | ours: one page at a time with **Previous** / **Next** and "Page X of N" |
-| Anything else | | "File preview not supported for this file type" and a download button |
+| Anything else | | "No preview for this type of file" and Download |
 
-- **Size limit:** files over **50 MB** of any kind aren't previewed. The panel says "File is too
+The type detection (left column) is still Storage Browser's, plus `registry.ts`; the viewers are
+drawn by `FileViewer.tsx` (§5).
+
+- **Size limit:** files over **50 MB** of any kind aren't previewed. The viewer says "File is too
   big to preview" and "Previews are available for files up to 50 MB. Download the file to open
   it.", with a download button.
-- The panel shows the file's details and has arrows to step to the previous or next file in the
-  list. It scrolls on its own; on a phone it takes the whole width and **Close** returns to the
-  list.
+- **The viewer** covers the screen. Its bar shows the name, size, date and position ("3 of 12"),
+  **Download** and **Close**. **Previous** / **Next** (buttons at the sides, or ← and →) step
+  through the files on the open page, skipping folders; **Esc** closes. Download is the row's own
+  download handler (Storage Browser's, with its progress; the list hides the row's download
+  button but keeps its handler), or the preview URL when the row has none. On a
+  phone the arrows float over the file and Download shows its icon only.
+- **The info panel** (⋮ → View info, files only) sits beside the list like the old preview panel:
+  name, folder, size, type and last modified, with **Open** (the viewer) and **Download**. On a
+  phone it takes the whole width and **Close** returns to the list. It doesn't show the file.
 - The PDF viewer loads the first time a PDF is opened ("Loading PDF viewer…").
 - Whether a format actually plays depends on the browser: HEIC photos show only in Safari, and
   `.mkv`, `.avi` and `.wmv` videos often don't play. Those fall back to the viewer's own error with
@@ -110,11 +121,11 @@ sequenceDiagram
     else
         SB->>SB: getUrl: presigned GET, Content-Disposition attachment, expires in 2 h (capped by the credentials)
         Note over SB: getUrl also does a HeadObject (validateObjectExistence)
-        SB->>R: rendererResolver(type)
-        alt our renderer
+        SB->>SB: FileViewer (FilePreview slot), in the viewer or the info panel
+        alt our renderer (rendererResolver)
             R-->>SB: MarkdownPreview or PdfPreviewLazy, given the URL and file data
-        else built-in
-            SB->>SB: ImagePreview, VideoPreview or TextPreview, or "not supported"
+        else image, video or text
+            SB->>SB: <img>, <video> or a fetched <pre>; anything else "No preview"
         end
     end
 ```
@@ -154,8 +165,10 @@ showing it. So PDF.js fetches the bytes over CORS and draws the pages itself.
 | Viewer props and entry shape | `web/src/preview/types.ts` | |
 | Markdown viewer | `web/src/preview/MarkdownPreview.tsx` | `web/test/markdownView.test.tsx` |
 | PDF viewer, lazy wrapper | `web/src/preview/PdfPreview.tsx`, `PdfPreviewLazy.tsx` | registry test checks the PDF library isn't loaded up front |
-| Wiring | `web/src/preview/feature.ts`: `filePreview: filePreviewConfig`, `displayText: previewDisplayText` | |
-| Layout | `web/src/styles.css` (`__file-preview`, `.markdown-preview`, `.pdf-preview`, `.pdf-pager`, phone rules) | playground |
+| Viewer popup and info panel (Storage Browser's `FilePreview` slot) | `web/src/preview/FileViewer.tsx`, `fileInfo.ts` (size, name, position) | `web/test/fileViewer.test.tsx` |
+| Viewer or info: which way an opened file shows, the page's files and their downloads | `web/src/driveHost/openFile.ts` (set by `fileList/FileTable.tsx`: name → viewer, ⋮ View info → info) | `fileViewer.test.tsx` |
+| Wiring | `web/src/preview/feature.ts`: `filePreview: filePreviewConfig`, `displayText: previewDisplayText`, `components: { FilePreview: FileViewer }` | |
+| Layout | `web/src/styles.css` (`.viewer*`, `.file-info*`, `__file-preview`, `.markdown-preview`, `.pdf-preview`, `.pdf-pager`, phone rules) | playground |
 | Worker upload | `scripts/deploy.sh` (`.mjs` as `text/javascript`) | |
 | Playground | `web/src/playground/Playground.tsx`, `samples.ts`, `sample.pdf` | |
 
@@ -164,7 +177,7 @@ showing it. So PDF.js fetches the bytes over CORS and draws the pages itself.
 | Option | Value | Notes |
 |---|---|---|
 | `fileTypeResolver` | `resolvePreviewType()` | our types by extension first, then content type; `undefined` lets Storage Browser decide |
-| `rendererResolver` | the entry's `renderer` | `undefined` uses the built-in viewer |
+| `rendererResolver` | the entry's `renderer` | called by `FileViewer`; `undefined` falls back to its image, video or text viewer |
 | `maxFileSize` | `min(entry.maxBytes ?? 50 MB, 50 MB)` | in **bytes**, although the library docs say KB; replaces Storage Browser's defaults (image 200 MB, video 2 GB, text 10 MB, other 200 MB) for every type |
 | `urlOptions` | not set | Storage Browser's default: `expiresIn: 7200`, `validateObjectExistence: true` |
 
@@ -248,9 +261,9 @@ including the PDF.js files.
 
 ### Observability
 
-- **In the panel:** "Something went wrong" with Retry (HEAD or signing failed); the built-in
-  viewers' load errors with Retry; ours: "Couldn't load this file. Try downloading it." (Markdown)
-  and "Couldn't open this PDF. Try downloading it."
+- **In the viewer:** "This file couldn't be loaded" with **Try again** (HEAD or signing failed);
+  "This file couldn't be loaded." for a text file; "Couldn't load this file. Try downloading it."
+  (Markdown) and "Couldn't open this PDF. Try downloading it."
 - **Browser devtools:**
   - `403 AccessDenied` on the presigned URL: no read permission, or the URL expired
     (`Request has expired`);
@@ -295,14 +308,14 @@ curl -sI "https://<cloudfront domain>/<worker key from above>" | grep -i content
 
 ## 7. Limits and failure modes
 
-| Situation | What the panel shows |
+| Situation | What the viewer shows |
 |---|---|
 | File over 50 MB | "File is too big to preview" / "Previews are available for files up to 50 MB. Download the file to open it." + Download |
-| Type with no viewer (`.docx`, `.zip`, …) | "File preview not supported for this file type" + Download |
-| HEAD or signing fails (offline, credentials) | "Something went wrong" + Retry |
-| Image the browser can't decode (HEIC outside Safari, corrupt) | built-in image error + Retry |
-| Video codec not supported | built-in video error + Retry |
-| Text file can't be fetched | built-in text error + Retry; empty file: "File is empty" |
+| Type with no viewer (`.docx`, `.zip`, …) | "No preview for this type of file" + Download |
+| HEAD or signing fails (offline, credentials) | "This file couldn't be loaded" + Try again |
+| Image the browser can't decode (HEIC outside Safari, corrupt) | the browser's broken-image box; Download still works |
+| Video codec not supported | the browser's video error; Download still works |
+| Text file can't be fetched | "This file couldn't be loaded."; an empty file shows an empty sheet |
 | Markdown can't be fetched | "Couldn't load this file. Try downloading it." |
 | PDF corrupt, encrypted or can't be fetched | "Couldn't open this PDF. Try downloading it." |
 | PDF viewer chunk fails to load (offline, old tab after a deploy) | React's lazy-load error; reload the page |
@@ -316,10 +329,14 @@ curl -sI "https://<cloudfront domain>/<worker key from above>" | grep -i content
   - `previewRegistry.test.ts`: Markdown and PDF by extension or content type, built-in types left
     to Storage Browser, the 50 MB limit in bytes for every type, the wording, PDF not loaded up front;
   - `markdownView.test.tsx`: formatting, GitHub tables and checklists, raw HTML never becomes
-    elements, `javascript:` links dropped, images as links.
+    elements, `javascript:` links dropped, images as links;
+  - `fileViewer.test.tsx`: a name opens the viewer, ⋮ View info (files only) the info panel; the
+    viewer's details, position, Previous/Next buttons and keys, Esc, Download (the row's or the
+    URL), too big, no viewer, Try again; the info panel's details and Open.
 - **Playground:** `npm run dev --prefix web`, then `/playground.html` shows the Markdown and PDF
-  viewers and the too-big message with sample files, no AWS needed. `?view=drive` shows the panel
-  in the real layout, but previews there show an error because there is no real S3.
+  viewers and the too-big message with sample files, no AWS needed. `?view=drive` opens files from
+  the mock drive in the real viewer and info panel: `Global/linh/` has a photo, a video over 50 MB,
+  a `.txt`, a `.md`, a PDF and a `.docx`.
 - **Manual:** the preview items in [deployment.md's end-to-end checklist](../deployment.md#end-to-end-test-checklist):
   a photo, a video, a `.txt`, a `.md`, a multi-page PDF, a `.docx` (no preview), a file over 50 MB.
 
@@ -328,4 +345,4 @@ curl -sI "https://<cloudfront domain>/<worker key from above>" | grep -i content
 - [ADR 0002](../adr/0002-storage-browser-without-amplify-backend.md): Storage Browser, extended around its built-in parts.
 - [ADR 0013](../adr/0013-files-in-intelligent-tiering-without-archive-tiers.md): no archive tiers, so previews always work.
 - [ADR 0001](../adr/0001-no-backend-browser-talks-to-s3.md): no backend, so viewers run in the browser against presigned URLs.
-- Tickets: #32 (this doc). Preview has no ADR of its own; its rules live in `registry.ts` and this doc.
+- Tickets: #32 (this doc). The viewer popup and View info replaced the preview panel (owner's request, November 2026). Preview has no ADR of its own; its rules live in `registry.ts` and this doc.

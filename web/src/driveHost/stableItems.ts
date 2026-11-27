@@ -13,6 +13,11 @@ export function useStableItems<T extends { data: unknown }>(tasks: readonly T[])
   const items = tasks.map((t) => t.data);
   // Both: Copy's tasks keep their id but change key when the destination changes.
   const key = items.map((d) => `${(d as { id?: string }).id ?? ""}|${(d as { key?: string }).key ?? ""}`).join("\n");
+  // Reading and writing the ref while rendering is the point: the array must
+  // keep its identity across renders without a re-render to store it, or
+  // useAction resets and loops (see above). Allowed on purpose (#84).
+  // oxlint-disable-next-line react/refs
   if (key !== ref.current.key) ref.current = { key, items };
+  // oxlint-disable-next-line react/refs
   return ref.current.items;
 }

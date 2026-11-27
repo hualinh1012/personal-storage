@@ -7,7 +7,7 @@
     "test": "vitest run",
     "build": "esbuild src/preSignUp.ts src/preTokenGeneration.ts --bundle --platform=node --target=node22 --format=cjs --outdir=dist",
     "typecheck": "tsc -p .",
-    "lint": "oxlint"
+    "lint": "oxlint --deny-warnings"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.164",

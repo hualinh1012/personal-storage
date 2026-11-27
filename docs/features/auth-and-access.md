@@ -10,8 +10,11 @@ allowlist or access levels.
 
 ## 1. Purpose and user-facing behaviour
 
-- The landing page has one button, **Sign in with Google**. There is no username/password and
-  no self sign-up form.
+- The landing page (`web/src/pages/Landing.tsx`, #70) says in plain words what Family Drive is,
+  that only invited people can sign in ("ask the person who runs it": no name or contact, since the
+  page is public), and links to the source on GitHub (new tab, `rel="noopener noreferrer"`; a plain
+  link, so the CSP needs no new host). It has one button, **Sign in with Google**. There is no
+  username/password, no self sign-up and no request-access form.
 - Only Google accounts whose email is on the **allowlist** get in. Anyone else comes back to
   "You don't have access to this drive." with a **Sign out** button. Both pages are one card
   with the app's icon (`web/src/pages/AuthCard.tsx`); the playground shows them at

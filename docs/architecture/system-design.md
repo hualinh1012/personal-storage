@@ -281,6 +281,7 @@ signed in with OIDC as a `family-drive-gh-*` role that may only start and watch 
 | `ci.yml` (no AWS access) | every pull request; called by `deploy.yml` | lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
 | `deploy.yml` | push to `main` (except docs-only), or by hand (target, optional older commit of `main`) | `ci.yml` on the commit → if `infra/foundation/**` changed: approve `foundation`, run the foundation pipeline → approve `app`, run the deploy pipeline |
 | `destroy.yml` | by hand, with the typed confirmation `destroy-family-drive` | approve `destroy`, run the destroy pipeline |
+| Dependency updates (Dependabot) | weekly, Monday 09:00 Singapore | `.github/dependabot.yml`: one PR for the pinned actions, and per package (`web`, `functions/allowlist`) one grouped minor/patch PR plus one per major (`@aws-amplify/ui-react-storage` always alone: it needs the manual re-check in `web/CLAUDE.md`). Each is checked by `ci.yml`; merging one deploys like any merge, after approval in `deploy.yml` |
 
 `deploy.yml` and `destroy.yml` share the concurrency group `aws-app`: one AWS change at a time.
 

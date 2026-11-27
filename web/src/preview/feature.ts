@@ -1,9 +1,14 @@
 import type { DriveFeature } from "../driveHost/feature";
+import { FileViewer } from "./FileViewer";
 import { filePreviewConfig, previewDisplayText } from "./registry";
 
-/** File preview beside the list: our extra viewers (registry.ts) and the "too big" wording. */
+/**
+ * Opening a file: the viewer popup and the View info panel (FileViewer), our
+ * extra viewers (registry.ts) and the "too big" wording.
+ */
 export const previewFeature: DriveFeature = {
   name: "preview",
   filePreview: filePreviewConfig,
   displayText: previewDisplayText,
+  components: { FilePreview: FileViewer },
 };
