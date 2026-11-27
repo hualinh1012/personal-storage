@@ -18,7 +18,7 @@ fi
 PIPELINE="$1"
 SHA="$2"
 REGION="${AWS_REGION:-ap-southeast-1}"
-SOURCE_ACTION="${SOURCE_ACTION:-Source}" # the pipeline's source action name
+SOURCE_ACTION="${SOURCE_ACTION:-CodeConnections}" # the pipeline's source action name
 POLL_SECONDS="${POLL_SECONDS:-20}"
 MAX_WAIT_SECONDS="${MAX_WAIT_SECONDS:-3000}"
 
