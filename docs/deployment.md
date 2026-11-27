@@ -53,6 +53,7 @@ Set up by following the [setup guide](guides/setup-from-scratch.md). Values spec
 | GitHub repository variables | `AWS_ACCOUNT_ID`, `FOUNDATION_PIPELINE`, `DEPLOY_PIPELINE`, `DESTROY_PIPELINE` (the pipelines' names in the console); optional `SOURCE_ACTION` (the pipelines' source action name, default `CodeConnections`) |
 | Cognito domain | `family-drive-084519186805.auth.ap-southeast-1.amazoncognito.com` |
 | Files bucket | `family-drive-files-084519186805` |
+| Custom domain | `drive.linhwas.dev` (zone `Z04788981R8G05XYQJRR6`, certificate in us-east-1), set as the defaults in `infra/foundation/main.tf`: a value set only in SSM is reset on the next foundation run |
 
 **Required controls on production** (#52, #92). These are what stops an unreviewed change reaching AWS.
 Keep them in place:

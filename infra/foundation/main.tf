@@ -50,25 +50,27 @@ variable "deleted_retention_days" {
   }
 }
 
-# Custom domain for the app (ADR 0014). Empty (the default) keeps the app at
-# its *.cloudfront.net address; set all three to switch. Written to SSM below
-# (ssm.tf) for the app stack, which checks them before planning.
+# Custom domain for the app (ADR 0014). Empty keeps the app at its
+# *.cloudfront.net address; set all three to switch. Written to SSM below
+# (ssm.tf) for the app stack, which checks them before planning. These defaults
+# are the source of truth: every foundation run writes them to SSM, so a value
+# set only in SSM is reset to CHANGE_ME on the next run.
 variable "custom_domain" {
   description = "Host name the app is served at, e.g. drive.example.com. Empty: no custom domain."
   type        = string
-  default     = ""
+  default     = "drive.linhwas.dev"
 }
 
 variable "certificate_arn" {
   description = "Issued ACM certificate in us-east-1 (CloudFront's region) covering custom_domain."
   type        = string
-  default     = ""
+  default     = "arn:aws:acm:us-east-1:084519186805:certificate/6834d47f-6904-47dd-9778-5434f92628aa"
 }
 
 variable "hosted_zone_id" {
   description = "Route 53 hosted zone in this account that holds custom_domain."
   type        = string
-  default     = ""
+  default     = "Z04788981R8G05XYQJRR6"
 }
 
 provider "aws" {
