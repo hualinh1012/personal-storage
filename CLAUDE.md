@@ -105,9 +105,14 @@ type-check, test and build both packages, Terraform `fmt -check` and offline `va
 (`.github/dependabot.yml`) opens weekly update PRs for the pinned actions and both packages; the
 same checks run on each.
 
-**CI/CD** (AWS CodePipeline): `ci/pipeline.sh` tests, builds, applies `infra/` and runs
-`scripts/deploy.sh`; `ci/destroy-app.sh` (manual pipeline) destroys the app stack only; the
-foundation pipeline runs `bootstrap.sh`. **A new AWS resource type adds its actions to the
+**CI/CD:** GitHub Actions decides when, CodePipeline deploys
+([ADR 0017](docs/adr/0017-github-actions-starts-codepipeline-with-oidc.md)). `deploy.yml` runs `ci.yml`,
+then, after approval in a GitHub Environment, starts the foundation pipeline (`bootstrap.sh`, only if
+`infra/foundation/**` changed) and then the deploy pipeline (`ci/pipeline.sh`: tests, builds, applies
+`infra/`, runs `scripts/deploy.sh`). `destroy.yml` (manual) starts the destroy pipeline
+(`ci/destroy-app.sh`, app stack only). GitHub signs in with OIDC as `family-drive-gh-*` roles that can only
+start their own pipeline: **never put an AWS key in GitHub, never give a pipeline a push trigger, an
+approval stage or a destroy stage in deploy.** **A new AWS resource type adds its actions to the
 matching `ci/iam/*-policy.json`**, or the pipeline fails with AccessDenied.
 
 ## Before you change…

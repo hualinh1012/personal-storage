@@ -214,7 +214,7 @@ flowchart LR
             CW["CloudWatch Logs"]
         end
     end
-    GH["GitHub repo"] --> CP
+    GH["GitHub Actions: checks + environment approval"] -->|"OIDC: start pipeline"| CP
     GC["Google Cloud: OAuth client, Drive API, Picker API"]
 ```
 
@@ -228,10 +228,11 @@ flowchart LR
 | `react-pdf` (PDF.js), `react-markdown` + `remark-gfm` | Preview | lazy PDF |
 | Lambda `nodejs22.x` | Triggers | esbuild bundles |
 | Terraform ≥ 1.10, AWS provider ~> 6.0 | Both stacks | S3 backend with lockfile |
-| CodePipeline V2, Commands action | Deploy | Terraform 1.16.6 installed per run |
+| CodePipeline V2, Commands action | Deploy | Terraform 1.16.6 installed per run; started only by GitHub Actions (ADR 0017) |
+| GitHub Actions + Environments, OIDC | Checks, deciding when to deploy, approvals | `ci.yml`, `deploy.yml`, `destroy.yml` |
 | Google Identity Services, Picker, Drive API v3 | Sign-in, import | `drive.readonly` |
 
-**Baseline = target**, except: `main` isn't protected and pipelines aren't gated yet (#52).
+**Baseline = target.** `main` is protected and every pipeline run is gated by an approval in a GitHub Environment (#52, #92).
 
 ## 7. Security architecture
 
@@ -245,7 +246,7 @@ flowchart TB
     Member -->|"ID token"| IdPool["Identity Pool: claims to session tags"]
     IdPool --> Role["IAM role policy: prefix + tag conditions"]
     Member -->|"SigV4"| Role --> Files[("Files bucket: TLS-only, private, versioned")]
-    Repo["GitHub main"] -->|"push deploys"| Pipelines["Pipeline roles"] --> AWSRes["All app and foundation resources"]
+    Repo["GitHub main"] -->|"checks, approval, OIDC start"| Pipelines["Pipeline roles"] --> AWSRes["All app and foundation resources"]
 ```
 
 | Layer | Control | Where |
@@ -305,7 +306,7 @@ exploitable by an outsider; the widest boundary is the pipelines.
 
 | Risk | Impact | Mitigation | Status |
 |---|---|---|---|
-| A push to `main` (or a compromised GitHub account) changes AWS | Account takeover, data loss | Branch protection, pipeline approval, permissions boundary | #52 open; boundary in place (#53) |
+| A push to `main` (or a compromised GitHub account) changes AWS | Account takeover, data loss | Branch protection, approval in a GitHub Environment for every pipeline run, OIDC trigger roles that can only start a pipeline, permissions boundary | Gated (#52, #92); boundary in place (#53) |
 | Files lost with no second copy | Family photos gone | Versioning (30 days), `Deleted/`, `prevent_destroy` | Accepted (#54) |
 | Unnoticed misuse or cost spike | Late discovery | Manual checks; incident steps in the security assessment | Accepted (#56) |
 | XSS steals the 30-day refresh token | Ongoing access to files | Careful viewers; CSP | #55: shipped report-only, enforce after checking |

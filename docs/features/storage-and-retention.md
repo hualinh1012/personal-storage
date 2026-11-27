@@ -152,10 +152,10 @@ sequenceDiagram
     participant AP as App pipeline
 
     Dev->>GH: edit infra/foundation/files.tf or deleted_retention_days, merge
-    GH->>FP: push touching infra/foundation/**
+    GH->>FP: deploy.yml, after approval (push touched infra/foundation/**)
     FP->>S3: PutBucketLifecycleConfiguration (whole rule set replaced)
     FP->>SSM: PutParameter /family-drive/deleted_retention_days
-    Dev->>AP: Release change (so config.json carries the new number)
+    GH->>AP: deploy.yml, after the foundation and approval (config.json carries the new number)
     AP->>AP: write-config.sh: deletedRetentionDays
     Note over S3: S3 applies the new rules on its next lifecycle runs, to existing objects too
 ```

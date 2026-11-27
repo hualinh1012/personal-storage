@@ -1,0 +1,60 @@
+# Destroys the app stack (infra/) only, by starting the destroy CodePipeline
+# (ci/destroy-app.sh). The foundation (files, settings, state) is never touched.
+# Manual only: type the confirmation, then approve in the "destroy" GitHub Environment.
+# Bring the app back with Deploy → Run workflow (target: app). ADR 0017.
+name: Destroy app
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type destroy-family-drive to take the app down
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# Shared with deploy.yml: never destroy while a deploy runs, or the other way round.
+concurrency:
+  group: aws-app
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  confirm:
+    name: Check the confirmation
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != destroy-family-drive ]; then
+            echo "::error::Confirmation doesn't match: type destroy-family-drive to destroy the app."
+            exit 1
+          fi
+
+  destroy:
+    name: Destroy the app stack
+    needs: confirm
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: destroy
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/family-drive-gh-destroy
+          role-session-name: gh-destroy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+      - env:
+          PIPELINE: ${{ vars.DESTROY_PIPELINE || 'family-drive-destroy' }}
+        run: bash ci/start-pipeline.sh "$PIPELINE" "$GITHUB_SHA"
