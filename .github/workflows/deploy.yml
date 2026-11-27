@@ -5,7 +5,7 @@
 #
 # Push to main: foundation runs only if infra/foundation/** changed, always before app.
 # Run workflow (manual): pick a target, and optionally an older commit of main to roll back to.
-name: Deploy
+name: Deploy app
 
 on:
   push:
@@ -18,8 +18,8 @@ on:
       target:
         description: What to deploy
         type: choice
-        options: [app, foundation-then-app, foundation]
-        default: app
+        options: [application, foundation-then-application, foundation]
+        default: application
       ref:
         description: Commit of main to deploy (empty = the latest)
         type: string
@@ -76,9 +76,9 @@ jobs:
             fi
           else
             case "$TARGET" in
-              app) foundation=false app=true ;;
+              application) foundation=false app=true ;;
               foundation) foundation=true app=false ;;
-              foundation-then-app) foundation=true app=true ;;
+              foundation-then-application) foundation=true app=true ;;
               *) echo "::error::unknown target ${TARGET}"; exit 1 ;;
             esac
           fi

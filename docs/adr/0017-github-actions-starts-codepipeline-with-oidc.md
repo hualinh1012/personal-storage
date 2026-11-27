@@ -23,9 +23,12 @@ Now **GitHub Actions decides when, and CodePipeline still does the deploying** (
   (single maintainer), and each environment accepts only `main`.
 - **No AWS key in GitHub.** Jobs sign in with GitHub's OIDC token. `ci/iam/github-trigger-roles.sh`
   creates three roles: `family-drive-gh-foundation`, `-deploy` and `-destroy`. Each trusts only
-  `repo:hualinh1012/personal-storage:environment:<its environment>` and may only start and watch its own
-  pipeline. A job that uses an environment presents `…:environment:<name>` as its OIDC subject, not the
-  branch, so the trust names the environment.
+  `repo:hualinh1012@25895272/personal-storage@1445087687:environment:<its environment>` and may only start
+  and watch its own pipeline. A job that uses an environment presents `…:environment:<name>` as its OIDC
+  subject, not the branch, so the trust names the environment. The repository uses GitHub's **immutable
+  subjects**: the owner and repository are named by ID as well, so a renamed, deleted or re-created
+  repository with the same name can't match. The script asks GitHub for that prefix
+  (`actions/oidc/customization/sub`) rather than building it from the name.
 - `deploy.yml` and `destroy.yml` share the concurrency group `aws-app`: one AWS change at a time, and a
   running one is never cancelled.
 

@@ -14,6 +14,9 @@
 # names as GitHub repository variables, see docs/guides/setup-from-scratch.md):
 #
 #   FOUNDATION_PIPELINE=<name> DEPLOY_PIPELINE=<name> DESTROY_PIPELINE=<name> bash ci/iam/github-trigger-roles.sh
+#
+# It asks gh for the OIDC subject prefix the roles must trust. Without gh, pass it as
+# SUB_PREFIX (gh api repos/<owner>/<name>/actions/oidc/customization/sub --jq .sub_claim_prefix).
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -35,7 +38,7 @@ ROLES=(
 )
 
 render() { # <file> <environment> <pipeline>
-  sed -e "s|__ACCOUNT_ID__|${ACCOUNT_ID}|g" -e "s|__REGION__|${REGION}|g" -e "s|__REPO__|${REPO}|g" \
+  sed -e "s|__ACCOUNT_ID__|${ACCOUNT_ID}|g" -e "s|__REGION__|${REGION}|g" -e "s|__SUB_PREFIX__|${SUB_PREFIX}|g" \
     -e "s|__ENVIRONMENT__|$2|g" -e "s|__PIPELINE__|$3|g" "$1"
 }
 
@@ -55,7 +58,29 @@ provider_exists() {
   exit 1
 }
 
+# The start of the OIDC subject GitHub sends, before ":environment:<name>". With GitHub's
+# immutable subjects (this repository) it names the owner and repo by ID too, e.g.
+# repo:owner@123/name@456, so a renamed or re-created repository can't match. Asked from
+# GitHub, since guessing it from the name breaks when immutable subjects are on.
+if [ -z "${SUB_PREFIX:-}" ]; then
+  if command -v gh >/dev/null 2>&1 \
+    && SUB_PREFIX="$(gh api "repos/${REPO}/actions/oidc/customization/sub" --jq .sub_claim_prefix 2>/dev/null | tr -d '\r')" \
+    && [ -n "$SUB_PREFIX" ] && [ "$SUB_PREFIX" != null ]; then
+    :
+  else
+    echo "Can't ask GitHub for the OIDC subject prefix (gh missing or not signed in)." >&2
+    echo "Get it with: gh api repos/${REPO}/actions/oidc/customization/sub --jq .sub_claim_prefix" >&2
+    echo "then re-run with SUB_PREFIX='<that value>'." >&2
+    exit 1
+  fi
+fi
+case "$SUB_PREFIX" in
+  repo:*) ;;
+  *) echo "Unexpected OIDC subject prefix '${SUB_PREFIX}' (a custom subject template?): expected repo:…" >&2; exit 1 ;;
+esac
+
 echo "Account ${ACCOUNT_ID}, repository ${REPO}"
+echo "OIDC subject: ${SUB_PREFIX}:environment:<foundation|app|destroy>"
 
 if provider_exists; then
   echo "OIDC provider exists: ${PROVIDER_ARN}"

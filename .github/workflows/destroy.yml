@@ -1,7 +1,7 @@
 # Destroys the app stack (infra/) only, by starting the destroy CodePipeline
 # (ci/destroy-app.sh). The foundation (files, settings, state) is never touched.
 # Manual only: type the confirmation, then approve in the "destroy" GitHub Environment.
-# Bring the app back with Deploy → Run workflow (target: app). ADR 0017.
+# Bring the app back with Deploy app → Run workflow (target: application). ADR 0017.
 name: Destroy app
 
 on:
