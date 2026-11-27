@@ -270,12 +270,25 @@ the alias records follow the new distribution, so the app's address stays the sa
 
 ### Pipelines
 
-| Pipeline | Trigger | Runs |
+GitHub Actions decides **when**; CodePipeline does **the deploying**
+([ADR 0017](../adr/0017-github-actions-starts-codepipeline-with-oidc.md)). No CodePipeline starts on a
+push or has an approval stage. The workflows start them at an exact commit through `ci/start-pipeline.sh`,
+signed in with OIDC as a `family-drive-gh-*` role that may only start and watch its own pipeline
+(`ci/iam/github-trigger-roles.sh`). Approvals are GitHub Environments, with the owner as the only reviewer.
+
+| Workflow (GitHub Actions) | Trigger | Does |
 |---|---|---|
-| Foundation | push to `main` touching `infra/foundation/**` | `terraform fmt -check`, `bootstrap.sh`: init (or first-run local state then migrate), import existing parameters, buckets and the boundary policy, apply |
-| App deploy | push to `main` excluding `infra/foundation/**` | `ci/pipeline.sh` (below) |
-| App destroy | manual, after an approval | `ci/destroy-app.sh`: build Lambdas, init, `terraform destroy` of `infra/` only |
-| Pull-request checks (GitHub Actions, no AWS access) | every pull request and push to `main` | `.github/workflows/ci.yml`: lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
+| `ci.yml` (no AWS access) | every pull request; called by `deploy.yml` | lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
+| `deploy.yml` | push to `main` (except docs-only), or by hand (target, optional older commit of `main`) | `ci.yml` on the commit → if `infra/foundation/**` changed: approve `foundation`, run the foundation pipeline → approve `app`, run the deploy pipeline |
+| `destroy.yml` | by hand, with the typed confirmation `destroy-family-drive` | approve `destroy`, run the destroy pipeline |
+
+`deploy.yml` and `destroy.yml` share the concurrency group `aws-app`: one AWS change at a time.
+
+| CodePipeline (V2, `QUEUED`) | Started by | Runs |
+|---|---|---|
+| Foundation | `deploy.yml`, job `foundation` | `terraform fmt -check`, `bootstrap.sh`: init (or first-run local state then migrate), import existing parameters, buckets and the boundary policy, apply |
+| Deploy | `deploy.yml`, job `app` | `ci/pipeline.sh` (below) |
+| Destroy | `destroy.yml` | `ci/destroy-app.sh`: build Lambdas, init, `terraform destroy` of `infra/` only |
 
 `ci/pipeline.sh`, in order:
 1. `ci/app-env.sh`: check Terraform and Node ≥ 22.12; `npm ci`, test and build the Lambdas (Terraform zips `dist/*.js`).

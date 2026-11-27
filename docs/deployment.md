@@ -16,11 +16,19 @@ There are two Terraform stacks and three pipelines.
 | **Foundation** | `infra/foundation/` | Terraform state bucket, files bucket (the family's files), SSM parameters | **Retained.** Every resource has `prevent_destroy`. |
 | **App** | `infra/` | Cognito + Google sign-in, allowlist Lambdas, Identity Pool, CloudFront, web bucket, files bucket CORS rule | **Disposable.** Can be destroyed and recreated. |
 
-| Pipeline | Runs | Trigger |
+| Pipeline | Runs | Started by (GitHub Actions) |
 |---|---|---|
-| Foundation | `infra/foundation/bootstrap.sh` | Push to `main` touching `infra/foundation/**` |
-| App deploy | `ci/pipeline.sh` | Push to `main`, excluding `infra/foundation/**` |
-| App destroy (optional) | `ci/destroy-app.sh` | Manual only, after an approval |
+| Foundation | `infra/foundation/bootstrap.sh` | `deploy.yml`, when a push to `main` changes `infra/foundation/**`, after approval in the `foundation` environment |
+| App deploy | `ci/pipeline.sh` | `deploy.yml`, on every push to `main` except docs-only ones, after approval in `app` (and after the foundation, if it ran) |
+| App destroy | `ci/destroy-app.sh` | `destroy.yml`, by hand only: typed confirmation, then approval in `destroy` |
+
+No pipeline starts on a push by itself or has an approval stage: GitHub Actions starts them at the
+commit its checks passed, signed in with OIDC ([ADR 0017](adr/0017-github-actions-starts-codepipeline-with-oidc.md)).
+Approve a waiting run under **Actions → the run → Review deployments**.
+
+**"Run the app pipeline"** (used throughout this page) means **Actions → Deploy → Run workflow**, target
+`app`, then approve. **"Run the foundation pipeline"** is the same with target `foundation`;
+`foundation-then-app` runs both in order. To roll back, give an older commit of `main` as `ref`.
 
 Both stacks keep their state in `s3://family-drive-tfstate-084519186805`:
 - the foundation at `foundation/terraform.tfstate`;
@@ -36,24 +44,29 @@ Set up by following the [setup guide](guides/setup-from-scratch.md). Values spec
 |---|---|
 | Foundation pipeline role | `CodePipelineStarterTemplate-Terraf-CodePipelineRole-lvPDiLLs7PoE` |
 | App pipeline role | `CodePipelineStarterTemplate-Terraf-CodePipelineRole-Rlc9BkIMwwfd` |
+| GitHub trigger roles | `family-drive-gh-foundation`, `family-drive-gh-deploy`, `family-drive-gh-destroy` (`ci/iam/github-trigger-roles.sh`) |
+| GitHub repository variables | `AWS_ACCOUNT_ID`, `FOUNDATION_PIPELINE`, `DEPLOY_PIPELINE`, `DESTROY_PIPELINE` (the pipelines' names in the console) |
 | Cognito domain | `family-drive-084519186805.auth.ap-southeast-1.amazoncognito.com` |
 | Files bucket | `family-drive-files-084519186805` |
 
-**Required controls on production** (#52). Every push to `main` deploys, so these are what stops an
-unreviewed change reaching AWS. Keep them in place:
+**Required controls on production** (#52, #92). These are what stops an unreviewed change reaching AWS.
+Keep them in place:
 
 | Control | Setting |
 |---|---|
 | `main` ruleset | Pull request required (0 approvals: single maintainer), force pushes and deletion blocked |
-| Foundation pipeline | Manual approval stage before `bootstrap.sh` runs |
-| Destroy | Only in the separate manual destroy pipeline, which has its own approval; never a stage of the deploy pipeline |
+| GitHub Environments `foundation`, `app`, `destroy` | Required reviewer: the owner only ("Prevent self-review" off); deployment branches: `main` only |
+| Trigger roles | OIDC only, no AWS key in GitHub. Each role trusts one environment and can start only its own pipeline |
+| CodePipelines | No push trigger, no approval stage, execution mode `QUEUED` |
+| Destroy | Only in the separate destroy pipeline, started by `destroy.yml`; never a stage of the deploy pipeline |
+| Fork pull requests | Settings → Actions → General: approval required for workflows from outside contributors. `ci.yml` has no AWS access either way |
 | AWS Connector GitHub App | Installed for **all** repositories (owner's choice: the connection is used elsewhere). Scoping it to this repository would be stricter. |
 
 ## Day-to-day
 
 **Add or remove a family member:**
 1. Edit `/family-drive/allowed_emails` in SSM.
-2. Re-run the app pipeline (**Release change**).
+2. Re-run the app pipeline (**Actions → Deploy → Run workflow**, then approve).
 3. While the OAuth consent screen is in **Testing** (always, once Google Drive import is set up), also add or
    remove them under **Google Auth Platform → Audience → Test users**. Google blocks sign-in for anyone not listed.
 
@@ -65,16 +78,16 @@ When adding someone, also give them an entry in `/family-drive/access` if they n
 
 **Recover a deleted file:** Delete in the app moves files to the **Deleted** folder. Someone with `trash` opens Home → `Deleted/`, selects the file and uses **Restore** in the ⋮ menu. Files there stay until someone deletes them permanently or empties Deleted, or for **30 days**, after which S3 removes them with every version (ADR 0012).
 
-**Change how long Deleted keeps files:** edit `deleted_retention_days` in `infra/foundation/main.tf` and push. Once the foundation pipeline has run, run the app pipeline so the note in `Deleted/` shows the new number. A shorter value also applies to files already there.
+**Change how long Deleted keeps files:** edit `deleted_retention_days` in `infra/foundation/main.tf` and push. Approve the foundation, then the app: the app runs after the foundation, so the note in `Deleted/` shows the new number. A shorter value also applies to files already there.
 
 **Use a custom domain** ([ADR 0014](adr/0014-custom-domain-as-foundation-variables.md)). Do these steps in order:
 1. Issue an ACM certificate in **us-east-1** (CloudFront's region) that covers the domain, for example `drive.example.com`. Validate it with DNS in Route 53. Its status must be **Issued**.
-2. In `infra/foundation/main.tf`, set the defaults of `custom_domain` (e.g. `drive.example.com`), `certificate_arn` (`arn:aws:acm:us-east-1:<account>:certificate/<id>`) and `hosted_zone_id` (from **Route 53 → Hosted zones**, the zone holding the name). Commit and merge: the foundation pipeline writes them to SSM.
-3. Once the foundation pipeline has finished, run the app pipeline (again, if it ran alongside). It adds the domain to CloudFront, creates the `A`/`AAAA` alias records, and moves Cognito, CORS and `config.json` to `https://<domain>`. CloudFront takes 5–15 minutes to deploy. From then on, sign-in works only at the new address.
+2. In `infra/foundation/main.tf`, set the defaults of `custom_domain` (e.g. `drive.example.com`), `certificate_arn` (`arn:aws:acm:us-east-1:<account>:certificate/<id>`) and `hosted_zone_id` (from **Route 53 → Hosted zones**, the zone holding the name). Commit and merge, then approve the foundation: it writes them to SSM.
+3. Approve the app, which starts once the foundation has finished. It adds the domain to CloudFront, creates the `A`/`AAAA` alias records, and moves Cognito, CORS and `config.json` to `https://<domain>`. CloudFront takes 5–15 minutes to deploy. From then on, sign-in works only at the new address.
 4. Google: add `https://<domain>` to the OAuth client's **Authorized JavaScript origins**, and `https://<domain>/*` to the API key's website restriction. Remove the old `https://<id>.cloudfront.net` entries.
 5. Share the new address. Anyone with the app on their home screen re-adds it once from the new address.
 
-To go back to the CloudFront address, set all three variables back to `""` and run both pipelines the same way. A partial set stops the app plan.
+To go back to the CloudFront address, set all three variables back to `""` and merge the same way. A partial set stops the app plan.
 
 **Recover an overwritten file, or one deleted outside the app (within 30 days):**
 ```bash
@@ -108,9 +121,15 @@ console open (desktop Chrome, and once on a phone), on the deployed site. Messag
 in `infra/web.tf`; when a full run shows none, set `csp_enforce` to `true` in `infra/variables.tf` and
 push. If something breaks after that, set it back to `false` and push.
 
-**Change the foundation:** edit `infra/foundation/` and push. The foundation pipeline picks it up.
+**Change the foundation:** edit `infra/foundation/` and push. `deploy.yml` asks to approve the foundation, then the app.
 
-**When a policy in `ci/iam/` changes:** re-run its `aws iam put-role-policy` command ([setup steps 4.2 and 7.2](guides/setup-from-scratch.md#42-give-the-pipeline-its-permissions)) **before** pushing the change that needs it. The pipelines don't update their own roles.
+**Take the app down:** **Actions → Destroy app → Run workflow**, type `destroy-family-drive`, then approve.
+The files, settings and state stay. Bring it back by running the app pipeline.
+
+**When a pipeline is renamed or recreated:** set its name in the matching GitHub repository variable, and
+re-run `ci/iam/github-trigger-roles.sh` with the same name (see the script's header).
+
+**When a policy in `ci/iam/` changes:** re-run its command **before** pushing the change that needs it: `aws iam put-role-policy` or `attach-app-policies.sh` for the pipeline roles ([setup steps 4.2 and 7.2](guides/setup-from-scratch.md#42-give-the-pipeline-its-permissions)), `github-trigger-roles.sh` for the GitHub trigger roles. Nothing updates its own role.
 
 ## Troubleshooting
 
@@ -128,6 +147,13 @@ push. If something breaks after that, set it back to `false` and push.
 | Delete fails with "Couldn't move it to Deleted (AccessDenied…)" | The app stack wasn't re-applied after this change (no `Deleted/` statements or `trash` tag mapping) | Re-run the app pipeline. |
 | Restore says the file "was in <email>'s personal folder, which only they can write to" | Trash managers can't write into other people's personal folders | Give that person `trash` for a moment, or move it back in the console (strip ` (deleted …)` from the name). |
 | Stage fails but the action "Didn't run" | The action couldn't start: missing log or artifact permissions, or wrong input artifact | Check the stage error. The `CommandsActionLogs` and `PipelineArtifacts` statements cover the usual cases. |
+| Deploy job fails at "Configure AWS credentials": `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The role's trust doesn't match: the environment name differs, the job has no `environment`, the repository was renamed or transferred, or the role doesn't exist yet | Check the environment names (`foundation`, `app`, `destroy`) and re-run `bash ci/iam/github-trigger-roles.sh` (`REPO=owner/name` if the repository moved). |
+| Deploy job fails at "Configure AWS credentials": role ARN `arn:aws:iam:::role/…` | The repository variable `AWS_ACCOUNT_ID` isn't set | Set it under **Settings → Secrets and variables → Actions → Variables**. |
+| `AccessDenied … codepipeline:StartPipelineExecution` | The pipeline's name differs from the one the role was made for | Set `FOUNDATION_PIPELINE` / `DEPLOY_PIPELINE` / `DESTROY_PIPELINE` to the console names and re-run `github-trigger-roles.sh` with the same names. |
+| `start-pipeline-execution`: `InvalidParameter`/`ActionNotFound` for the source revision | The pipeline's source action isn't named `Source` | Rename the action to `Source` in the console, or add `SOURCE_ACTION: <name>` to the env of the `start-pipeline.sh` steps in the workflows. |
+| Deploy run waits forever at "Waiting for review" | Nobody approved the environment | **Actions → the run → Review deployments → Approve**. A newer push waits behind it (concurrency group `aws-app`): approve or reject the older run first. |
+| A push to `main` deployed nothing | It changed only `docs/**` or Markdown files (`paths-ignore`), or its checks failed | Run the app pipeline by hand if needed. |
+| The pipeline started on a push by itself, as well as from GitHub | Its push trigger is still on | Remove the trigger in the pipeline's settings (setup guide step 4.1 / 7.1). |
 | `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the app policies (`bash ci/iam/attach-app-policies.sh <app-pipeline-role>`). |
 | AccessDenied opening your own personal folder | The Identity Pool's principal tag mapping is missing (stack not re-applied), or the account's email has capitals in its claim | Re-run the app pipeline; check the `email` claim in the ID token is lower case (ADR 0009). |
 | `iam:PassRole on … family-drive-authenticated` | Older policy limited PassRole with `iam:PassedToService`, which Cognito Identity doesn't send | Re-attach the app policies (`bash ci/iam/attach-app-policies.sh <app-pipeline-role>`). |
