@@ -50,7 +50,7 @@ Set up by following the [setup guide](guides/setup-from-scratch.md). Values spec
 | Foundation pipeline role | `CodePipelineStarterTemplate-Terraf-CodePipelineRole-lvPDiLLs7PoE` |
 | App pipeline role | `CodePipelineStarterTemplate-Terraf-CodePipelineRole-Rlc9BkIMwwfd` |
 | GitHub trigger roles | `family-drive-gh-foundation`, `family-drive-gh-deploy`, `family-drive-gh-destroy` (`ci/iam/github-trigger-roles.sh`) |
-| GitHub repository variables | `AWS_ACCOUNT_ID`, `FOUNDATION_PIPELINE`, `DEPLOY_PIPELINE`, `DESTROY_PIPELINE` (the pipelines' names in the console) |
+| GitHub repository variables | `AWS_ACCOUNT_ID`, `FOUNDATION_PIPELINE`, `DEPLOY_PIPELINE`, `DESTROY_PIPELINE` (the pipelines' names in the console); optional `SOURCE_ACTION` (the pipelines' source action name, default `CodeConnections`) |
 | Cognito domain | `family-drive-084519186805.auth.ap-southeast-1.amazoncognito.com` |
 | Files bucket | `family-drive-files-084519186805` |
 
@@ -156,7 +156,7 @@ re-run `ci/iam/github-trigger-roles.sh` with the same name (see the script's hea
 | Deploy job fails at "Configure AWS credentials": `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The role's trust doesn't match the token's subject: trust written as `repo:owner/name:…` while the repository sends immutable subjects (`repo:owner@id/name@id:…`), the environment name differs, the repository was renamed or transferred, or the role doesn't exist yet | Re-run `bash ci/iam/github-trigger-roles.sh` with `gh` signed in: it reads the subject prefix from GitHub (`REPO=owner/name` if the repository moved). Check the environment names (`foundation`, `app`, `destroy`). |
 | Deploy job fails at "Configure AWS credentials": role ARN `arn:aws:iam:::role/…` | The repository variable `AWS_ACCOUNT_ID` isn't set | Set it under **Settings → Secrets and variables → Actions → Variables**. |
 | `AccessDenied … codepipeline:StartPipelineExecution` | The pipeline's name differs from the one the role was made for | Set `FOUNDATION_PIPELINE` / `DEPLOY_PIPELINE` / `DESTROY_PIPELINE` to the console names and re-run `github-trigger-roles.sh` with the same names. |
-| `start-pipeline-execution`: `InvalidParameter`/`ActionNotFound` for the source revision | The pipeline's source action isn't named `Source` | Rename the action to `Source` in the console, or add `SOURCE_ACTION: <name>` to the env of the `start-pipeline.sh` steps in the workflows. |
+| `start-pipeline-execution`: `ValidationException` … `The action name provided in the source revision is not valid` | The pipeline's source action isn't named `CodeConnections` (the console's default) | Set the repository variable `SOURCE_ACTION` to the source action's name (the box in the pipeline's first stage), or rename the action to `CodeConnections`. All three pipelines must use the same name. |
 | Deploy app run waits forever at "Waiting for review" | Nobody approved the environment | **Actions → the run → Review deployments → Approve**. A newer push waits behind it (concurrency group `aws-app`): approve or reject the older run first. |
 | A push to `main` deployed nothing | It changed only `docs/**` or Markdown files (`paths-ignore`), or its checks failed | Run the app pipeline by hand if needed. |
 | The pipeline started on a push by itself, as well as from GitHub | Its push trigger is still on | Remove the trigger in the pipeline's settings (setup guide step 4.1 / 7.1). |

@@ -151,8 +151,8 @@ The foundation creates the files bucket, the Terraform state bucket and the SSM 
 1. **CodePipeline → Create pipeline**: a V2 pipeline built from scratch (or the Terraform starter template),
    named `family-drive-foundation` (or the name you gave in step 3.2). Execution mode: **Queued**.
 2. **Source stage:** GitHub (via GitHub App): the connection from step 3, the repository, branch `main`,
-   default output artifact format. Name the source action **`Source`**: GitHub starts runs at a commit by
-   this name.
+   default output artifact format. Keep the source action's default name, **`CodeConnections`**: GitHub starts
+   runs at a commit by this name (set the repository variable `SOURCE_ACTION` if yours differs).
 3. **No trigger:** untick **Start the pipeline on source code change** and remove any triggers.
    GitHub Actions starts it (`deploy.yml`) after you approve in the `foundation` environment. The
    foundation can change the bucket that holds the family's files, so it never applies without you looking (#52).
@@ -290,7 +290,7 @@ prints your JSON (`jq` reports a syntax error if it isn't valid).
 ### 7.1 Create the pipeline
 
 1. **CodePipeline → Create pipeline** (V2), named `family-drive-deploy`, execution mode **Queued**, with the
-   same GitHub source, repository and branch, and the source action named **`Source`**.
+   same GitHub source, repository and branch, and the source action named **`CodeConnections`** (the default).
 2. **No trigger and no approval stage:** untick **Start the pipeline on source code change** and remove
    any triggers. GitHub Actions starts it after its checks pass and you approve in the `app` environment.
 3. **Deploy stage:** a **Commands** action, input artifact = Source:
@@ -480,7 +480,7 @@ deploy pipeline**, not even behind a disabled transition (#52). It's its own pip
 command, and gets the real one only after that first run:
 
 1. **Create pipeline** (V2), named `family-drive-destroy`, execution mode **Queued**, same source, with the
-   source action named **`Source`**.
+   source action named **`CodeConnections`** (the default).
 2. **Untick "Start the pipeline on source code change"** and remove any triggers. No approval stage: the
    approval is the `destroy` GitHub Environment.
 3. Add a **Destroy** stage with a **Commands** action whose only command is `echo "placeholder"`.

@@ -118,6 +118,8 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - env:
           PIPELINE: ${{ vars.FOUNDATION_PIPELINE || 'family-drive-foundation' }}
+          # The pipelines' source action name (the console's default for a GitHub source).
+          SOURCE_ACTION: ${{ vars.SOURCE_ACTION || 'CodeConnections' }}
           SHA: ${{ needs.changes.outputs.sha }}
         run: bash ci/start-pipeline.sh "$PIPELINE" "$SHA"
 
@@ -146,5 +148,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - env:
           PIPELINE: ${{ vars.DEPLOY_PIPELINE || 'family-drive-deploy' }}
+          # The pipelines' source action name (the console's default for a GitHub source).
+          SOURCE_ACTION: ${{ vars.SOURCE_ACTION || 'CodeConnections' }}
           SHA: ${{ needs.changes.outputs.sha }}
         run: bash ci/start-pipeline.sh "$PIPELINE" "$SHA"

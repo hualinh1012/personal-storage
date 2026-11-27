@@ -57,4 +57,6 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - env:
           PIPELINE: ${{ vars.DESTROY_PIPELINE || 'family-drive-destroy' }}
+          # The pipelines' source action name (the console's default for a GitHub source).
+          SOURCE_ACTION: ${{ vars.SOURCE_ACTION || 'CodeConnections' }}
         run: bash ci/start-pipeline.sh "$PIPELINE" "$GITHUB_SHA"
