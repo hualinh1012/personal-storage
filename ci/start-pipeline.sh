@@ -21,6 +21,8 @@ REGION="${AWS_REGION:-ap-southeast-1}"
 SOURCE_ACTION="${SOURCE_ACTION:-CodeConnections}" # the pipeline's source action name
 POLL_SECONDS="${POLL_SECONDS:-20}"
 MAX_WAIT_SECONDS="${MAX_WAIT_SECONDS:-3000}"
+NOT_FOUND_GRACE_SECONDS="${NOT_FOUND_GRACE_SECONDS:-120}" # how long a new run may stay "not found"
+NOT_FOUND_POLL_SECONDS="${NOT_FOUND_POLL_SECONDS:-5}"
 
 codepipeline() { aws codepipeline --region "$REGION" "$@"; }
 
@@ -38,8 +40,20 @@ fi
 waited=0
 last=""
 while :; do
-  status="$(codepipeline get-pipeline-execution --pipeline-name "$PIPELINE" --pipeline-execution-id "$id" \
-    --query pipelineExecution.status --output text)"
+  # CodePipeline is eventually consistent: a run that start-pipeline-execution just
+  # returned can be "not found" for a few seconds. Retry that one error for a while.
+  if ! status="$(codepipeline get-pipeline-execution --pipeline-name "$PIPELINE" --pipeline-execution-id "$id" \
+    --query pipelineExecution.status --output text 2>&1)"; then
+    if [[ "$status" == *PipelineExecutionNotFoundException* ]] && [ "$waited" -lt "$NOT_FOUND_GRACE_SECONDS" ]; then
+      [ "$last" = "NotVisibleYet" ] || echo "$(date -u +%H:%M:%S) execution not visible yet; retrying"
+      last="NotVisibleYet"
+      sleep "$NOT_FOUND_POLL_SECONDS"
+      waited=$((waited + NOT_FOUND_POLL_SECONDS))
+      continue
+    fi
+    echo "$status" >&2
+    exit 1
+  fi
   if [ "$status" != "$last" ]; then
     echo "$(date -u +%H:%M:%S) ${status}"
     last="$status"
