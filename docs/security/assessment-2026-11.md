@@ -9,7 +9,7 @@ A one-off review of Family Drive across code, infrastructure, pipelines and supp
   not visible and are marked **not verified**.
 - **Method:** threat model, then a manual review of every area in the ticket against the code,
   Terraform and IAM policies, `npm audit`, a lockfile check and a secrets scan of the full git
-  history. The IaC scanner run is still to do (see the CVE baseline).
+  history. The IaC scan runs in the pull-request checks since #103 (see the CVE baseline).
 - **Severity** is the impact if it happens. **Likelihood** is how plausible it is for this
   deployment: a private family app on a public GitHub repo with one maintainer.
 
@@ -391,21 +391,19 @@ entries from the Google OAuth client and API key in production.
 | Lockfile | v3, 370 packages, every one with an `integrity` hash, all from `registry.npmjs.org` | v3, 111 packages, same |
 | Install in CI | `npm ci` (lockfile only) | `npm ci` |
 
-**IaC scan: not run yet.** Installing Checkov or Trivy wasn't possible in the environment this
-review ran in, so `infra/` and `infra/foundation/` were reviewed by hand (sections above). To close
-the baseline, run one of these and triage every high and critical result here:
+**IaC scan (#103, 28 November 2026):** `trivy config infra` (Trivy 0.76.2) runs on every pull request
+(`ci.yml`, job `iac-scan`) and fails on high or critical. Its high findings were all decisions this
+review had already made, and are suppressed in the Terraform with the reason:
 
-```bash
-pipx run checkov -d infra --framework terraform
-```
+| Finding | Where | Decision |
+|---|---|---|
+| AWS-0132: SSE-S3, not a customer managed KMS key | files, state and web buckets | Accepted (Encryption above) |
+| AWS-0011: no WAF | CloudFront | Not needed for a static site; no paid WAF (C-5) |
+| AWS-0013: TLS minimum | CloudFront | Accepted until a custom domain (TLS above) |
 
-```bash
-trivy config infra
-```
-
-Expect scanner noise that this review already decided on: no KMS (accepted), no S3 access logging
-(S5), no WAF (static site, not needed), CloudFront without a custom certificate (accepted), no
-cross-region replication (S3).
+Reported but not failing (low and medium): no access logging on the buckets or CloudFront (S5),
+no versioning on the web bucket (it only holds the build), unencrypted Lambda log groups and no
+X-Ray tracing on the trigger Lambdas. To run it locally: `trivy config infra`.
 
 ### Detection and recovery
 

@@ -59,7 +59,8 @@ bash ci/tf-init.sh                                 # real init of infra/ against
 
 The linter is oxlint, not ESLint: TypeScript 7 has no compiler API for typescript-eslint
 ([ADR 0016](docs/adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)). The Lambdas run
-on `nodejs22.x`; the web build and tests need Node ≥ 22.12.
+on `nodejs22.x`; the web build, the tests and the deploy pipeline need Node ≥ 26
+(`ci/app-env.sh` enforces it).
 
 ## Architecture in brief
 
@@ -101,7 +102,9 @@ resources by name. Rules in [`infra/CLAUDE.md`](infra/CLAUDE.md).
 is only a client library, with no Amplify backend tooling.
 
 **Pull-request checks** (GitHub Actions, `.github/workflows/ci.yml`, no AWS access): lint,
-type-check, test and build both packages, Terraform `fmt -check` and offline `validate`. Dependabot
+type-check, test and build both packages, Terraform `fmt -check` and offline `validate`, a Trivy IaC scan
+of `infra/` (high or critical fails; accepted findings carry `#trivy:ignore` with a reason), ShellCheck on
+every `*.sh` and actionlint on the workflows. Dependabot
 (`.github/dependabot.yml`) opens weekly update PRs for the pinned actions and both packages; the
 same checks run on each.
 

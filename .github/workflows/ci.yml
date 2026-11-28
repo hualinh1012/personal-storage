@@ -1,5 +1,6 @@
-# Checks every pull request: lint, type-check, test and build each package, and check the
-# Terraform offline. deploy.yml calls it too (workflow_call), so every commit is
+# Checks every pull request: lint, type-check, test and build each package, check the
+# Terraform offline and scan it (Trivy), and lint the shell scripts (ShellCheck) and the
+# workflows (actionlint). deploy.yml calls it too (workflow_call), so every commit is
 # checked before it deploys. No AWS credentials here: deploy.yml starts the
 # CodePipelines, which do the deploying (ADR 0016, ADR 0017).
 name: CI
@@ -59,7 +60,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "22" # the documented minimum is 22.12
+          node-version: "26" # the documented minimum
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
@@ -85,3 +86,64 @@ jobs:
       - run: terraform -chdir=infra validate
       - run: terraform -chdir=infra/foundation init -backend=false -input=false
       - run: terraform -chdir=infra/foundation validate
+
+  # Misconfiguration scan of both Terraform stacks. Trivy is a checksum-pinned release binary,
+  # not trivy-action: that action's tags were rewritten in a 2026 supply-chain attack. The
+  # checks bundled in the binary are used (--skip-check-update), so results only change when
+  # the version does. Accepted findings are suppressed in place (#trivy:ignore, with a reason).
+  iac-scan:
+    name: IaC scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TRIVY_VERSION: "0.76.2"
+      TRIVY_SHA256: bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf # trivy_0.76.2_Linux-64bit.tar.gz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Install Trivy
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/trivy.tgz" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  $RUNNER_TEMP/trivy.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/trivy.tgz" -C "$RUNNER_TEMP" trivy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Report every finding
+        run: trivy config --skip-check-update --skip-version-check --exit-code 0 infra
+      - name: Fail on high or critical
+        run: trivy config --skip-check-update --skip-version-check --severity HIGH,CRITICAL --exit-code 1 infra
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - run: shellcheck --version
+      - run: git ls-files -z '*.sh' | xargs -0 shellcheck # preinstalled on the runner
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ACTIONLINT_VERSION: "1.7.12"
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 # actionlint_1.7.12_linux_amd64.tar.gz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Install actionlint
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tgz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
+      # Also runs ShellCheck (preinstalled) on each workflow's run: scripts.
+      - run: '"$RUNNER_TEMP/actionlint" -color'

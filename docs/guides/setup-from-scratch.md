@@ -48,7 +48,7 @@ About an hour end to end, most of it waiting for pipelines and CloudFront.
 | Tool | Version | Check |
 |---|---|---|
 | git | any recent | `git --version` |
-| Node.js | ≥ 22.12 (Vite 8, Vitest 5) | `node --version` |
+| Node.js | ≥ 26 (Vite 8, Vitest 5, jsdom 31) | `node --version` |
 | AWS CLI | v2 | `aws --version` |
 | Terraform | ≥ 1.10 (the pipelines use 1.16.6) | `terraform version` |
 | jq (optional) | any | `jq --version`; used only to check JSON |
@@ -87,7 +87,7 @@ Open `http://localhost:5173/playground.html`, then `http://localhost:5173/playgr
 shows the real drive screen with sample files (Upload, Move, Delete and Restore work on them). The app
 itself at `/` needs `web/public/config.json`, which step 11 creates.
 
-**If it fails:** `Node >= 22.12 required` means upgrading Node.
+**If it fails:** `Node >= 26 required` means upgrading Node.
 
 ## Step 3. Connect GitHub to AWS and protect `main`
 
@@ -302,6 +302,7 @@ prints your JSON (`jq` reports a syntax error if it isn't valid).
    dnf install -y dnf-plugins-core
    dnf config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
    dnf install -y terraform-1.16.6
+   npm install -g n && n 26 && hash -r   # the image's Node is older than the required 26
    bash ci/apply-app.sh
    ```
 
@@ -494,6 +495,7 @@ command, and gets the real one only after that first run:
    dnf install -y dnf-plugins-core
    dnf config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
    dnf install -y terraform-1.16.6
+   npm install -g n && n 26 && hash -r   # the image's Node is older than the required 26
    bash ci/destroy-app.sh
    ```
 
