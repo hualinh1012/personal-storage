@@ -39,3 +39,13 @@ Empty Deleted). Display only: IAM session tags are the boundary.
 
 **Location policy**: `web/src/locationPolicy.ts`, the one browser-side mirror of the IAM
 policy in `infra/identity.tf` (issue #38).
+
+## Recovery
+
+**Version**: an earlier state of a file kept by S3 versioning for 30 days after it's overwritten or
+deleted (ADR 0006). Same bucket, same account.
+
+**Backup copy**: a copy of a file outside the files bucket (another region or account), never read
+by the app. **None exists today** (ADR 0018).
+
+_Avoid:_ "backup" for versions or the Deleted folder: neither survives loss of the bucket.
