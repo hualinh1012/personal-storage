@@ -280,7 +280,7 @@ Rough Singapore (`ap-southeast-1`) list prices, November 2026; check the S3 pric
 | CloudFront | per GB and per request | only the SPA (a few MB per visit), never the files |
 | Deletes and expirations | free | Delete permanently, Empty Deleted, lifecycle expiry |
 
-The foundation budget alerts the owner when the whole account's monthly spend passes $2 (see Observability).
+The foundation budget alerts the owner when the whole account's monthly spend passes `monthly_budget_usd` (default $2; see Observability).
 
 **Example:** 100 GB of family photos (40,000 objects), mostly unopened after a few months, costs
 roughly $0.6–1.5 per month in storage plus $0.10 in monitoring, plus whatever is downloaded.

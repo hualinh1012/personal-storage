@@ -21,7 +21,7 @@ A one-off review of Family Drive across code, infrastructure, pipelines and supp
 | S2 | The app pipeline's IAM policy allows escalation to account admin | High | Low | #53 |
 | S3 | The family's files have no backup outside the bucket, and the foundation pipeline can expose or wipe them | High | Low | #54, **accepted** (won't fix: cost) |
 | S4 | No Content Security Policy, while tokens and AWS credentials sit in `localStorage` | Medium | Low | #55 |
-| S5 | No detection or response: no trail, alarms or budget alert in code, and no runbook for a compromised account | Medium | Medium | #56, **accepted** (won't fix: cost) |
+| S5 | No detection or response: no trail or alarms in code (a budget alert exists, #98), and no runbook for a compromised account | Medium | Medium | #56, **accepted** (won't fix: cost) |
 | S6 | Production trusts `http://localhost:5173` (Cognito callbacks, S3 CORS, Google origins) | Low | Low | #57 |
 | S7 | Small hardening gaps: app client `write_attributes`, bucket object ownership, Cognito/CloudFront `Resource: "*"` | Low | Low | #58 |
 
@@ -183,7 +183,7 @@ visitor's IP address and the app's origin.
 ### S5. No detection or response (Medium / Medium)
 
 **Evidence:** neither stack defines a CloudTrail trail, S3 server access logging or data events,
-CloudWatch alarms, or an AWS Budgets alert. Whether the account has a trail outside Terraform is
+or CloudWatch alarms. The foundation stack has an AWS Budgets cost alert since #98. Whether the account has a trail outside Terraform is
 **not verified**. There is no runbook for a compromised family account or pipeline.
 
 **Risk:** a stolen session, a mass delete, a bucket made public or an unexpected bill would go
@@ -197,7 +197,7 @@ session also needs a specific step: Identity Pool credentials can't be invalidat
   `DeletePublicAccessBlock`/`PutPublicAccessBlock`, `PutBucketVersioning`, `PutBucketLifecycle`
   on the files bucket; IAM changes to `family-drive-*` roles; `UpdateFunctionConfiguration` on the
   trigger Lambdas; `PutParameter` on `/family-drive/*`.
-- An AWS Budgets alert on monthly cost.
+- ~~An AWS Budgets alert on monthly cost.~~ Done in #98 (`infra/foundation/budget.tf`).
 - Optional: S3 data events for `DeleteObject` on the files bucket (cheap at family volume).
 - A short runbook in `docs/deployment.md`, for a compromised family account:
   1. remove the email from `allowed_emails` and re-run the app pipeline;
@@ -428,4 +428,4 @@ Terraform state versioning; the app stack can be rebuilt from the repo. No indep
 | The AWS Connector GitHub App is installed for all of the owner's repositories, not only this one | Owner's choice: the connection is used elsewhere (#52) |
 | Family members can run up storage costs | Family trust |
 | No backup outside the files bucket (S3) | Owner's decision, 14 November 2026 (#54): a family app on a small budget; a second copy would roughly double storage cost. Versioning (30 days) is the only recovery, so #52 and #53 matter more. |
-| No trail, alarms or budget alert (S5) | Owner's decision, 14 November 2026 (#56): small budget. The incident steps in S5 still apply by hand. |
+| No trail or alarms (S5); the budget alert now exists (#98) | Owner's decision, 14 November 2026 (#56): small budget. The incident steps in S5 still apply by hand. |

@@ -42,6 +42,14 @@ policy_exists() {
   exit 1
 }
 
+budget_exists() {
+  local out
+  if out="$(aws budgets describe-budget --account-id "$ACCOUNT_ID" --budget-name "$1" 2>&1 >/dev/null)"; then return 0; fi
+  if grep -q NotFoundException <<<"$out"; then return 1; fi
+  echo "$out" >&2
+  exit 1
+}
+
 import_if_missing() { # <address> <import id>
   if ! tf state show "$1" >/dev/null 2>&1; then
     echo "Importing existing $2 into $1"
@@ -49,8 +57,8 @@ import_if_missing() { # <address> <import id>
   fi
 }
 
-# Adopt resources that exist but aren't in state: SSM parameters or the
-# boundary policy created by hand, or buckets left behind by a first run that failed part-way (its local
+# Adopt resources that exist but aren't in state: SSM parameters, the
+# boundary policy or the monthly budget created by hand, or buckets left behind by a first run that failed part-way (its local
 # state is lost with the build container).
 import_existing() {
   local name
@@ -68,6 +76,9 @@ import_existing() {
   local boundary="arn:aws:iam::${ACCOUNT_ID}:policy/${PROJECT}-boundary"
   if policy_exists "$boundary"; then
     import_if_missing aws_iam_policy.boundary "$boundary"
+  fi
+  if budget_exists "${PROJECT}-monthly"; then
+    import_if_missing aws_budgets_budget.monthly "${ACCOUNT_ID}:${PROJECT}-monthly"
   fi
 }
 
