@@ -379,7 +379,7 @@ A new S3 or logs permission for one of these roles works only if the boundary al
 - **Token lifetimes:** ID and access 60 minutes, refresh 30 days.
 - **Triggers:** pre sign-up; pre token generation with `lambda_version = "V1_0"`.
 - **Lambdas:** `nodejs22.x`, handlers `preSignUp.handler` / `preTokenGeneration.handler`,
-  default 128 MB and 3 s timeout, logs kept 14 days.
+  default 128 MB and 3 s timeout. Logs: pre sign-up kept 14 days, pre token generation 90 days.
 - **Identity Pool:** authenticated identities only, one provider (the user pool endpoint and
   app client) with `server_side_token_check = true`, principal tags `email`, `global_access`,
   `personal`, `trash` with `use_defaults = false`.
@@ -403,6 +403,7 @@ A new S3 or logs permission for one of these roles works only if the boundary al
 | Where | What you see |
 |---|---|
 | CloudWatch Logs `/aws/lambda/family-drive-pre-sign-up` and `/aws/lambda/family-drive-pre-token-generation` | A thrown `ACCESS_DENIED` for each refusal; "access levels are not valid JSON" and other parser errors when `ACCESS_LEVELS` is broken |
+| CloudWatch Logs `/aws/lambda/family-drive-pre-token-generation` | One usage line per allowed token issue: `{"event":"token","email":"…","source":"…"}` (ADR 0019). No line for a denied sign-in; never a token, claim value or file name. Counted with the query in [deployment.md](../deployment.md#day-to-day) |
 | Redirect URL in the browser | `error_description=…ACCESS_DENIED.` → access-denied page; any other `error_description` (e.g. Google's `redirect_uri_mismatch`) is a setup problem |
 | CloudTrail | `GetId`, `GetCredentialsForIdentity` (Cognito Identity), `AssumeRoleWithWebIdentity` (STS) with the session tags |
 | S3 responses | `AccessDenied` when the session tags don't allow a request |
@@ -473,7 +474,7 @@ Extensions → Lambda triggers); Cognito → Identity pools → `family-drive` �
 ## 8. Testing
 
 - **Unit tests:** `npm test --prefix functions/allowlist` (allowlist parsing, access parsing and
-  claims, both handlers including refresh denial and malformed `ACCESS_LEVELS`) and
+  claims, the usage line on allow and its absence on deny, both handlers including refresh denial and malformed `ACCESS_LEVELS`) and
   `npm test --prefix web` (`access`, `authErrors`, `session`, `config`, `locationPolicy`).
 - **Terraform:** `terraform -chdir=infra validate` (offline); `terraform plan` exercises the
   preconditions against the real SSM values.
@@ -493,4 +494,5 @@ Extensions → Lambda triggers); Cognito → Identity pools → `family-drive` �
 - [ADR 0009](../adr/0009-personal-folders-keyed-by-email.md): personal folders keyed by the `email` principal tag.
 - [ADR 0010](../adr/0010-per-person-access-levels-in-ssm.md): per-person access levels in SSM, enforced by session tags.
 - [ADR 0011](../adr/0011-delete-moves-to-a-deleted-folder.md): the `trash` flag and the `Deleted/` statements.
-- Tickets: #14 (personal folders), #15 (access levels), #24 (Deleted folder), #26 (this doc).
+- [ADR 0019](../adr/0019-usage-line-in-the-token-trigger.md): one usage line per token issue, kept 90 days.
+- Tickets: #14 (personal folders), #15 (access levels), #24 (Deleted folder), #26 (this doc), #99 (usage line).

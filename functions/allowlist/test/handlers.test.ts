@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PreSignUpTriggerEvent, PreTokenGenerationTriggerEvent } from "aws-lambda";
 import { handler as preSignUp } from "../src/preSignUp";
 import { handler as preTokenGeneration } from "../src/preTokenGeneration";
@@ -58,6 +58,51 @@ describe("preTokenGeneration", () => {
   });
   it("denies an unverified email", async () => {
     await expect(preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "mom@gmail.com", "false"))).rejects.toThrow("ACCESS_DENIED");
+  });
+});
+
+describe("preTokenGeneration usage line", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  it("writes one usage line with exactly event, lower-cased email and source on hosted auth", async () => {
+    await preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", " Mom@Gmail.com "));
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const line = logSpy.mock.calls[0][0] as string;
+    expect(line).toBe(JSON.stringify({ event: "token", email: "mom@gmail.com", source: "TokenGeneration_HostedAuth" }));
+    expect(Object.keys(JSON.parse(line))).toEqual(["event", "email", "source"]);
+  });
+
+  it("records the refresh trigger source", async () => {
+    await preTokenGeneration(tokenEvent("TokenGeneration_RefreshTokens", "mom@gmail.com"));
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(logSpy.mock.calls[0][0] as string)).toMatchObject({ source: "TokenGeneration_RefreshTokens" });
+  });
+
+  it("writes no line when the sign-in is denied", async () => {
+    await expect(preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "stranger@gmail.com"))).rejects.toThrow("ACCESS_DENIED");
+    await expect(preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "mom@gmail.com", "false"))).rejects.toThrow("ACCESS_DENIED");
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("writes no line when ACCESS_LEVELS is malformed", async () => {
+    process.env.ACCESS_LEVELS = "CHANGE_ME";
+    await expect(preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "mom@gmail.com"))).rejects.toThrow(/not valid JSON/);
+    expect(logSpy).not.toHaveBeenCalled();
+    delete process.env.ACCESS_LEVELS;
+  });
+
+  it("never puts access claims, the token or file names in the line", async () => {
+    process.env.ACCESS_LEVELS = JSON.stringify({ "mom@gmail.com": { global: "write", personal: true, trash: true } });
+    await preTokenGeneration(tokenEvent("TokenGeneration_HostedAuth", "mom@gmail.com"));
+    const line = logSpy.mock.calls[0][0] as string;
+    expect(line).not.toMatch(/write|yes|global_access|personal|trash/);
+    delete process.env.ACCESS_LEVELS;
   });
 });
 

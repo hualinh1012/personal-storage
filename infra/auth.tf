@@ -52,7 +52,7 @@ resource "aws_cloudwatch_log_group" "pre_sign_up" {
 
 resource "aws_cloudwatch_log_group" "pre_token_generation" {
   name              = "/aws/lambda/${var.project}-pre-token-generation"
-  retention_in_days = 14
+  retention_in_days = 90
 }
 
 resource "aws_lambda_function" "pre_sign_up" {

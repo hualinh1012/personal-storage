@@ -11,6 +11,9 @@ export async function handler(event: PreTokenGenerationTriggerEvent): Promise<Pr
   // (infra/identity.tf). A malformed ACCESS_LEVELS throws, so nobody gets a
   // token until it's fixed; Terraform validates it before deploying anyway.
   const access = accessFor(email, parseAccess(process.env.ACCESS_LEVELS));
+  // One usage line per issued token set, written last so a denied or malformed
+  // sign-in writes nothing. Only these three fields: no token, claim or file name.
+  console.log(JSON.stringify({ event: "token", email: email.trim().toLowerCase(), source: event.triggerSource }));
   event.response = {
     ...event.response,
     claimsOverrideDetails: {
