@@ -69,6 +69,7 @@ data "aws_iam_policy_document" "authenticated" {
   statement {
     sid = "WriteDriveObjects"
     actions = [
+      "s3:GetObjectVersion",
       "s3:PutObject",
       "s3:DeleteObject",
       "s3:AbortMultipartUpload",
@@ -83,13 +84,35 @@ data "aws_iam_policy_document" "authenticated" {
     }
   }
 
+  # Earlier versions (ADR 0020): writers list a file's versions where they can
+  # write, and restore one by copying it on top (GetObjectVersion above, plus
+  # PutObject). Separate from ListDriveFolder, which readers hold too. Nothing
+  # grants DeleteObjectVersion outside Deleted/, so history can't be erased.
+  statement {
+    sid       = "ListDriveVersions"
+    actions   = ["s3:ListBucketVersions"]
+    resources = [data.aws_s3_bucket.files.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["Global/", "Global/*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalTag/global_access"
+      values   = ["write"]
+    }
+  }
+
   # Personal folders (ADR 0009): Personal/<email>/, where <email> is the
   # caller's `email` session tag (see the principal tag mapping below), only
   # for people whose `personal` tag is "yes". "$$" keeps the IAM variable
   # literal instead of Terraform interpolation.
   statement {
     sid       = "ListOwnPersonalFolder"
-    actions   = ["s3:ListBucket"]
+    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
     resources = [data.aws_s3_bucket.files.arn]
 
     condition {
@@ -109,6 +132,7 @@ data "aws_iam_policy_document" "authenticated" {
     sid = "ManageOwnPersonalObjects"
     actions = [
       "s3:GetObject",
+      "s3:GetObjectVersion",
       "s3:PutObject",
       "s3:DeleteObject",
       "s3:AbortMultipartUpload",

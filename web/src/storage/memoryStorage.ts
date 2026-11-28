@@ -20,7 +20,7 @@ export interface MemoryObject {
 }
 
 type VersionBody = { deleteMarker: true } | { deleteMarker?: false; object: MemoryObject };
-type Version = { versionId: string } & VersionBody;
+type Version = { versionId: string; lastModified: Date } & VersionBody;
 
 export interface MemorySeed {
   key: string;
@@ -58,12 +58,14 @@ export function memoryDriveStorage(seed: MemorySeed[] = [], options: MemoryOptio
   };
   const push = (key: string, version: VersionBody) => {
     const versions = history.get(key) ?? [];
-    versions.push({ ...version, versionId: `v${nextVersion++}` });
+    const lastModified = version.deleteMarker ? now() : version.object.lastModified;
+    versions.push({ ...version, versionId: `v${nextVersion++}`, lastModified });
     history.set(key, versions);
   };
   const put = (key: string, object: MemoryObject) => push(key, { object });
   const currentKeys = () => [...history.keys()].filter((k) => current(k));
   const notFound = (key: string) => new DriveStorageError("NotFound", `No such key: ${key}`);
+  const cannotRestoreMarker = () => new DriveStorageError("Other", "A deleted version can't be restored.");
 
   for (const s of seed) {
     const body = typeof s.body === "string" ? utf8(s.body) : s.body;
@@ -122,7 +124,19 @@ export function memoryDriveStorage(seed: MemorySeed[] = [], options: MemoryOptio
       await latency();
       const out: ObjectVersion[] = [];
       for (const [key, versions] of history) {
-        if (key.startsWith(prefix)) for (const v of versions) out.push({ key, versionId: v.versionId });
+        if (!key.startsWith(prefix)) continue;
+        // History is oldest first; S3 lists each key newest first.
+        for (let i = versions.length - 1; i >= 0; i--) {
+          const v = versions[i];
+          out.push({
+            key,
+            versionId: v.versionId,
+            lastModified: v.lastModified,
+            size: v.deleteMarker ? 0 : v.object.size,
+            isLatest: i === versions.length - 1,
+            deleteMarker: !!v.deleteMarker,
+          });
+        }
       }
       return out;
     },
@@ -134,6 +148,16 @@ export function memoryDriveStorage(seed: MemorySeed[] = [], options: MemoryOptio
       if (!versions || i === -1) return; // Like S3: deleting a missing version succeeds.
       versions.splice(i, 1);
       if (versions.length === 0) history.delete(key);
+    },
+
+    async restoreVersion({ key, versionId, isLatest, deleteMarker }) {
+      if (deleteMarker) throw cannotRestoreMarker();
+      if (isLatest) return;
+      await latency();
+      const version = history.get(key)?.find((v) => v.versionId === versionId);
+      if (!version) throw new DriveStorageError("NotFound", `No such version of ${key}: ${versionId}`);
+      if (version.deleteMarker) throw cannotRestoreMarker();
+      put(key, { ...version.object, lastModified: now() });
     },
 
     async read(key) {

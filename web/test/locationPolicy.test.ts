@@ -17,9 +17,13 @@ import {
  * Checked by hand against the `authenticated` policy in infra/identity.tf
  * (ADR 0010, 0009, 0011). Statement ids per location:
  * - Global/:             ListDriveFolder, ReadDriveObjects (everyone);
- *                        WriteDriveObjects (global_access = write).
- * - Personal/<email>/:   ListOwnPersonalFolder, ManageOwnPersonalObjects (personal = yes),
+ *                        WriteDriveObjects (incl. GetObjectVersion), ListDriveVersions
+ *                        (global_access = write).
+ * - Personal/<email>/:   ListOwnPersonalFolder (incl. ListBucketVersions),
+ *                        ManageOwnPersonalObjects (incl. GetObjectVersion) (personal = yes),
  *                        only for the caller's own `email` tag.
+ * restoreVersions follows the version actions: exactly where write is, never in Deleted/
+ * (no DeleteObjectVersion outside Deleted/; ADR 0020).
  * - Deleted/:            ListDeletedFolder, ManageDeletedObjects (trash = yes). Writers'
  *                        PutObject into Deleted/ (MoveSharedFilesToDeleted,
  *                        MoveOwnPersonalFilesToDeleted) is part of Delete elsewhere, not
@@ -36,10 +40,10 @@ const ALL: Access = { globalWrite: true, personal: true, trash: true };
 
 // prettier-ignore
 const C = {
-  nothing:  { read: false, write: false, move: false, manageDeleted: false },
-  read:     { read: true,  write: false, move: false, manageDeleted: false },
-  full:     { read: true,  write: true,  move: true,  manageDeleted: false },
-  deleted:  { read: true,  write: false, move: false, manageDeleted: true  },
+  nothing:  { read: false, write: false, move: false, manageDeleted: false, restoreVersions: false },
+  read:     { read: true,  write: false, move: false, manageDeleted: false, restoreVersions: false },
+  full:     { read: true,  write: true,  move: true,  manageDeleted: false, restoreVersions: true  },
+  deleted:  { read: true,  write: false, move: false, manageDeleted: true,  restoreVersions: false },
 } satisfies Record<string, Capabilities>;
 
 // prettier-ignore
@@ -47,12 +51,19 @@ const table: [string, Access, string, LocationKind, Capabilities, string[]][] = 
   // who,       access,   prefix or key,                   kind,       capabilities, Storage Browser permissions
   ["read-only", NONE,     "Global/",                       "shared",   C.read,    ["get", "list"]],
   ["writer",    WRITE,    "Global/photos/a.jpg",           "shared",   C.full,    ["delete", "get", "list", "write"]],
+  ["writer",    WRITE,    "Global/",                       "shared",   C.full,    ["delete", "get", "list", "write"]],
+  ["personal",  PERSONAL, "Global/",                       "shared",   C.read,    ["get", "list"]],
+  ["trash",     TRASH,    "Global/",                       "shared",   C.read,    ["get", "list"]],
   ["read-only", NONE,     "Personal/me@x.com/",            "personal", C.nothing, []],
+  ["writer",    WRITE,    "Personal/me@x.com/",            "personal", C.nothing, []],
+  ["trash",     TRASH,    "Personal/me@x.com/",            "personal", C.nothing, []],
   ["personal",  PERSONAL, "Personal/me@x.com/",            "personal", C.full,    ["delete", "get", "list", "write"]],
   ["personal",  PERSONAL, "Personal/me@x.com/tax/a.pdf",   "personal", C.full,    ["delete", "get", "list", "write"]],
   ["everyone",  ALL,      "Personal/mom@x.com/",           "other",    C.nothing, []],
   ["everyone",  ALL,      "Personal/me@x.com.evil/",       "other",    C.nothing, []],
+  ["read-only", NONE,     "Deleted/",                      "deleted",  C.nothing, []],
   ["writer",    WRITE,    "Deleted/",                      "deleted",  C.nothing, []],
+  ["personal",  PERSONAL, "Deleted/",                      "deleted",  C.nothing, []],
   ["trash",     TRASH,    "Deleted/",                      "deleted",  C.deleted, ["delete", "get", "list"]],
   ["everyone",  ALL,      "Deleted/Global/a (deleted).jpg","deleted",  C.deleted, ["delete", "get", "list"]],
   ["everyone",  ALL,      "",                              "other",    C.nothing, []],
@@ -86,6 +97,16 @@ describe("hideUnless", () => {
     expect(hideUnless("move")(at(TRASH, "Deleted/"))).toBe(true);
     expect(hideUnless("manageDeleted")(at(TRASH, "Deleted/"))).toBe(false);
     expect(hideUnless("manageDeleted")(at(ALL, "Global/"))).toBe(true);
+  });
+
+  it("shows restoreVersions only where the person can write, never in Deleted/", () => {
+    const at = (access: Access, prefix: string) => locationPolicy(access, ME, prefix).permissions;
+    expect(hideUnless("restoreVersions")(at(NONE, "Global/"))).toBe(true);
+    expect(hideUnless("restoreVersions")(at(WRITE, "Global/"))).toBe(false);
+    expect(hideUnless("restoreVersions")(at(PERSONAL, personalPrefix(ME)))).toBe(false);
+    expect(hideUnless("restoreVersions")(at(WRITE, personalPrefix(ME)))).toBe(true);
+    expect(hideUnless("restoreVersions")(at(ALL, "Personal/mom@x.com/"))).toBe(true);
+    expect(hideUnless("restoreVersions")(at(ALL, "Deleted/"))).toBe(true);
   });
 });
 

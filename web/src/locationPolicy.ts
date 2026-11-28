@@ -34,6 +34,8 @@ export interface Capabilities {
   move: boolean;
   /** Restore, Delete permanently and Empty Deleted: only in the Deleted folder. */
   manageDeleted: boolean;
+  /** List a file's earlier versions and restore one (ADR 0020): exactly where `write` is, never in Deleted/. */
+  restoreVersions: boolean;
 }
 
 type Permission = "delete" | "get" | "list" | "write";
@@ -61,16 +63,22 @@ export function locationKind(prefixOrKey: string, email: string): LocationKind {
   return "other";
 }
 
-const NOTHING: Capabilities = { read: false, write: false, move: false, manageDeleted: false };
+const NOTHING: Capabilities = { read: false, write: false, move: false, manageDeleted: false, restoreVersions: false };
 
 function capabilitiesFor(kind: LocationKind, access: Access): Capabilities {
   switch (kind) {
-    case "shared": // ListDriveFolder, ReadDriveObjects; WriteDriveObjects with global_access = write
-      return { read: true, write: access.globalWrite, move: access.globalWrite, manageDeleted: false };
-    case "personal": // ListOwnPersonalFolder, ManageOwnPersonalObjects with personal = yes
-      return access.personal ? { read: true, write: true, move: true, manageDeleted: false } : NOTHING;
+    case "shared": // ListDriveFolder, ReadDriveObjects; WriteDriveObjects, ListDriveVersions with global_access = write
+      return {
+        read: true,
+        write: access.globalWrite,
+        move: access.globalWrite,
+        manageDeleted: false,
+        restoreVersions: access.globalWrite,
+      };
+    case "personal": // ListOwnPersonalFolder, ManageOwnPersonalObjects (with their version actions) with personal = yes
+      return access.personal ? { read: true, write: true, move: true, manageDeleted: false, restoreVersions: true } : NOTHING;
     case "deleted": // ListDeletedFolder, ManageDeletedObjects with trash = yes; no PutObject to list or read back
-      return access.trash ? { read: true, write: false, move: false, manageDeleted: true } : NOTHING;
+      return access.trash ? { read: true, write: false, move: false, manageDeleted: true, restoreVersions: false } : NOTHING;
     case "other":
       return NOTHING;
   }
@@ -108,6 +116,8 @@ export function capabilitiesOf(permissions: readonly string[]): Capabilities {
     write: has("write"),
     move: has("write") && has("delete"),
     manageDeleted: has("delete") && !has("write"),
+    // IAM grants the version actions exactly where it grants writing, so no permission string of its own.
+    restoreVersions: has("write"),
   };
 }
 

@@ -35,7 +35,8 @@ Unlisted allowlisted people get read-only shared drive and nothing else.
 **Capabilities**: what the Location policy says a person can do in a location: `read`
 (list, download), `write` (upload, create folder, copy into, import, edit), `move` (Move, and
 Delete, which moves to the Deleted folder), `manageDeleted` (Restore, Delete permanently,
-Empty Deleted). Display only: IAM session tags are the boundary.
+Empty Deleted), `restoreVersions` (list a file's earlier versions and restore one; exactly where
+`write` is, never in the Deleted folder). Display only: IAM session tags are the boundary.
 
 **Location policy**: `web/src/locationPolicy.ts`, the one browser-side mirror of the IAM
 policy in `infra/identity.tf` (issue #38).
