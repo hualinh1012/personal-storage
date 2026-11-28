@@ -187,6 +187,10 @@ the list keeps its full width under it.
 - `web/test/driveStorageContract.ts` is the contract both adapters pass: `driveStorage.test.ts`
   runs it in memory; `driveStorage.s3.test.ts` runs it against a real bucket when
   `DRIVE_STORAGE_S3_BUCKET` and AWS credentials are set (use a scratch bucket).
+- `listVersions(prefix)` returns each key's versions newest first, with `lastModified`, `size`,
+  `isLatest` and `deleteMarker`; it matches by prefix, so callers filter by `key`.
+  `restoreVersion` copies a version on top of its key (no request for the latest; a delete
+  marker is refused).
 - A new S3 operation goes into the interface, both adapters and the contract. Its IAM is in
   `infra/identity.tf`.
 

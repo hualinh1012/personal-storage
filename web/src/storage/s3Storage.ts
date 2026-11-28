@@ -18,9 +18,10 @@ export interface S3Target {
 /** Files up to this size go up in one PutObject; bigger ones in parts of this size. */
 export const PART_SIZE = 8 * 1024 * 1024;
 
-/** CopySource is "bucket/key" with the key URL-encoded segment by segment. */
-export function copySource(bucket: string, key: string): string {
-  return `${bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+/** CopySource is "bucket/key" with the key URL-encoded segment by segment, and "?versionId=" to copy a version. */
+export function copySource(bucket: string, key: string, versionId?: string): string {
+  const source = `${bucket}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  return versionId === undefined ? source : `${source}?versionId=${encodeURIComponent(versionId)}`;
 }
 
 type SdkError = { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
@@ -33,7 +34,7 @@ export function toStorageError(error: unknown): DriveStorageError {
   // HEAD responses have no body, so the SDK has only the status to go on ("UnknownError").
   const message = e.message && e.message !== "UnknownError" ? e.message : undefined;
   if (e.name === "AbortError") return new DriveStorageError("Aborted", message ?? "Cancelled", { cause: error });
-  if (e.name === "NotFound" || e.name === "NoSuchKey" || status === 404) {
+  if (e.name === "NotFound" || e.name === "NoSuchKey" || e.name === "NoSuchVersion" || status === 404) {
     return new DriveStorageError("NotFound", message ?? "Not Found", { cause: error });
   }
   if (e.name === "AccessDenied" || e.name === "Forbidden" || status === 403) {
@@ -113,22 +114,49 @@ export function s3DriveStorage({ bucket, region, credentials }: S3Target): Drive
 
     listVersions: (prefix) =>
       call(async (s3, c) => {
-        const versions: ObjectVersion[] = [];
+        // S3 returns versions and delete markers in two lists, each newest first per key.
+        // Grouped by key in S3's order, then merged newest first again.
+        const byKey = new Map<string, ObjectVersion[]>();
         let KeyMarker: string | undefined;
         let VersionIdMarker: string | undefined;
         do {
           const page = await c.send(new s3.ListObjectVersionsCommand({ Bucket, Prefix: prefix, KeyMarker, VersionIdMarker }));
-          for (const v of [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])]) {
-            if (v.Key && v.VersionId) versions.push({ key: v.Key, versionId: v.VersionId });
+          const entries = [
+            ...(page.Versions ?? []).map((v) => ({ v, deleteMarker: false, size: v.Size ?? 0 })),
+            ...(page.DeleteMarkers ?? []).map((v) => ({ v, deleteMarker: true, size: 0 })),
+          ];
+          for (const { v, deleteMarker, size } of entries) {
+            if (!v.Key || !v.VersionId) continue;
+            const list = byKey.get(v.Key) ?? [];
+            list.push({
+              key: v.Key,
+              versionId: v.VersionId,
+              lastModified: v.LastModified ?? new Date(0),
+              size,
+              isLatest: !!v.IsLatest,
+              deleteMarker,
+            });
+            byKey.set(v.Key, list);
           }
           KeyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
           VersionIdMarker = page.IsTruncated ? page.NextVersionIdMarker : undefined;
         } while (KeyMarker);
-        return versions;
+        // Stable sort: the latest first, then by time; same-second entries keep S3's order.
+        const newestFirst = (a: ObjectVersion, b: ObjectVersion) =>
+          Number(b.isLatest) - Number(a.isLatest) || b.lastModified.getTime() - a.lastModified.getTime();
+        return [...byKey.values()].flatMap((list) => list.sort(newestFirst));
       }),
 
     removeVersion: ({ key, versionId }) =>
       call((s3, c) => c.send(new s3.DeleteObjectCommand({ Bucket, Key: key, VersionId: versionId }))).then(() => undefined),
+
+    async restoreVersion({ key, versionId, isLatest, deleteMarker }) {
+      if (deleteMarker) throw new DriveStorageError("Other", "A deleted version can't be restored.");
+      // Already current; S3 may refuse copying an object onto itself.
+      if (isLatest) return;
+      // Single-request copy (5 GB limit, like copy). MetadataDirective COPY keeps the version's content type.
+      await call((s3, c) => c.send(new s3.CopyObjectCommand({ Bucket, Key: key, CopySource: copySource(bucket, key, versionId) })));
+    },
 
     read: (key) =>
       call(async (s3, c) => {

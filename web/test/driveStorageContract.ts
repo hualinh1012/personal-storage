@@ -98,6 +98,77 @@ export function driveStorageContract(name: string, make: () => { storage: DriveS
       expect(versions.filter((v) => v.key === `${p}v.txt`)).toHaveLength(3);
     });
 
+    it("lists each key's versions newest first, with what a version list shows", async () => {
+      const { s, p, put } = setup();
+      await put("meta.txt", "one");
+      await put("meta.txt", "two");
+      await s.remove(`${p}meta.txt`);
+      const versions = (await s.listVersions(`${p}meta.txt`)).filter((v) => v.key === `${p}meta.txt`);
+      expect(versions.map((v) => [v.deleteMarker, v.isLatest, v.size])).toEqual([
+        [true, true, 0],
+        [false, false, 3],
+        [false, false, 3],
+      ]);
+      for (const v of versions) expect(v.lastModified).toBeInstanceOf(Date);
+      expect(new Set(versions.map((v) => v.versionId)).size).toBe(3);
+    });
+
+    it("restores an earlier version on top, keeping the replaced content as a version", async () => {
+      const { s, p, put } = setup();
+      await put("r.txt", "one");
+      await put("r.txt", "two!");
+      const before = (await s.listVersions(`${p}r.txt`)).filter((v) => v.key === `${p}r.txt`);
+      const one = before.find((v) => v.size === 3)!;
+      await s.restoreVersion(one);
+      expect(str(await s.read(`${p}r.txt`))).toBe("one");
+      const after = (await s.listVersions(`${p}r.txt`)).filter((v) => v.key === `${p}r.txt`);
+      expect(after).toHaveLength(3);
+      expect(after[0]).toMatchObject({ isLatest: true, deleteMarker: false, size: 3 });
+      expect(after.map((v) => v.versionId)).toEqual(expect.arrayContaining(before.map((v) => v.versionId)));
+    });
+
+    it("restores the last real version of a deleted file", async () => {
+      const { s, p, put } = setup();
+      await put("del.txt", "keep me");
+      await s.remove(`${p}del.txt`);
+      const versions = (await s.listVersions(`${p}del.txt`)).filter((v) => v.key === `${p}del.txt`);
+      await s.restoreVersion(versions.find((v) => !v.deleteMarker)!);
+      expect(await s.exists(`${p}del.txt`)).toBe(true);
+      expect(str(await s.read(`${p}del.txt`))).toBe("keep me");
+    });
+
+    it("restoring the latest version changes nothing", async () => {
+      const { s, p, put } = setup();
+      await put("latest.txt", "one");
+      await put("latest.txt", "two");
+      const [latest] = await s.listVersions(`${p}latest.txt`);
+      await s.restoreVersion(latest);
+      expect(await s.listVersions(`${p}latest.txt`)).toHaveLength(2);
+      expect(str(await s.read(`${p}latest.txt`))).toBe("two");
+    });
+
+    it("refuses to restore a delete marker or an unknown version", async () => {
+      const { s, p, put } = setup();
+      await put("m.txt");
+      await put("m.txt", "newer");
+      await s.remove(`${p}m.txt`);
+      const [marker, newer] = await s.listVersions(`${p}m.txt`);
+      expect(marker.deleteMarker).toBe(true);
+      expect(await s.restoreVersion(marker).catch((e: unknown) => e)).toBeInstanceOf(DriveStorageError);
+      const unknown = { ...newer, isLatest: false, versionId: "no-such-version-id" };
+      expect(await s.restoreVersion(unknown).catch((e: unknown) => e)).toBeInstanceOf(DriveStorageError);
+      expect(await s.exists(`${p}m.txt`)).toBe(false);
+    });
+
+    it("restores versions of keys with spaces, unicode and + (CopySource encoding)", async () => {
+      const { s, p, put } = setup();
+      await put("Tết 2026/a+b & c.txt", "first");
+      await put("Tết 2026/a+b & c.txt", "second");
+      const versions = await s.listVersions(`${p}Tết 2026/a+b & c.txt`);
+      await s.restoreVersion(versions[1]);
+      expect(str(await s.read(`${p}Tết 2026/a+b & c.txt`))).toBe("first");
+    });
+
     it("removing every version leaves nothing, not even in the versions list", async () => {
       const { s, p, put } = setup();
       await put("purge/a.txt", "one");

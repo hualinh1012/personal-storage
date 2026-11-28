@@ -16,6 +16,13 @@
 export interface ObjectVersion {
   key: string;
   versionId: string;
+  lastModified: Date;
+  /** Bytes; 0 for a delete marker. */
+  size: number;
+  /** The newest entry for its key: the current content, or the marker that deleted it. */
+  isLatest: boolean;
+  /** A delete marker, not content. */
+  deleteMarker: boolean;
 }
 
 export interface StoredFile {
@@ -49,10 +56,19 @@ export interface DriveStorage {
   listKeys(prefix: string): Promise<string[]>;
   /** One level of a folder. */
   listFolder(prefix: string): Promise<FolderListing>;
-  /** Every version and delete marker under a prefix. */
+  /**
+   * Every version and delete marker under a prefix, newest first for each key.
+   * It's a prefix: listing "a.txt" also lists "a.txt.bak", so callers filter by `key`.
+   */
   listVersions(prefix: string): Promise<ObjectVersion[]>;
   /** Removes one version or delete marker for good. */
-  removeVersion(version: ObjectVersion): Promise<void>;
+  removeVersion(version: Pick<ObjectVersion, "key" | "versionId">): Promise<void>;
+  /**
+   * Makes this version the current content of its key again, by copying it on
+   * top. The replaced content stays as a version. The latest version is already
+   * current, so nothing happens; a delete marker can't be restored (rejects).
+   */
+  restoreVersion(version: ObjectVersion): Promise<void>;
   /** The current object's bytes. */
   read(key: string): Promise<Uint8Array>;
   /** Creates or replaces an object. */

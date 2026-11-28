@@ -85,15 +85,61 @@ describe("s3DriveStorage", () => {
     expect(sent.map((s) => s.input.Delimiter)).toEqual(["/", "/"]);
   });
 
-  it("lists versions and delete markers across pages", async () => {
+  it("lists versions and delete markers across pages, each key newest first", async () => {
+    const t = (s: number) => new Date(Date.UTC(2026, 10, 1, 0, 0, s));
     respond = ({ input }) =>
       input.KeyMarker
-        ? { DeleteMarkers: [{ Key: "Deleted/b", VersionId: "m1" }] }
-        : { Versions: [{ Key: "Deleted/a", VersionId: "v1" }], IsTruncated: true, NextKeyMarker: "Deleted/a", NextVersionIdMarker: "v1" };
-    expect(await storage().listVersions("Deleted/")).toEqual([
-      { key: "Deleted/a", versionId: "v1" },
-      { key: "Deleted/b", versionId: "m1" },
+        ? {
+            Versions: [{ Key: "Global/b", VersionId: "b1", Size: 2, LastModified: t(1), IsLatest: false }],
+            DeleteMarkers: [{ Key: "Global/b", VersionId: "m1", LastModified: t(5), IsLatest: true }],
+          }
+        : {
+            Versions: [
+              { Key: "Global/a", VersionId: "a2", Size: 9, LastModified: t(3), IsLatest: true },
+              { Key: "Global/a", VersionId: "a1", Size: 4, LastModified: t(2), IsLatest: false },
+            ],
+            IsTruncated: true,
+            NextKeyMarker: "Global/a",
+            NextVersionIdMarker: "a1",
+          };
+    expect(await storage().listVersions("Global/")).toEqual([
+      { key: "Global/a", versionId: "a2", lastModified: t(3), size: 9, isLatest: true, deleteMarker: false },
+      { key: "Global/a", versionId: "a1", lastModified: t(2), size: 4, isLatest: false, deleteMarker: false },
+      { key: "Global/b", versionId: "m1", lastModified: t(5), size: 0, isLatest: true, deleteMarker: true },
+      { key: "Global/b", versionId: "b1", lastModified: t(1), size: 2, isLatest: false, deleteMarker: false },
     ]);
+    expect(sent[1].input).toMatchObject({ KeyMarker: "Global/a", VersionIdMarker: "a1" });
+  });
+
+  const version = (over: Partial<{ isLatest: boolean; deleteMarker: boolean }> = {}) => ({
+    key: "Global/Tết/a b.jpg",
+    versionId: "3/L4kq+cz",
+    lastModified: new Date(),
+    size: 1,
+    isLatest: false,
+    deleteMarker: false,
+    ...over,
+  });
+
+  it("restores a version with one CopyObject from ?versionId= onto its own key", async () => {
+    await storage().restoreVersion(version());
+    expect(sent).toEqual([
+      {
+        command: "CopyObject",
+        input: { Bucket: "files", Key: "Global/Tết/a b.jpg", CopySource: "files/Global/T%E1%BA%BFt/a%20b.jpg?versionId=3%2FL4kq%2Bcz" },
+      },
+    ]);
+  });
+
+  it("sends nothing to restore the latest version, and refuses a delete marker", async () => {
+    await storage().restoreVersion(version({ isLatest: true }));
+    await expect(storage().restoreVersion(version({ deleteMarker: true }))).rejects.toMatchObject({ kind: "Other" });
+    expect(sent).toEqual([]);
+  });
+
+  it("maps an unknown version to the one not-found rule", async () => {
+    respond = () => Object.assign(new Error("The specified version does not exist."), { name: "NoSuchVersion" });
+    expect(isNotFound(await storage().restoreVersion(version()).catch((e: unknown) => e))).toBe(true);
   });
 
   it("maps a missing key on read to the one not-found rule", async () => {

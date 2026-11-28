@@ -101,16 +101,19 @@ A missing or unexpected tag fails every condition that tests it, so the fallback
 |---|---|---|---|---|
 | `ListDriveFolder` | `s3:ListBucket` | bucket | `s3:prefix` like `Global/`, `Global/*` | Listing the shared drive (everyone) |
 | `ReadDriveObjects` | `s3:GetObject` | `Global/*` | none | Download and preview (everyone) |
-| `WriteDriveObjects` | `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` | `Global/*` | `aws:PrincipalTag/global_access` = `write` | Upload, create folder, Move, Delete's move to `Deleted/`, Google import |
-| `ListOwnPersonalFolder` | `s3:ListBucket` | bucket | `s3:prefix` like `Personal/${aws:PrincipalTag/email}/`, `…/*`, and `personal` = `yes` | Listing your own folder |
-| `ManageOwnPersonalObjects` | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` | `Personal/${aws:PrincipalTag/email}/*` | `personal` = `yes` | Everything in your own folder |
+| `WriteDriveObjects` | `s3:GetObjectVersion`, `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` | `Global/*` | `aws:PrincipalTag/global_access` = `write` | Upload, create folder, Move, Delete's move to `Deleted/`, Google import, restoring an earlier version |
+| `ListDriveVersions` | `s3:ListBucketVersions` | bucket | `s3:prefix` like `Global/`, `Global/*`, and `global_access` = `write` | Listing a shared file's earlier versions (ADR 0020) |
+| `ListOwnPersonalFolder` | `s3:ListBucket`, `s3:ListBucketVersions` | bucket | `s3:prefix` like `Personal/${aws:PrincipalTag/email}/`, `…/*`, and `personal` = `yes` | Listing your own folder and its files' versions |
+| `ManageOwnPersonalObjects` | `s3:GetObject`, `s3:GetObjectVersion`, `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` | `Personal/${aws:PrincipalTag/email}/*` | `personal` = `yes` | Everything in your own folder, including restoring an earlier version |
 | `MoveSharedFilesToDeleted` | `s3:PutObject` | `Deleted/Global/*` | `global_access` = `write` | Delete in `Global/` (copy into `Deleted/`) |
 | `MoveOwnPersonalFilesToDeleted` | `s3:PutObject` | `Deleted/Personal/${aws:PrincipalTag/email}/*` | `personal` = `yes` | Delete in your own folder |
 | `ListDeletedFolder` | `s3:ListBucket`, `s3:ListBucketVersions` | bucket | `s3:prefix` like `Deleted/`, `Deleted/*`, and `trash` = `yes` | Showing `Deleted/`, finding every version to purge |
 | `ManageDeletedObjects` | `s3:GetObject`, `s3:DeleteObject`, `s3:DeleteObjectVersion` | `Deleted/*` | `trash` = `yes` | Restore, Delete permanently, Empty Deleted |
 
 `s3:PutObject` also covers `CreateMultipartUpload`, `UploadPart` and `CompleteMultipartUpload`,
-and `CopyObject` needs `GetObject` on the source and `PutObject` on the destination. In
+and `CopyObject` needs `GetObject` on the source and `PutObject` on the destination (from a
+`?versionId=` source, `GetObjectVersion`: how restoring a version works). Nothing grants
+`s3:DeleteObjectVersion` outside `Deleted/`. In
 Terraform, `$${…}` keeps the IAM policy variable literal.
 
 The role's trust policy (`data.aws_iam_policy_document.authenticated_assume`) lets only
@@ -129,6 +132,7 @@ The role's trust policy (`data.aws_iam_policy_document.authenticated_assume`) le
 | Home lists `Deleted/` only with `trash` | `listDriveLocations()` | `ListDeletedFolder`, `ManageDeletedObjects` |
 | Home never lists other people's folders | `listDriveLocations()` (replaces the adapter's `listLocations`) | No statement allows `Personal/<someone else>/` |
 | Restore refuses targets the person can't write | `canWriteAt()` in `web/src/locationPolicy.ts` | the `Global/` and personal statements |
+| Earlier versions listed and restored only where `restoreVersions` (= `write`) | `locationPolicy().restoreVersions` | `ListDriveVersions`, `ListOwnPersonalFolder`, and `GetObjectVersion` in the write statements |
 
 ## 4. Flows
 

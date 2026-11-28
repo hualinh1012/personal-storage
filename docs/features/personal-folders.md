@@ -68,9 +68,13 @@ written `$${aws:PrincipalTag/email}` so Terraform leaves it for IAM to resolve p
 
 | Sid | Actions | Resource | Conditions | Needed for |
 |---|---|---|---|---|
-| `ListOwnPersonalFolder` | `s3:ListBucket` | the bucket | `s3:prefix` like `Personal/${aws:PrincipalTag/email}/` or `…/*`; `aws:PrincipalTag/personal` = `yes` | list, search, pager count, Copy/Move destination picker, Delete of a folder |
-| `ManageOwnPersonalObjects` | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` | `Personal/${aws:PrincipalTag/email}/*` | `personal` = `yes` | everything on files: download, preview, upload (incl. multipart), create folder, Copy, Move, Edit, the original's removal on Delete, Google import |
+| `ListOwnPersonalFolder` | `s3:ListBucket`, `s3:ListBucketVersions` | the bucket | `s3:prefix` like `Personal/${aws:PrincipalTag/email}/` or `…/*`; `aws:PrincipalTag/personal` = `yes` | list, search, pager count, Copy/Move destination picker, Delete of a folder, listing a file's earlier versions |
+| `ManageOwnPersonalObjects` | `s3:GetObject`, `s3:GetObjectVersion`, `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` | `Personal/${aws:PrincipalTag/email}/*` | `personal` = `yes` | everything on files: download, preview, upload (incl. multipart), create folder, Copy, Move, Edit, the original's removal on Delete, Google import, restoring an earlier version |
 | `MoveOwnPersonalFilesToDeleted` | `s3:PutObject` | `Deleted/Personal/${aws:PrincipalTag/email}/*` | `personal` = `yes` | Delete's copy into `Deleted/` |
+
+The version actions ([ADR 0020](../adr/0020-writers-restore-earlier-versions.md)) let the owner
+list a file's earlier versions and restore one by copying it on top; nothing grants
+`s3:DeleteObjectVersion` here, so history can't be erased from the app.
 
 There is no statement for `Personal/*` in general, so a request for another person's folder, or
 for `Personal/` itself, matches nothing and S3 returns `AccessDenied`, whatever the browser sends.
@@ -85,7 +89,7 @@ the owner in ADR 0011). They can't restore into someone else's folder: they have
 |---|---|---|
 | Home lists `Personal/<own email>/` only when `personal` is `yes` and the email is known | `listDriveLocations()` in `web/src/locationPolicy.ts` | `ListOwnPersonalFolder`, `ManageOwnPersonalObjects` need `personal` = `yes` |
 | Home never lists anyone else's folder | `listDriveLocations()` (replaces the Amplify adapter's `listLocations`; listing everyone's would mean shipping the allowlist to the browser) | no statement matches another email |
-| The personal location always has `["delete", "get", "list", "write"]` | `locationPolicy()` (kind `personal`) | same statements, independent of `global_access` |
+| The personal location always has `["delete", "get", "list", "write"]`, and `restoreVersions` | `locationPolicy()` (kind `personal`) | same statements, independent of `global_access` |
 | **+ New** shown (disabled outside a writable location) when the person can write somewhere; **My files** in the sidebar only with the folder | `showNew` in `web/src/driveHost/DriveView.tsx`, `driveLocations()` | |
 | Restore refuses targets in another person's folder with a clear message | `canWriteAt()` in `web/src/locationPolicy.ts`, `cantWriteMessage()` in `trash.ts` | no write on that folder |
 

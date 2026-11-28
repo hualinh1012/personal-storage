@@ -71,11 +71,15 @@ From `aws_iam_role_policy.authenticated` in `infra/identity.tf` (full table and 
 |---|---|---|---|
 | `ListDriveFolder` | `s3:ListBucket` on the bucket | `s3:prefix` like `Global/`, `Global/*` | list, search, pager count, Copy/Move destination picker, Delete of a folder (lists its files) |
 | `ReadDriveObjects` | `s3:GetObject` on `Global/*` | none | download, preview, Edit (open), `HeadObject` (Move's clash check, download's existence check), source of every copy |
-| `WriteDriveObjects` | `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` on `Global/*` | `aws:PrincipalTag/global_access` = `write` | upload (single and multipart), create folder, Copy/Move destination, Move's delete, Edit (save), Delete's removal of the original |
+| `WriteDriveObjects` | `s3:GetObjectVersion`, `s3:PutObject`, `s3:DeleteObject`, `s3:AbortMultipartUpload`, `s3:ListMultipartUploadParts` on `Global/*` | `aws:PrincipalTag/global_access` = `write` | upload (single and multipart), create folder, Copy/Move destination, Move's delete, Edit (save), Delete's removal of the original, restoring an earlier version (`GetObjectVersion` on the source, `PutObject` on the key) |
+| `ListDriveVersions` | `s3:ListBucketVersions` on the bucket | `s3:prefix` like `Global/`, `Global/*`; `global_access` = `write` | listing a file's earlier versions ([ADR 0020](../adr/0020-writers-restore-earlier-versions.md)); separate from `ListDriveFolder` because readers hold that one |
 | `MoveSharedFilesToDeleted` | `s3:PutObject` on `Deleted/Global/*` | `global_access` = `write` | Delete's copy into `Deleted/` |
 
 Nothing grants `s3:DeleteObjectVersion` on `Global/*`, so nobody can remove a version from the
-app: versioning stays the backstop against raw-credential misuse.
+app: versioning stays the backstop against raw-credential misuse. Writers can list and restore
+versions (ADR 0020): `DriveStorage.restoreVersion` copies the version on top of its key
+(`CopyObject` from `?versionId=`), so the replaced content becomes a version too. The Versions menu
+item that uses it is a follow-up (target 1.0.0, G4).
 
 ### What the UI hides versus what IAM enforces
 
@@ -84,6 +88,7 @@ app: versioning stays the backstop against raw-credential misuse.
 | `Global/` location has permissions `["get", "list"]` without write, `["delete", "get", "list", "write"]` with it | `driveLocation()` in `web/src/locationPolicy.ts` | `WriteDriveObjects` |
 | Storage Browser hides Upload, Create folder, Copy and Delete for a location without `write`/`delete` | Storage Browser's own action configs | same |
 | Move, Edit and Delete hide without `write` (Move and Delete also need `delete`) | `hide` in `moveAction.ts`, `editAction.ts`, `trash/actions.ts` | same |
+| Listing and restoring versions only where `restoreVersions` is true (exactly where `write` is) | `locationPolicy().restoreVersions`, `hideUnless("restoreVersions")` | `ListDriveVersions`, `WriteDriveObjects` (`GetObjectVersion`) |
 | **+ New** enabled only where the open location has `write`, left out for people who can't write anywhere | `locationPolicy().write`, `canWriteSomewhere()`, `showNew` in `web/src/driveHost/DriveView.tsx` | same |
 | Sidebar lists only readable locations | `driveLocations()` in `web/src/locationPolicy.ts` | the list statements above |
 | Home lists only `Global/` (plus own folder/`Deleted/`) | `listDriveLocations()` | `ListDriveFolder` only matches `Global/`; listing the bucket root is denied |
