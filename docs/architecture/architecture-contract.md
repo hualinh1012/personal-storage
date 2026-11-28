@@ -6,7 +6,7 @@ The agreement on how changes to Family Drive conform to its architecture
 here it is scaled to a project with one owner, occasional contributors and coding agents.
 
 - **Version:** 1.0, 14 November 2026.
-- **Applies to:** every change merged into `main`: code, Terraform, pipelines, IAM policies, docs.
+- **Applies to:** every change merged into `develop` (and so released to `main`): code, Terraform, pipelines, IAM policies, docs.
 
 ## 1. Parties and roles
 
@@ -14,7 +14,7 @@ here it is scaled to a project with one owner, occasional contributors and codin
 |---|---|---|
 | Owner | Architecture authority, operator, approver | Owns the principles and ADRs; triages tickets; approves and merges every PR; applies console-only changes (IAM policy re-attachment, SSM values, Google Cloud); grants waivers |
 | Contributor (human) | Implementer | Follows this contract; fills in the checklist in the PR description |
-| Coding agent | Implementer | Same as a contributor; picks only `ready-for-agent` tickets; never merges or approves; never pushes to `main` |
+| Coding agent | Implementer | Same as a contributor; picks only `ready-for-agent` tickets; never merges or approves; never pushes to `develop` or `main` |
 
 ## 2. What every change must respect
 

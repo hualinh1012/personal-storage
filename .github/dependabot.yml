@@ -8,6 +8,7 @@ updates:
   # "# vX.Y.Z" comment together.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop # PRs go to develop; main only gets develop's merges
     schedule:
       interval: weekly
       day: monday
@@ -23,6 +24,7 @@ updates:
 
   - package-ecosystem: npm
     directory: /web
+    target-branch: develop # PRs go to develop; main only gets develop's merges
     schedule:
       interval: weekly
       day: monday
@@ -42,6 +44,7 @@ updates:
 
   - package-ecosystem: npm
     directory: /functions/allowlist
+    target-branch: develop # PRs go to develop; main only gets develop's merges
     schedule:
       interval: weekly
       day: monday

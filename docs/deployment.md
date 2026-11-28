@@ -22,6 +22,10 @@ There are two Terraform stacks and three pipelines.
 | App deploy | `ci/apply-app.sh` | `deploy.yml`, by hand only (target `application` or `foundation-then-application`), after approval in `app` (and after the foundation, if it ran) |
 | App destroy | `ci/destroy-app.sh` | `destroy.yml`, by hand only: typed confirmation, then approval in `destroy` |
 
+**Releasing:** open a pull request from `develop` into `main`, merge it with a **merge commit** (never a
+squash, so the branches don't drift apart), then run the pipelines below on `main`. Nothing else lands on
+`main`. Factory tickets wait in `awaiting-deploy` until then; L10 checks the run on `main` afterwards.
+
 A push or merge to `main` deploys nothing. No pipeline starts on a push by itself or has an approval stage: GitHub Actions starts them at the
 commit its checks passed, signed in with OIDC ([ADR 0017](adr/0017-github-actions-starts-codepipeline-with-oidc.md)).
 Approve a waiting run under **Actions → the run → Review deployments**.
@@ -60,7 +64,7 @@ Keep them in place:
 
 | Control | Setting |
 |---|---|
-| `main` ruleset | Pull request required (0 approvals: single maintainer), force pushes and deletion blocked |
+| `main` and `develop` rulesets | Pull request required (0 approvals: single maintainer), force pushes and deletion blocked |
 | GitHub Environments `foundation`, `app`, `destroy` | Required reviewer: the owner only ("Prevent self-review" off); deployment branches: `main` only |
 | Trigger roles | OIDC only, no AWS key in GitHub. Each role trusts one environment and can start only its own pipeline |
 | CodePipelines | No push trigger, no approval stage, execution mode `QUEUED` |

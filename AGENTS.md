@@ -105,6 +105,10 @@ type-check, test and build both packages, Terraform `fmt -check` and offline `va
 (`.github/dependabot.yml`) opens weekly update PRs for the pinned actions and both packages; the
 same checks run on each.
 
+**Branches:** pull requests target `develop`. A release is a pull request from `develop` into `main`,
+merged with a merge commit (never squashed), then **Run workflow** on `main`. Nothing else lands on `main`:
+no release or hotfix branches. Both branches need a pull request.
+
 **CI/CD:** GitHub Actions decides when, CodePipeline deploys
 ([ADR 0017](docs/adr/0017-github-actions-starts-codepipeline-with-oidc.md)). `deploy.yml` runs only by hand
 (**Run workflow**; a push or merge to `main` deploys nothing): it runs `ci.yml`, then, after approval in a
@@ -171,7 +175,8 @@ The project uses Matt Pocock's skills (`mattpocock-skills`), not superpowers (tu
 
 This repo is a single-repo product in the development factory: it is its own workspace. `repos.yaml`
 lists its commands and the deploy check, and `factory-policy.yaml` (owned by the factory maintainer)
-sets how much the factory does on its own; a person merges and deploys. The factory's rules come
+sets how much the factory does on its own; a person merges and deploys. Factory pull requests target
+`develop` (`branch` in `repos.yaml`); `main` is the `release_branch`. The factory's rules come
 first; this file may only tighten them. In factory runs, agents never edit the workspace files
 (`repos.yaml`, `factory-policy.yaml`, `CODEOWNERS`, `AGENTS.md`, `CLAUDE.md`, `.gitignore`,
 `docs/agents/**`) or anything under `.github/**`: a change there is a human ticket.
