@@ -2,6 +2,7 @@
 #   - Terraform state bucket (holds this stack's state and the app stack's state)
 #   - Family files bucket (the actual data)
 #   - SSM parameters the deploy reads (Google client, allowed emails, Deleted retention)
+#   - Monthly cost budget with email alerts (budget.tf)
 #   - Permissions boundary for the app stack's IAM roles (boundary.tf)
 # Everything here has prevent_destroy. Apply it with ./bootstrap.sh from an admin
 # machine; the CodePipeline only deploys the app stack.
@@ -47,6 +48,19 @@ variable "deleted_retention_days" {
   validation {
     condition     = var.deleted_retention_days >= 1 && floor(var.deleted_retention_days) == var.deleted_retention_days
     error_message = "deleted_retention_days must be a whole number of days, at least 1."
+  }
+}
+
+# Monthly AWS cost budget in USD (budget.tf). The brief caps the running cost at
+# about $2 a month (measure M1); the owner is emailed at 100% of actual and of
+# forecast spend.
+variable "monthly_budget_usd" {
+  type    = number
+  default = 2
+
+  validation {
+    condition     = var.monthly_budget_usd > 0
+    error_message = "monthly_budget_usd must be greater than 0."
   }
 }
 

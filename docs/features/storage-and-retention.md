@@ -252,6 +252,12 @@ The app pipeline only reads the retention parameter (`ReadFoundationParams`).
 - **Cost:** Cost Explorer filtered by service S3 and the `Project = family-drive` tag (the app stack's
   default tag; the foundation adds `Stack = foundation`), grouped by usage type
   (`TimedStorage-INT-FA-ByteHrs`, `-INT-IA-`, `-INT-AIA-`, `Requests-Tier1`, `DataTransfer-Out-Bytes`).
+- **Budget alert:** the foundation's AWS budget `family-drive-monthly` (`infra/foundation/budget.tf`)
+  emails the owner when spend passes the limit (`monthly_budget_usd`, default $2, the brief's ceiling)
+  at 100% of **actual** spend and at 100% of **forecast** spend. The address is the owner-set SSM
+  parameter `/family-drive/budget_alert_email`; while it is `CHANGE_ME` the budget tracks spend but has no
+  notifications, and setting the address takes effect on the next foundation run. AWS updates spend about
+  three times a day and needs some history to forecast, so an alert can lag a spike by hours.
 - **Optional:** S3 Storage Lens' free dashboard shows noncurrent bytes and incomplete multipart
   uploads, the two things that grow quietly.
 - **Error codes tied to storage class:** `InvalidObjectState` would mean an archived object, which
@@ -273,6 +279,8 @@ Rough Singapore (`ap-southeast-1`) list prices, November 2026; check the S3 pric
 | Data transfer out | about $0.12 per GB after the free allowance | downloads and previews go **straight from S3** to the browser, not through CloudFront |
 | CloudFront | per GB and per request | only the SPA (a few MB per visit), never the files |
 | Deletes and expirations | free | Delete permanently, Empty Deleted, lifecycle expiry |
+
+The foundation budget alerts the owner when the whole account's monthly spend passes `monthly_budget_usd` (default $2; see Observability).
 
 **Example:** 100 GB of family photos (40,000 objects), mostly unopened after a few months, costs
 roughly $0.6–1.5 per month in storage plus $0.10 in monitoring, plus whatever is downloaded.

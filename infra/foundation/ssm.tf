@@ -86,6 +86,20 @@ resource "aws_ssm_parameter" "google_project_number" {
   }
 }
 
+# Where the monthly budget (budget.tf) emails its alerts. Owner-set like the
+# parameters above; no address is committed. While it is CHANGE_ME the budget
+# exists but has no notifications.
+resource "aws_ssm_parameter" "budget_alert_email" {
+  name  = "/${var.project}/budget_alert_email"
+  type  = "String"
+  value = local.placeholder
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [value, insecure_value]
+  }
+}
+
 # The Deleted folder's retention (issue #25), published for the app stack, which
 # finds foundation values by name rather than reading this stack's state; the SPA
 # shows it in Deleted/. Unlike the parameters above, Terraform owns this value:

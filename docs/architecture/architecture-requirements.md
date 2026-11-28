@@ -80,7 +80,7 @@ says how changes are checked against this document.
 | NFR-A2 | Rebuilding the app never touches the files or settings. | App stack destroy and redeploy keeps the foundation | ADR 0004 | Met |
 | NFR-A3 | Mistakes are recoverable for 30 days. | Versioning + Deleted folder | ADR 0006, 0011, 0012 | Met |
 | NFR-A4 | The files survive loss of the bucket or the account. | Independent backup | #54 | Accepted gap (cost) |
-| NFR-A5 | Misuse or failure is noticed promptly. | Trail, alarms, budget alert | #56 | Accepted gap (cost) |
+| NFR-A5 | Misuse or failure is noticed promptly. | Trail, alarms, budget alert | #56, #98 | Partly met: budget alert in place (#98); trail and alarms remain an accepted gap (cost) |
 
 ### Cost
 
@@ -88,7 +88,7 @@ says how changes are checked against this document.
 |---|---|---|---|---|
 | NFR-C1 | Nothing costs money while idle except storage. | No servers, databases or always-on services | ADR 0001 | Met |
 | NFR-C2 | Storage gets cheaper for files nobody opens. | Intelligent-Tiering on `Global/` and `Personal/` | #18, ADR 0013 | Met |
-| NFR-C3 | Running cost stays at a few dollars a month for a family's files. | See [storage-and-retention.md](../features/storage-and-retention.md#cost) | ADD §1 | Met (no alert: NFR-A5) |
+| NFR-C3 | Running cost stays at a few dollars a month for a family's files. | See [storage-and-retention.md](../features/storage-and-retention.md#cost) | ADD §1 | Met (budget alert: #98, NFR-A5) |
 
 ### Performance and limits
 

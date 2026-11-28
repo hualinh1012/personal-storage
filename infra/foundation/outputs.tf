@@ -17,6 +17,7 @@ output "ssm_parameters" {
     aws_ssm_parameter.allowed_emails.name,
     aws_ssm_parameter.google_api_key.name,
     aws_ssm_parameter.google_project_number.name,
+    aws_ssm_parameter.budget_alert_email.name,
     aws_ssm_parameter.custom_domain.name,
     aws_ssm_parameter.certificate_arn.name,
     aws_ssm_parameter.hosted_zone_id.name,
