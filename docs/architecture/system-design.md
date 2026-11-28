@@ -92,6 +92,7 @@ of truth.
 | Files bucket, lifecycle, TLS-only policies | `infra/foundation/files.tf`, `tls.tf` | foundation | [storage-and-retention.md](../features/storage-and-retention.md) |
 | State bucket | `infra/foundation/state.tf` | foundation | [storage-and-retention.md](../features/storage-and-retention.md) |
 | SSM parameters | `infra/foundation/ssm.tf` | foundation | §4 below |
+| Monthly cost budget and email alerts | `infra/foundation/budget.tf` | foundation | [storage-and-retention.md](../features/storage-and-retention.md) |
 | Config into the SPA | `scripts/write-config.sh` | scripts | §4 below |
 | Build and upload of the SPA | `scripts/deploy.sh` | scripts | §5 below |
 | Pipelines | `ci/apply-app.sh`, `ci/app-env.sh`, `ci/tf-init.sh`, `ci/destroy-app.sh`, `infra/foundation/bootstrap.sh` | CI | §5 below |
@@ -226,6 +227,7 @@ names, sizes, dates and content types are what S3 returns. Versioning, lifecycle
 | Access levels | SSM `/family-drive/access` (`String`, JSON) | owner, by hand | app plan (validated) → Lambda env `ACCESS_LEVELS` |
 | Google OAuth client ID / secret | SSM (`String` / `SecureString`) | owner, by hand | app plan → Cognito Google IdP; the ID also → `config.json` |
 | Google API key, project number | SSM (`String`) | owner, by hand | app plan → outputs → `config.json` |
+| Budget alert address | SSM `/family-drive/budget_alert_email` (`String`) | owner, by hand | foundation plan → AWS budget notifications (`CHANGE_ME` = none); the app stack doesn't read it |
 | Deleted retention | SSM `/family-drive/deleted_retention_days` | Terraform (foundation variable) | app plan → `config.json` |
 | Custom domain, certificate ARN, hosted zone | SSM `/family-drive/custom_domain`, `certificate_arn`, `hosted_zone_id` | Terraform (foundation variables; `CHANGE_ME` = off) | app plan → CloudFront alias and certificate, Route 53 records, `app_url` |
 | Terraform state | `family-drive-tfstate-<account>`: `foundation/`, `family-drive/` | pipelines | pipelines |
@@ -256,7 +258,7 @@ must match the app client's callback URLs in `infra/auth.tf`. A rework of this p
 
 | | Foundation `infra/foundation/` | App `infra/` |
 |---|---|---|
-| Holds | files bucket, state bucket, SSM parameters, the app roles' permissions boundary | Cognito, Lambdas, Identity Pool, role, CloudFront, web bucket, files bucket CORS, the custom domain's Route 53 records (if set) |
+| Holds | files bucket, state bucket, SSM parameters, the monthly cost budget, the app roles' permissions boundary | Cognito, Lambdas, Identity Pool, role, CloudFront, web bucket, files bucket CORS, the custom domain's Route 53 records (if set) |
 | Lifetime | retained: every resource `prevent_destroy` | disposable: destroy and rebuild freely |
 | State | `s3://family-drive-tfstate-<account>/foundation/terraform.tfstate` | `…/family-drive/terraform.tfstate` |
 | Applied by | `bootstrap.sh` (foundation pipeline, `AUTO_APPROVE=1`) | `ci/apply-app.sh` (app pipeline) |

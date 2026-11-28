@@ -273,8 +273,21 @@ aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/a
 | `/family-drive/access` | String | Access levels JSON |
 | `/family-drive/google_api_key` | String | Leave `CHANGE_ME` until step 10 |
 | `/family-drive/google_project_number` | String | Leave `CHANGE_ME` until step 10 |
+| `/family-drive/budget_alert_email` | String | Optional: where the $2 monthly budget emails its alerts. See below |
 | `/family-drive/deleted_retention_days` | String | **Set by Terraform; don't edit** |
 | `/family-drive/custom_domain`, `certificate_arn`, `hosted_zone_id` | String | **Set by Terraform; don't edit** (custom domain, optional) |
+
+**Cost alerts (optional).** The foundation creates an AWS budget of $2 a month that emails the address in
+`/family-drive/budget_alert_email` at 100% of actual spend and at 100% of forecast spend:
+
+```bash
+aws ssm put-parameter --region ap-southeast-1 --overwrite --name /family-drive/budget_alert_email --value 'you@gmail.com'
+```
+
+The address is read when the foundation runs, so **run the foundation pipeline again after setting it**
+(deploy target `foundation`). While the parameter is `CHANGE_ME` the budget exists and tracks spend but
+sends no email, and the foundation still applies. AWS Budgets emails need no confirmation click. Change the
+limit with `monthly_budget_usd` in `infra/foundation/main.tf`.
 
 For a custom domain from the start, set the three foundation variables in `infra/foundation/main.tf`
 before step 4 ([deployment.md, **Use a custom domain**](../deployment.md#day-to-day)); `app_url` below
