@@ -86,6 +86,16 @@ When adding someone, also give them an entry in `/family-drive/access` if they n
 
 **Change someone's access level:** edit `/family-drive/access` ([setup step 6](guides/setup-from-scratch.md#step-6-set-the-settings-in-ssm)) and re-run the app pipeline. It takes effect at their next token refresh, within about 2 hours, or at once when they sign out and back in.
 
+**Count active family members:** each token issue writes one line `{"event":"token","email":"…","source":"…"}` to `/aws/lambda/family-drive-pre-token-generation` (ADR 0019). Those logs keep **90 days**, so the query covers at most about three months. In CloudWatch, `ap-southeast-1`, open **Logs Insights**, select that log group, set the time range to the month, and run:
+
+```
+filter @message like /"event":"token"/
+| parse @message /"email":"(?<email>[^"]+)"/
+| stats count_distinct(email) as active_members
+```
+
+Brief measure M3 needs at least 2. For who was active, use `... | stats count(*) as token_issues by email` instead.
+
 **Recover a deleted file:** Delete in the app moves files to the **Deleted** folder. Someone with `trash` opens Home → `Deleted/`, selects the file and uses **Restore** in the ⋮ menu. Files there stay until someone deletes them permanently or empties Deleted, or for **30 days**, after which S3 removes them with every version (ADR 0012).
 
 **Change how long Deleted keeps files:** edit `deleted_retention_days` in `infra/foundation/main.tf` and push. Approve the foundation, then the app: the app runs after the foundation, so the note in `Deleted/` shows the new number. A shorter value also applies to files already there.

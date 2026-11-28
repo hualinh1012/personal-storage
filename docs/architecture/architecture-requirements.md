@@ -70,7 +70,7 @@ says how changes are checked against this document.
 |---|---|---|---|---|
 | NFR-P1 | A removed person loses access quickly. | Within about 2 hours, or at once by deleting their Cognito user | ADR 0003 | Met |
 | NFR-P2 | The Google token isn't stored or sent anywhere but Google. | In memory only; `driveClient.ts` the only caller | ADR 0008 | Met |
-| NFR-P3 | Logs hold no file contents and no tokens. | Trigger Lambdas log only errors | [auth-and-access.md](../features/auth-and-access.md) | Met |
+| NFR-P3 | Logs hold no file contents and no tokens. | Trigger Lambdas log errors and one usage line with the email; never tokens or file names | [auth-and-access.md](../features/auth-and-access.md) | Met |
 
 ### Availability and recoverability
 
