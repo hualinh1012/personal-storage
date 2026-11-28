@@ -105,7 +105,7 @@ type-check, test and build both packages, Terraform `fmt -check` and offline `va
 (`.github/dependabot.yml`) opens weekly update PRs for the pinned actions and both packages; the
 same checks run on each.
 
-**CI/CD** (AWS CodePipeline): `ci/pipeline.sh` tests, builds, applies `infra/` and runs
+**CI/CD** (AWS CodePipeline): `ci/apply-app.sh` tests, builds, applies `infra/` and runs
 `scripts/deploy.sh`; `ci/destroy-app.sh` (manual pipeline) destroys the app stack only; the
 foundation pipeline runs `bootstrap.sh`. **A new AWS resource type adds its actions to the
 matching `ci/iam/*-policy.json`**, or the pipeline fails with AccessDenied.

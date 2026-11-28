@@ -1,6 +1,6 @@
 # Checks every pull request and every push to main: lint, type-check, test and build
 # each package, and check the Terraform offline. No AWS credentials: deploying stays in
-# CodePipeline (ci/pipeline.sh).
+# CodePipeline (ci/apply-app.sh).
 name: CI
 
 on:

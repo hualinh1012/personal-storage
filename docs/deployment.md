@@ -19,7 +19,7 @@ There are two Terraform stacks and three pipelines.
 | Pipeline | Runs | Trigger |
 |---|---|---|
 | Foundation | `infra/foundation/bootstrap.sh` | Push to `main` touching `infra/foundation/**` |
-| App deploy | `ci/pipeline.sh` | Push to `main`, excluding `infra/foundation/**` |
+| App deploy | `ci/apply-app.sh` | Push to `main`, excluding `infra/foundation/**` |
 | App destroy (optional) | `ci/destroy-app.sh` | Manual only, after an approval |
 
 Both stacks keep their state in `s3://family-drive-tfstate-084519186805`:

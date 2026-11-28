@@ -253,7 +253,7 @@ prints your JSON (`jq` reports a syntax error if it isn't valid).
    dnf install -y dnf-plugins-core
    dnf config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
    dnf install -y terraform-1.16.6
-   bash ci/pipeline.sh
+   bash ci/apply-app.sh
    ```
 
 **Never add a Destroy stage to this pipeline**, not even behind a disabled transition: a queued run would
@@ -279,7 +279,7 @@ own roles. Keep each app policy file under 6,144 non-whitespace characters.
 
 ### 7.3 Run it
 
-**Release change** (or push to `main`). `ci/pipeline.sh`:
+**Release change** (or push to `main`). `ci/apply-app.sh`:
 1. checks Terraform and Node; tests and builds the allowlist Lambdas; runs the web tests;
 2. `terraform fmt -check`, `init` against the state bucket, `plan`, `apply` in `infra/`;
 3. writes `web/public/config.json` from the outputs, builds the SPA, uploads it and invalidates CloudFront.

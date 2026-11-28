@@ -9,7 +9,7 @@ tf_output() { terraform -chdir="$ROOT/infra" output -raw "$1"; }
 
 bash "$ROOT/scripts/write-config.sh"
 
-# ci/pipeline.sh has already run `npm ci` for the web tests and says so with
+# ci/apply-app.sh has already run `npm ci` for the web tests and says so with
 # WEB_DEPS_INSTALLED=1; run on its own (e.g. locally), this script installs them.
 if [[ "${WEB_DEPS_INSTALLED:-}" != 1 ]]; then
   npm ci --prefix "$ROOT/web"
