@@ -292,7 +292,7 @@ signed in with OIDC as a `family-drive-gh-*` role that may only start and watch 
 | Destroy | `destroy.yml` | `ci/destroy-app.sh`: build Lambdas, init, `terraform destroy` of `infra/` only |
 
 `ci/apply-app.sh`, in order:
-1. `ci/app-env.sh`: check Terraform and Node ≥ 26; `npm ci`, test and build the Lambdas (Terraform zips `dist/*.js`).
+1. `ci/app-env.sh`: check Terraform and Node ≥ 24.15; `npm ci`, test and build the Lambdas (Terraform zips `dist/*.js`).
 2. `npm ci` and test the web app.
 3. `terraform fmt -check`, `ci/tf-init.sh` (backend bucket from the account ID), `plan`, `apply`.
 4. `scripts/deploy.sh` (with `WEB_DEPS_INSTALLED=1`): `write-config.sh`, `vite build`, upload, invalidate.

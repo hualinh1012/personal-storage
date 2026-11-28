@@ -222,7 +222,7 @@ flowchart LR
 
 | Technology | Used by | Version / setting |
 |---|---|---|
-| React 19, Vite 8, TypeScript | SPA | Node ≥ 26 to build |
+| React 19, Vite 8, TypeScript | SPA | Node ≥ 24.15 to build |
 | AWS Amplify JS v6, Storage Browser (`@aws-amplify/ui-react-storage` 3.x) | SPA | client library only, no Amplify backend |
 | `@aws-sdk/client-s3` (lazy) | Deleted folder, Edit | version APIs Amplify lacks |
 | `react-pdf` (PDF.js), `react-markdown` + `remark-gfm` | Preview | lazy PDF |

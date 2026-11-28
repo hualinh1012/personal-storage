@@ -7,7 +7,7 @@
 Until now nothing checked a pull request: CodePipeline runs the tests only after a merge to `main`, as part of deploying. `.github/workflows/ci.yml` now runs on every pull request and every push to `main`:
 
 - **Lambdas** (`functions/allowlist`): lint, type-check, test, build, on Node 22 (the Lambda runtime).
-- **Web app** (`web`): lint, test, build (`tsc --noEmit` + `vite build`), on Node 26 (the documented minimum).
+- **Web app** (`web`): lint, test, build (`tsc --noEmit` + `vite build`), on Node 24 (the documented minimum is 24.15).
 - **Terraform**: `fmt -check`, then `init -backend=false` and `validate` for both stacks.
 
 It has no AWS credentials and needs none: **deploying stays in CodePipeline** (`ci/pipeline.sh`), which still runs its own tests before applying. The workflow only reads the repository (`permissions: contents: read`), and every action is pinned to a commit SHA.

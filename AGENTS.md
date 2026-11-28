@@ -59,7 +59,7 @@ bash ci/tf-init.sh                                 # real init of infra/ against
 
 The linter is oxlint, not ESLint: TypeScript 7 has no compiler API for typescript-eslint
 ([ADR 0016](docs/adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)). The Lambdas run
-on `nodejs22.x`; the web build, the tests and the deploy pipeline need Node ≥ 26
+on `nodejs22.x`; the web build, the tests and the deploy pipeline need Node ≥ 24.15
 (`ci/app-env.sh` enforces it).
 
 ## Architecture in brief
