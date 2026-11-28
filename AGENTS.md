@@ -101,7 +101,9 @@ resources by name. Rules in [`infra/CLAUDE.md`](infra/CLAUDE.md).
 is only a client library, with no Amplify backend tooling.
 
 **Pull-request checks** (GitHub Actions, `.github/workflows/ci.yml`, no AWS access): lint,
-type-check, test and build both packages, Terraform `fmt -check` and offline `validate`. Dependabot
+type-check, test and build both packages, Terraform `fmt -check` and offline `validate`, a Trivy IaC scan
+of `infra/` (high or critical fails; accepted findings carry `#trivy:ignore` with a reason), ShellCheck on
+every `*.sh` and actionlint on the workflows. Dependabot
 (`.github/dependabot.yml`) opens weekly update PRs for the pinned actions and both packages; the
 same checks run on each.
 

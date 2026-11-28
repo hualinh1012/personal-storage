@@ -33,6 +33,8 @@ resource "aws_s3_bucket_versioning" "tfstate" {
   }
 }
 
+# Trivy AWS-0132 (KMS key) accepted: SSE-S3 is enough here, access is limited to admins and the pipeline roles (security assessment 2026-11).
+#trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate" {
   bucket = aws_s3_bucket.tfstate.id
 

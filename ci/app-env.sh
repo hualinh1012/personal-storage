@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Sourced (not executed) by ci/apply-app.sh and ci/destroy-app.sh.
 # Checks the toolchain and builds the Lambda bundles (Terraform zips them even
 # for plan and destroy). The Google client and allowed emails are read by

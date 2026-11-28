@@ -23,6 +23,8 @@ resource "aws_s3_bucket_public_access_block" "web" {
   restrict_public_buckets = true
 }
 
+# Trivy AWS-0132 (KMS key) accepted: SSE-S3 is enough here, access is limited to admins and the pipeline roles (security assessment 2026-11).
+#trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "web" {
   bucket = aws_s3_bucket.web.id
 
@@ -161,6 +163,10 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
+# Trivy AWS-0011 (no WAF) accepted: a static SPA on a small budget, no paid WAF (constraint C-5).
+# Trivy AWS-0013 (TLS minimum) accepted: the default cloudfront.net certificate can't raise it; a custom domain gets TLSv1.2_2021.
+#trivy:ignore:AWS-0011
+#trivy:ignore:AWS-0013
 resource "aws_cloudfront_distribution" "web" {
   enabled             = true
   comment             = "${var.project} web app"

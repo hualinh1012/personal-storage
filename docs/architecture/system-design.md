@@ -278,7 +278,7 @@ signed in with OIDC as a `family-drive-gh-*` role that may only start and watch 
 
 | Workflow (GitHub Actions) | Trigger | Does |
 |---|---|---|
-| `ci.yml` (no AWS access) | every pull request; called by `deploy.yml` | lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
+| `ci.yml` (no AWS access) | every pull request; called by `deploy.yml` | lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks; Trivy IaC scan of `infra/` (fails on high or critical); ShellCheck on every `*.sh`; actionlint on the workflows ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
 | `deploy.yml` | by hand only (target, optional older commit of `main`); a push to `main` deploys nothing | `ci.yml` on the commit → if the target includes it: approve `foundation`, run the foundation pipeline → if the target includes it: approve `app`, run the deploy pipeline |
 | `destroy.yml` | by hand, with the typed confirmation `destroy-family-drive` | approve `destroy`, run the destroy pipeline |
 | Dependency updates (Dependabot) | weekly, Monday 09:00 Singapore | `.github/dependabot.yml`: one PR for the pinned actions, and per package (`web`, `functions/allowlist`) one grouped minor/patch PR plus one per major (`@aws-amplify/ui-react-storage` always alone: it needs the manual re-check in `web/CLAUDE.md`). Each is checked by `ci.yml`; merging one deploys nothing until `deploy.yml` is run by hand |
