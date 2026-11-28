@@ -197,7 +197,8 @@ What `bootstrap.sh` does:
   container, then migrates the state to `s3://family-drive-tfstate-<account-id>/foundation/terraform.tfstate`.
 - **Existing parameters or buckets** (created by hand, or left by a failed first run) are imported, not
   recreated; their values are kept.
-- **Later runs** only apply changes and never overwrite the SSM values you set.
+- **Later runs** only apply changes and never overwrite the hand-set SSM values. The Terraform-owned ones
+  (`custom_domain`, `certificate_arn`, `hosted_zone_id`, `deleted_retention_days`) follow `infra/foundation/main.tf`.
 
 Alternatively, run it once from your machine as an administrator: `bash infra/foundation/bootstrap.sh`
 (it asks before applying).

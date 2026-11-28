@@ -91,7 +91,7 @@ else
 fi
 
 echo
-echo "Next: set real values (Terraform never overwrites them):"
+echo "Next: set these by hand (Terraform creates them once and never overwrites them):"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_client_id --value '<client id>'"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_client_secret --value '<client secret>'"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/allowed_emails --value 'you@gmail.com,mom@gmail.com'"
@@ -99,3 +99,8 @@ echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/
 echo "  # Google Drive import (optional; see docs/deployment.md):"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_api_key --value '<browser API key>'"
 echo "  aws ssm put-parameter --region ${REGION} --overwrite --name /${PROJECT}/google_project_number --value '<project number>'"
+echo
+echo "Terraform owns /${PROJECT}/custom_domain, certificate_arn, hosted_zone_id and deleted_retention_days."
+echo "  Change them in infra/foundation/main.tf and re-run this script. Do not set them with put-parameter:"
+echo "  the next foundation run overwrites them. Check what was written:"
+echo "  aws ssm get-parameters --region ${REGION} --names /${PROJECT}/custom_domain /${PROJECT}/certificate_arn /${PROJECT}/hosted_zone_id /${PROJECT}/deleted_retention_days --query 'Parameters[].[Name,Value]' --output table"
