@@ -16,4 +16,4 @@ ADR 0013's "no archive tiers" rule is not the reason. That rule covers files the
 
 - Losing the bucket or the account, or noticing a mistake after 30 days, loses files for good (risk R1 in the brief).
 - The owner should keep the copies people already have elsewhere (phones, Google) until this changes.
-- Revisit when the budget rises, or when the stored data is small enough that a Deep Archive copy fits under the ceiling (brief Q3). Reversing this decision means a new ADR and a foundation-stack change.
+- Revisit when the budget rises, or when the stored data is small enough that a Deep Archive copy fits under the ceiling (tracked in #97). Reversing this decision means a new ADR and a foundation-stack change.
