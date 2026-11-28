@@ -13,7 +13,7 @@ There are two Terraform stacks and three pipelines.
 
 | Stack | Folder | Holds | Lifetime |
 |---|---|---|---|
-| **Foundation** | `infra/foundation/` | Terraform state bucket, files bucket (the family's files), SSM parameters | **Retained.** Every resource has `prevent_destroy`. |
+| **Foundation** | `infra/foundation/` | Terraform state bucket, files bucket (the family's files), SSM parameters, the monthly cost budget | **Retained.** Every resource has `prevent_destroy`. |
 | **App** | `infra/` | Cognito + Google sign-in, allowlist Lambdas, Identity Pool, CloudFront, web bucket, files bucket CORS rule | **Disposable.** Can be destroyed and recreated. |
 
 | Pipeline | Runs | Started by (GitHub Actions) |
