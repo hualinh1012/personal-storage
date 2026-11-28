@@ -9,3 +9,4 @@ web/public/config.json
 infra/tfplan
 *_override.tf
 web/public/amplify-storage-download/
+ci/.github-triggers.env

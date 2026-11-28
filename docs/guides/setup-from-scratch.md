@@ -16,8 +16,8 @@ tickets or commits.
 
 ```mermaid
 flowchart LR
-    GH["GitHub repo"] -->|"push to main"| FP["Foundation pipeline"]
-    GH -->|"push to main"| AP["App pipeline"]
+    GH["GitHub Actions: checks, then your approval"] -->|"starts, via OIDC"| FP["Foundation pipeline"]
+    GH -->|"starts, via OIDC"| AP["App pipeline"]
     FP --> F["Foundation stack: files bucket, state bucket, SSM settings"]
     AP --> A["App stack: Cognito + Google sign-in, Lambdas, Identity Pool, CloudFront, web bucket"]
     U["Family member's browser"] -->|"site"| A
@@ -27,7 +27,9 @@ flowchart LR
 
 - **Foundation** (`infra/foundation/`): kept forever; holds the family's files and the settings.
 - **App** (`infra/`): can be destroyed and rebuilt at any time.
-- Three pipelines in AWS CodePipeline: foundation, app deploy, and an optional manual destroy.
+- Three pipelines in AWS CodePipeline: foundation, app deploy and destroy. GitHub Actions starts them
+  after its checks pass and you approve ([ADR 0017](../adr/0017-github-actions-starts-codepipeline-with-oidc.md));
+  none starts on a push by itself.
 
 About an hour end to end, most of it waiting for pipelines and CloudFront.
 
@@ -89,17 +91,55 @@ itself at `/` needs `web/public/config.json`, which step 11 creates.
 
 ## Step 3. Connect GitHub to AWS and protect `main`
 
+### 3.1 Connect GitHub and protect `main`
+
 1. AWS console → **Developer Tools → Settings → Connections → Create connection** → GitHub.
 2. Install the **AWS Connector for GitHub** app. Give it access to **only this repository** unless you
    use the connection for other repositories too (this deployment does: it's installed for all of them,
    the owner's choice in #52).
 3. Wait until the connection shows **Available**.
 4. **Required.** On GitHub: **Settings → Rules → Rulesets → New branch ruleset** for `main`: require a
-   pull request before merging, block force pushes and deletion. Every push to `main` deploys to AWS,
-   so this is the main control on who can change production (#52). With a single maintainer, set the
+   pull request before merging, block force pushes and deletion. Only commits on `main` can deploy,
+   so this is the main control on what can reach production (#52). With a single maintainer, set the
    required approvals to **0**: GitHub doesn't let you approve your own pull request.
 
 **Check:** the connection is **Available**; pushing straight to `main` is refused.
+
+### 3.2 Let GitHub Actions start the pipelines
+
+GitHub Actions starts every pipeline, after its checks pass and you approve. It signs in to AWS with
+OIDC, so no AWS key is stored in GitHub ([ADR 0017](../adr/0017-github-actions-starts-codepipeline-with-oidc.md)).
+
+1. **Trigger roles.** As an administrator, run:
+
+   ```bash
+   bash ci/iam/github-trigger-roles.sh
+   ```
+
+   It creates the OIDC provider for GitHub and three roles. Each one trusts only one GitHub Environment of
+   this repository and can only start and watch one pipeline:
+   - `family-drive-gh-foundation` → environment `foundation` → pipeline `family-drive-foundation`
+   - `family-drive-gh-deploy` → `app` → `family-drive-deploy`
+   - `family-drive-gh-destroy` → `destroy` → `family-drive-destroy`
+
+   Give your pipelines those names in steps 4, 7 and 12. If you use other names, pass them to the script
+   (`FOUNDATION_PIPELINE=… DEPLOY_PIPELINE=… DESTROY_PIPELINE=…`), and use them in the next item. For a
+   fork, also pass `REPO=<owner>/<name>`.
+2. **Repository variables.** GitHub → **Settings → Secrets and variables → Actions → Variables**: set
+   `AWS_ACCOUNT_ID` to your account ID. Set `FOUNDATION_PIPELINE`, `DEPLOY_PIPELINE` and `DESTROY_PIPELINE`
+   only if your names differ. The script prints all four at the end. None of them is a secret.
+3. **Environments.** GitHub → **Settings → Environments**: create `foundation`, `app` and `destroy`. For
+   each one:
+   - **Required reviewers:** yourself. Leave **Prevent self-review** off: you approve your own runs.
+   - **Deployment branches and tags:** selected branches, `main` only.
+4. GitHub → **Settings → Actions → General → Fork pull request workflows from outside collaborators**:
+   **Require approval for all external contributors**.
+
+**Check:** the three roles exist in IAM, each with a trust naming the subject the script printed:
+`repo:<owner>@<id>/<name>@<id>:environment:<env>` with GitHub's immutable subjects (or
+`repo:<owner>/<name>:environment:<env>` without them). The script reads it from
+`gh api repos/<owner>/<name>/actions/oidc/customization/sub --jq .sub_claim_prefix`.
+The three environments each show one required reviewer.
 
 ## Step 4. Foundation: buckets and settings
 
@@ -108,12 +148,15 @@ The foundation creates the files bucket, the Terraform state bucket and the SSM 
 
 ### 4.1 Create the foundation pipeline
 
-1. **CodePipeline → Create pipeline**: a V2 pipeline built from scratch (or the Terraform starter template).
+1. **CodePipeline → Create pipeline**: a V2 pipeline built from scratch (or the Terraform starter template),
+   named `family-drive-foundation` (or the name you gave in step 3.2). Execution mode: **Queued**.
 2. **Source stage:** GitHub (via GitHub App): the connection from step 3, the repository, branch `main`,
-   default output artifact format.
-3. **Trigger:** push, branch `main`, file path filter **including** `infra/foundation/**`.
-4. **Approval stage (required):** add one with a **Manual approval** action. The foundation can change
-   the bucket that holds the family's files, so it must never apply without you looking (#52).
+   default output artifact format. Keep the source action's default name, **`CodeConnections`**: GitHub starts
+   runs at a commit by this name (set the repository variable `SOURCE_ACTION` if yours differs).
+3. **No trigger:** untick **Start the pipeline on source code change** and remove any triggers.
+   GitHub Actions starts it (`deploy.yml`) after you approve in the `foundation` environment. The
+   foundation can change the bucket that holds the family's files, so it never applies without you looking (#52).
+4. **No approval stage:** the approval is the GitHub Environment.
 5. **Deploy stage:** an action of type **Commands**, input artifact = Source, commands:
 
    ```bash
@@ -143,7 +186,8 @@ one in the file, replace it first; if your artifact bucket isn't named `codepipe
 
 ### 4.3 Run it
 
-**Release change**, then approve.
+Creating the pipeline starts its first run at once; that is this step. Later runs: **Actions → Deploy app →
+Run workflow**, target `foundation`, then approve (or push a change under `infra/foundation/`).
 
 What `bootstrap.sh` does:
 - **First run:** the state bucket doesn't exist yet, so it applies with local state inside the build
@@ -245,8 +289,10 @@ prints your JSON (`jq` reports a syntax error if it isn't valid).
 
 ### 7.1 Create the pipeline
 
-1. **CodePipeline → Create pipeline** (V2), with the same GitHub source, repository and branch.
-2. **Trigger:** push, branch `main`, file path filter **excluding** `infra/foundation/**`.
+1. **CodePipeline → Create pipeline** (V2), named `family-drive-deploy`, execution mode **Queued**, with the
+   same GitHub source, repository and branch, and the source action named **`CodeConnections`** (the default).
+2. **No trigger and no approval stage:** untick **Start the pipeline on source code change** and remove
+   any triggers. GitHub Actions starts it after its checks pass and you approve in the `app` environment.
 3. **Deploy stage:** a **Commands** action, input artifact = Source:
 
    ```bash
@@ -279,7 +325,9 @@ own roles. Keep each app policy file under 6,144 non-whitespace characters.
 
 ### 7.3 Run it
 
-**Release change** (or push to `main`). `ci/apply-app.sh`:
+Creating the pipeline starts its first run at once. If that run fails because step 7.2 wasn't done yet,
+run it again: **Actions → Deploy app → Run workflow**, target `application`, then approve. From now on a push to `main`
+deploys nothing: each deploy is a **Run workflow** like this one. `ci/apply-app.sh`:
 1. checks Terraform and Node; tests and builds the allowlist Lambdas; runs the web tests;
 2. `terraform fmt -check`, `init` against the state bucket, `plan`, `apply` in `infra/`;
 3. writes `web/public/config.json` from the outputs, builds the SPA, uploads it and invalidates CloudFront.
@@ -422,15 +470,22 @@ pipeline (or `terraform -chdir=infra apply`), so production stops trusting local
 Before changing code, read [CLAUDE.md](../../CLAUDE.md) (commands, conventions, gotchas) and the
 [Architecture Contract](../architecture/architecture-contract.md) (the checklist every PR follows).
 
-## Step 12. Optional: the destroy pipeline (manual only)
+## Step 12. The destroy pipeline (manual only)
 
-Takes the app down without touching the files, the settings or the state. The pipeline itself is optional,
-but **Destroy never goes in the deploy pipeline**, not even behind a disabled transition (#52).
+Takes the app down without touching the files, the settings or the state. **Destroy never goes in the
+deploy pipeline**, not even behind a disabled transition (#52). It's its own pipeline, started only by
+`destroy.yml`.
 
-1. **Create pipeline** (V2), same source.
-2. In the source action, **untick "Start the pipeline on source code change"** and remove any triggers.
-3. Add an **Approval** stage (manual approval).
-4. Add a **Destroy** stage with a **Commands** action:
+**Creating a pipeline runs it at once**, and this one has no approval stage. So it starts with a harmless
+command, and gets the real one only after that first run:
+
+1. **Create pipeline** (V2), named `family-drive-destroy`, execution mode **Queued**, same source, with the
+   source action named **`CodeConnections`** (the default).
+2. **Untick "Start the pipeline on source code change"** and remove any triggers. No approval stage: the
+   approval is the `destroy` GitHub Environment.
+3. Add a **Destroy** stage with a **Commands** action whose only command is `echo "placeholder"`.
+4. Create it, and let that first run finish (it does nothing).
+5. **Edit** the pipeline and change the Commands action's commands to:
 
    ```bash
    dnf install -y dnf-plugins-core
@@ -439,9 +494,10 @@ but **Destroy never goes in the deploy pipeline**, not even behind a disabled tr
    bash ci/destroy-app.sh
    ```
 
-5. Attach the app policies to this pipeline's role, as in step 7.2: `bash ci/iam/attach-app-policies.sh <destroy-pipeline-role>`, or pass both roles in one run.
+6. Attach the app policies to this pipeline's role, as in step 7.2: `bash ci/iam/attach-app-policies.sh <destroy-pipeline-role>`, or pass both roles in one run.
 
-**Running it:** **Release change**, then approve; about 5–15 minutes, mostly waiting for CloudFront.
+**Running it:** **Actions → Destroy app → Run workflow**, type `destroy-family-drive`, then approve. It takes
+about 5–15 minutes, mostly waiting for CloudFront.
 **Bringing the app back:** run the app pipeline. The Cognito domain stays the same, so sign-in keeps
 working. Without a custom domain the CloudFront URL changes: share the new `app_url` and update step 10's
 Google settings. With one, the address and the Google settings stay the same.

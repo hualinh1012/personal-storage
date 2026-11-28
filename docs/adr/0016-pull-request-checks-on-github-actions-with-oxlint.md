@@ -1,5 +1,9 @@
 # Pull-request checks on GitHub Actions, linted with oxlint
 
+> Partly superseded by [ADR 0017](0017-github-actions-starts-codepipeline-with-oidc.md): GitHub Actions now
+> starts the CodePipelines (with OIDC), and `ci.yml` runs on push to `main` only as part of `deploy.yml`.
+> `ci.yml` itself still has no AWS access.
+
 Until now nothing checked a pull request: CodePipeline runs the tests only after a merge to `main`, as part of deploying. `.github/workflows/ci.yml` now runs on every pull request and every push to `main`:
 
 - **Lambdas** (`functions/allowlist`): lint, type-check, test, build, on Node 22 (the Lambda runtime).

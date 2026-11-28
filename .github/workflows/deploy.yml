@@ -1,0 +1,136 @@
+# Deploys main: checks the commit (ci.yml), then, after approval in a GitHub Environment,
+# starts the foundation and/or deploy CodePipeline at that exact commit and waits for it.
+# GitHub only starts pipelines; Terraform and the uploads run inside CodePipeline under the
+# pipeline roles. AWS sign-in is OIDC: no AWS key is stored in GitHub (ADR 0017).
+#
+# Manual only: a push or merge to main deploys nothing. Run workflow, pick a target
+# (foundation always runs before application), and optionally an older commit of main to
+# roll back to.
+name: Deploy app
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to deploy
+        type: choice
+        options: [application, foundation-then-application, foundation]
+        default: application
+      ref:
+        description: Commit of main to deploy (empty = the latest)
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# One AWS change at a time, shared with destroy.yml. Never cancel a running deploy.
+concurrency:
+  group: aws-app
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  changes:
+    name: Decide what to deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.decide.outputs.sha }}
+      foundation: ${{ steps.decide.outputs.foundation }}
+      app: ${{ steps.decide.outputs.app }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: decide
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          # Only commits already on main deploy: a manual run can't ship an unreviewed branch.
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::${sha} is not on main"
+            exit 1
+          fi
+          case "$TARGET" in
+            application) foundation=false app=true ;;
+            foundation) foundation=true app=false ;;
+            foundation-then-application) foundation=true app=true ;;
+            *) echo "::error::unknown target ${TARGET}"; exit 1 ;;
+          esac
+          echo "Commit ${sha}: foundation=${foundation} app=${app}"
+          {
+            echo "sha=${sha}"
+            echo "foundation=${foundation}"
+            echo "app=${app}"
+          } >>"$GITHUB_OUTPUT"
+
+  ci:
+    name: Checks
+    needs: changes
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.changes.outputs.sha }}
+
+  foundation:
+    name: Foundation (infra/foundation)
+    needs: [changes, ci]
+    if: needs.changes.outputs.foundation == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: foundation
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.changes.outputs.sha }}
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/family-drive-gh-foundation
+          role-session-name: gh-foundation-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+      - env:
+          PIPELINE: ${{ vars.FOUNDATION_PIPELINE || 'family-drive-foundation' }}
+          # The pipelines' source action name (the console's default for a GitHub source).
+          SOURCE_ACTION: ${{ vars.SOURCE_ACTION || 'CodeConnections' }}
+          SHA: ${{ needs.changes.outputs.sha }}
+        run: bash ci/start-pipeline.sh "$PIPELINE" "$SHA"
+
+  app:
+    name: App (infra/ and the web app)
+    needs: [changes, ci, foundation]
+    # Runs after the foundation succeeded, or when it had nothing to do.
+    if: >-
+      ${{ !cancelled() && needs.changes.outputs.app == 'true' && needs.ci.result == 'success' &&
+      (needs.foundation.result == 'success' || needs.foundation.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: app
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.changes.outputs.sha }}
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/family-drive-gh-deploy
+          role-session-name: gh-deploy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+      - env:
+          PIPELINE: ${{ vars.DEPLOY_PIPELINE || 'family-drive-deploy' }}
+          # The pipelines' source action name (the console's default for a GitHub source).
+          SOURCE_ACTION: ${{ vars.SOURCE_ACTION || 'CodeConnections' }}
+          SHA: ${{ needs.changes.outputs.sha }}
+        run: bash ci/start-pipeline.sh "$PIPELINE" "$SHA"

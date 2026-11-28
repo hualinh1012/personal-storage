@@ -37,7 +37,9 @@ stacks, pipelines) and the feature docs' AWS sections.
 - **A new AWS resource type adds its actions to the matching `ci/iam/*-policy.json`**, or the
   pipeline fails with AccessDenied. The app's two managed files each stay under 6,144
   non-whitespace characters; the owner re-attaches them (`ci/iam/attach-app-policies.sh`) before
-  the change is pushed.
+  the change is pushed. Never add them to `ci/iam/github-trigger-*.json`: the GitHub trigger roles
+  only start and watch one pipeline each, and their trust names one GitHub Environment
+  ([ADR 0017](../docs/adr/0017-github-actions-starts-codepipeline-with-oidc.md)).
 - **Never add `aws_s3_bucket_intelligent_tiering_configuration` or a Glacier class.** Archived
   objects break download, preview, Move and Delete
   ([ADR 0013](../docs/adr/0013-files-in-intelligent-tiering-without-archive-tiers.md)). Never

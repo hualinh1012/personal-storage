@@ -1,15 +1,43 @@
-# Triage Labels
+# Triage labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+Which label in this repo's GitHub Issues (`hualinh1012/personal-storage`) means each factory status. The factory reads this table (left: factory status, right: our label). The five triage roles the engineering skills use are the same statuses: `needs-triage` is the `triage` status, and `needs-info`, `ready-for-agent`, `ready-for-human` and `wontfix` keep their names.
 
-| Label in mattpocock/skills | Label in our tracker | Meaning                                  |
-| -------------------------- | -------------------- | ---------------------------------------- |
-| `needs-triage`             | `needs-triage`       | Maintainer needs to evaluate this issue  |
-| `needs-info`               | `needs-info`         | Waiting on reporter for more information |
-| `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
-| `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
-| `wontfix`                  | `wontfix`            | Will not be actioned                     |
+Status labels are exclusive, and in factory runs only the factory's step worker sets them.
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
-
-Edit the "Label in our tracker" column to match whatever vocabulary you actually use.
+| Factory status | Label in our tracker |
+|---|---|
+| `intake` | `intake` |
+| `triage` | `needs-triage` |
+| `triaging` | `triaging` |
+| `needs-info` | `needs-info` |
+| `ready-for-agent` | `ready-for-agent` |
+| `ready-for-human` | `ready-for-human` |
+| `designing` | `designing` |
+| `blocked` | `blocked` |
+| `planned` | `planned` |
+| `implementing` | `implementing` |
+| `in-review` | `in-review` |
+| `reviewing` | `reviewing` |
+| `changes-requested` | `changes-requested` |
+| `fixing` | `fixing` |
+| `approved` | `approved` |
+| `merging` | `merging` |
+| `awaiting-merge` | `awaiting-merge` |
+| `merged` | `merged` |
+| `harvesting` | `harvesting` |
+| `ready-to-test` | `ready-to-test` |
+| `testing` | `testing` |
+| `test-failed` | `test-failed` |
+| `ready-to-deploy` | `ready-to-deploy` |
+| `deploying` | `deploying` |
+| `awaiting-deploy` | `awaiting-deploy` |
+| `deployed` | `deployed` |
+| `verifying` | `verifying` |
+| `deploy-failed` | `deploy-failed` |
+| `needs-human` | `needs-human` |
+| `wontfix` | `wontfix` |
+| `done` | `done` |
+| `XS` | `size:XS` |
+| `S` | `size:S` |
+| `M` | `size:M` |
+| `L` | `size:L` |

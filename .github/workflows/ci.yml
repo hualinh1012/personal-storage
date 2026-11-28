@@ -1,18 +1,24 @@
-# Checks every pull request: lint, type-check, test and build each package, and check
-# the Terraform offline. A push or merge to main doesn't start it; run it by hand from
-# the Actions tab (Run workflow). No AWS credentials: deploying stays in CodePipeline
-# (ci/apply-app.sh).
+# Checks every pull request: lint, type-check, test and build each package, and check the
+# Terraform offline. deploy.yml calls it too (workflow_call), so every commit is
+# checked before it deploys. No AWS credentials here: deploy.yml starts the
+# CodePipelines, which do the deploying (ADR 0016, ADR 0017).
 name: CI
 
 on:
   pull_request:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to check (default, empty, means the commit that triggered the caller)
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,6 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -48,6 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -66,6 +74,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
