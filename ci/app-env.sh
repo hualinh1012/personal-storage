@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Sourced (not executed) by ci/apply-app.sh and ci/destroy-app.sh.
 # Checks the toolchain and builds the Lambda bundles (Terraform zips them even
 # for plan and destroy). The Google client and allowed emails are read by
@@ -7,8 +8,8 @@
 export TF_IN_AUTOMATION=true TF_INPUT=0
 
 terraform version
-node -e 'const [a,b]=process.versions.node.split(".").map(Number);
-  if (a < 22 || (a === 22 && b < 12)) { console.error("Node >= 22.12 required (vite 8 / vitest 5), found " + process.version); process.exit(1); }
+node -e 'const a=Number(process.versions.node.split(".")[0]);
+  if (a < 26) { console.error("Node >= 26 required (vite 8 / vitest 5 / jsdom 31), found " + process.version); process.exit(1); }
   console.log("node " + process.version);'
 
 npm ci --prefix "$ROOT/functions/allowlist"

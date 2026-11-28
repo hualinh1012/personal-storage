@@ -33,9 +33,11 @@ upsert_policy() {
   arn="arn:aws:iam::${ACCOUNT_ID}:policy/${name}"
   if aws iam get-policy --policy-arn "$arn" >/dev/null 2>&1; then
     # A managed policy keeps at most 5 versions: drop the oldest non-default one first.
+    # shellcheck disable=SC2016 # the backticks are a JMESPath literal, not a command substitution
     versions="$(aws iam list-policy-versions --policy-arn "$arn" \
       --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text)"
     if [ "$(wc -w <<<"$versions")" -ge 4 ]; then
+      # shellcheck disable=SC2020 # maps each of tab and space to a newline, as intended
       oldest="$(tr '\t ' '\n\n' <<<"$versions" | sed 's/^v//' | sort -n | head -n1)"
       aws iam delete-policy-version --policy-arn "$arn" --version-id "v${oldest}"
     fi
