@@ -1,6 +1,8 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and specs for this repo live as GitHub issues on `hualinh1012/personal-storage`. Use the `gh` CLI for all operations.
+
+**In factory step runs:** read with `gh issue view <n> --json number,title,body,labels,comments` and comment with `gh issue comment <n> --body-file <file>`. Never create, label, assign or close issues: end the run with `result.json`, and the factory's step worker does the rest. The commands below are for people and interactive sessions.
 
 ## Conventions
 

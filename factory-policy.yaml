@@ -1,0 +1,9 @@
+# Factory autonomy for this product. Owned by the factory maintainer only (BR-17):
+# CODEOWNERS names them for this file, and agents may never edit it.
+policy_version: 1
+steps:                          # omitted steps use the factory defaults (workflows/steps.yaml)
+  L8: {mode: human}             # factory | human | off; merge and deploy default to human
+  L10: {mode: human}
+limits: {}                      # optional; may only be lower than the factory's
+eligible_sizes: [XS, S]
+models: {}                      # optional; e.g. L5: {tier: large}, L2: {pin: {claude: sonnet}}

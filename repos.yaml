@@ -1,0 +1,38 @@
+# Factory workspace facts for this product (factory workspace contract v2).
+# Single-repo product: this repo is its own workspace (`path: .`).
+contract_version: 2
+factory_version: v0.2.0          # pending: the factory has no v0.2.0 tag yet, so bootstrap warns until it does
+product: personal-storage
+tracker:
+  type: github
+  repo: hualinh1012/personal-storage
+# A person deploys: approving the "Deploy app" workflow in its GitHub Environment starts CodePipeline
+# (ADR 0017), so there is no deploy.command. Once a ticket is `deployed`, L10 verifies: the latest
+# Deploy app run on main succeeded and the site answers. Roll back by hand (Run workflow with an older
+# commit), so there is no rollback command.
+deploy:
+  verify: >-
+    test "$(gh run list -R hualinh1012/personal-storage --workflow deploy.yml --branch main -L 1
+    --json status,conclusion -q '.[0].status + "/" + .[0].conclusion')" = "completed/success"
+    && curl -fsS -o /dev/null https://drive.linhwas.dev/
+    && curl -fsS -o /dev/null https://drive.linhwas.dev/config.json
+repos:
+  - name: personal-storage
+    path: .
+    url: https://github.com/hualinh1012/personal-storage.git
+    branch: main
+    # The same checks as .github/workflows/ci.yml, run from the repo root.
+    commands:
+      test: >-
+        npm --prefix functions/allowlist ci && npm --prefix functions/allowlist run typecheck
+        && npm --prefix functions/allowlist test
+        && npm --prefix web ci && npm --prefix web test
+      lint: >-
+        npm --prefix functions/allowlist ci && npm --prefix functions/allowlist run lint
+        && npm --prefix web ci && npm --prefix web run lint
+        && terraform fmt -check -recursive infra
+      e2e: >-
+        npm --prefix functions/allowlist ci && npm --prefix functions/allowlist run build
+        && npm --prefix web ci && npm --prefix web run build
+        && terraform -chdir=infra init -backend=false -input=false && terraform -chdir=infra validate
+        && terraform -chdir=infra/foundation init -backend=false -input=false && terraform -chdir=infra/foundation validate
