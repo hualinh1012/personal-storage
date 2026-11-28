@@ -8,8 +8,8 @@
 export TF_IN_AUTOMATION=true TF_INPUT=0
 
 terraform version
-node -e 'const a=Number(process.versions.node.split(".")[0]);
-  if (a < 26) { console.error("Node >= 26 required (vite 8 / vitest 5 / jsdom 31), found " + process.version); process.exit(1); }
+node -e 'const [a,b]=process.versions.node.split(".").map(Number);
+  if (a < 24 || (a === 24 && b < 15)) { console.error("Node >= 24.15 required (vite 8 / vitest 5 / jsdom 31), found " + process.version); process.exit(1); }
   console.log("node " + process.version);'
 
 npm ci --prefix "$ROOT/functions/allowlist"

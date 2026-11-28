@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # App deploy for a CodePipeline "Commands" action:
 # test + build Lambdas, Terraform plan + apply in infra/, then publish the web app.
-# Expects terraform and node (>= 26) on PATH, the foundation stack applied,
+# Expects terraform and node (>= 24.15) on PATH, the foundation stack applied,
 # and an IAM role allowed to read the SSM parameters and manage the app's resources.
 set -euo pipefail
 
