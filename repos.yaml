@@ -20,7 +20,10 @@ repos:
   - name: personal-storage
     path: .
     url: https://github.com/hualinh1012/personal-storage.git
-    branch: main
+    # Batched releases: PRs (the factory's too) target develop; a person merges develop into main
+    # with a merge commit and runs Deploy app from main. No release or hotfix branches.
+    branch: develop
+    release_branch: main
     # The same checks as .github/workflows/ci.yml, run from the repo root.
     commands:
       test: >-

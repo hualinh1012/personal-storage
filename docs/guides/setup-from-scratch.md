@@ -103,7 +103,10 @@ itself at `/` needs `web/public/config.json`, which step 11 creates.
    so this is the main control on what can reach production (#52). With a single maintainer, set the
    required approvals to **0**: GitHub doesn't let you approve your own pull request.
 
-**Check:** the connection is **Available**; pushing straight to `main` is refused.
+5. **Required.** Create `develop` from `main` and give it the same ruleset. Pull requests, the factory's
+   and Dependabot's (`target-branch: develop`), go to `develop`; a release merges `develop` into `main`.
+
+**Check:** the connection is **Available**; pushing straight to `main` or `develop` is refused.
 
 ### 3.2 Let GitHub Actions start the pipelines
 
