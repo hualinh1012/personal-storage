@@ -106,9 +106,10 @@ type-check, test and build both packages, Terraform `fmt -check` and offline `va
 same checks run on each.
 
 **CI/CD:** GitHub Actions decides when, CodePipeline deploys
-([ADR 0017](docs/adr/0017-github-actions-starts-codepipeline-with-oidc.md)). `deploy.yml` runs `ci.yml`,
-then, after approval in a GitHub Environment, starts the foundation pipeline (`bootstrap.sh`, only if
-`infra/foundation/**` changed) and then the deploy pipeline (`ci/pipeline.sh`: tests, builds, applies
+([ADR 0017](docs/adr/0017-github-actions-starts-codepipeline-with-oidc.md)). `deploy.yml` runs only by hand
+(**Run workflow**; a push or merge to `main` deploys nothing): it runs `ci.yml`, then, after approval in a
+GitHub Environment, starts the foundation pipeline (`bootstrap.sh`, when the chosen target includes it) and
+then the deploy pipeline (`ci/apply-app.sh`: tests, builds, applies
 `infra/`, runs `scripts/deploy.sh`). `destroy.yml` (manual) starts the destroy pipeline
 (`ci/destroy-app.sh`, app stack only). GitHub signs in with OIDC as `family-drive-gh-*` roles that can only
 start their own pipeline: **never put an AWS key in GitHub, never give a pipeline a push trigger, an

@@ -1,5 +1,7 @@
 # GitHub Actions starts the CodePipelines, signed in with OIDC
 
+Amended by [0018](0018-deploys-run-only-by-hand.md): `deploy.yml` runs only by hand, never on a push to `main`.
+
 Until now CodePipeline decided when to deploy. A push to `main` started the pipelines directly, whether or not
 the GitHub checks ([ADR 0016](0016-pull-request-checks-on-github-actions-with-oxlint.md)) had passed.
 Approvals were clicked in the CodePipeline console. The foundation and app pipelines could run side by side.

@@ -3,16 +3,12 @@
 # GitHub only starts pipelines; Terraform and the uploads run inside CodePipeline under the
 # pipeline roles. AWS sign-in is OIDC: no AWS key is stored in GitHub (ADR 0017).
 #
-# Push to main: foundation runs only if infra/foundation/** changed, always before app.
-# Run workflow (manual): pick a target, and optionally an older commit of main to roll back to.
+# Manual only: a push or merge to main deploys nothing. Run workflow, pick a target
+# (foundation always runs before application), and optionally an older commit of main to
+# roll back to.
 name: Deploy app
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
   workflow_dispatch:
     inputs:
       target:
@@ -54,8 +50,6 @@ jobs:
           persist-credentials: false
       - id: decide
         env:
-          EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
           TARGET: ${{ inputs.target }}
         run: |
           sha="$(git rev-parse HEAD)"
@@ -64,24 +58,12 @@ jobs:
             echo "::error::${sha} is not on main"
             exit 1
           fi
-          if [ "$EVENT" = push ]; then
-            app=true
-            # New branch or a rewritten history leaves nothing to compare with: run the foundation too.
-            if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-              foundation=true
-            elif git diff --quiet "$BEFORE" "$sha" -- infra/foundation; then
-              foundation=false
-            else
-              foundation=true
-            fi
-          else
-            case "$TARGET" in
-              application) foundation=false app=true ;;
-              foundation) foundation=true app=false ;;
-              foundation-then-application) foundation=true app=true ;;
-              *) echo "::error::unknown target ${TARGET}"; exit 1 ;;
-            esac
-          fi
+          case "$TARGET" in
+            application) foundation=false app=true ;;
+            foundation) foundation=true app=false ;;
+            foundation-then-application) foundation=true app=true ;;
+            *) echo "::error::unknown target ${TARGET}"; exit 1 ;;
+          esac
           echo "Commit ${sha}: foundation=${foundation} app=${app}"
           {
             echo "sha=${sha}"

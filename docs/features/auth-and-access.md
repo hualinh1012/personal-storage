@@ -253,7 +253,7 @@ up to an hour.
 | Access-denied redirect | `web/src/authErrors.ts` | `web/test/authErrors.test.ts` |
 | Access claims in the SPA | `web/src/access.ts` | `web/test/access.test.ts` |
 | Locations and capabilities per access level (the Location policy) | `web/src/locationPolicy.ts` (`locationPolicy`, `capabilitiesOf`, `hideUnless`, `canWriteAt`, `driveLocation`, `listDriveLocations`) | `web/test/locationPolicy.test.ts` |
-| Pipeline | `ci/pipeline.sh`, `ci/iam/app-pipeline-policy.json`, `ci/iam/app-pipeline-identity-policy.json` | |
+| Pipeline | `ci/apply-app.sh`, `ci/iam/app-pipeline-policy.json`, `ci/iam/app-pipeline-identity-policy.json` | |
 
 `currentUser()` reads the email from the ID token rather than calling `fetchUserAttributes()`:
 that would call Cognito `GetUser`, which needs the `aws.cognito.signin.user.admin` scope, and
@@ -346,7 +346,7 @@ Identity Pool (new identity IDs), which is why personal folders are keyed by ema
 | Cognito Identity | `sts:AssumeRoleWithWebIdentity` + `sts:TagSession` | AWS, on the browser's behalf |
 | User pool | `lambda:InvokeFunction` on both triggers | AWS (allowed by `aws_lambda_permission`, `source_arn` = the pool) |
 | Lambdas | none beyond writing CloudWatch Logs | |
-| App pipeline | `ssm:GetParameter(s)` on `/family-drive/*`; Cognito, Cognito Identity, Lambda, IAM and Logs calls to manage the resources | Terraform in `ci/pipeline.sh` |
+| App pipeline | `ssm:GetParameter(s)` on `/family-drive/*`; Cognito, Cognito Identity, Lambda, IAM and Logs calls to manage the resources | Terraform in `ci/apply-app.sh` |
 
 ### IAM for the pipeline
 

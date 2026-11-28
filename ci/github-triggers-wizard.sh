@@ -244,7 +244,7 @@ check_pipeline() {
       grep -q 'bootstrap.sh' <<<"$commands" || echo "no command runs infra/foundation/bootstrap.sh"
       ;;
     deploy)
-      grep -q 'ci/pipeline.sh' <<<"$commands" || echo "no command runs ci/pipeline.sh"
+      grep -q 'ci/apply-app.sh' <<<"$commands" || echo "no command runs ci/apply-app.sh (renamed from ci/pipeline.sh: update the Commands action)"
       if grep -q 'destroy-app.sh' <<<"$commands"; then echo "it still has a destroy stage (ci/destroy-app.sh)"; fi
       ;;
     destroy)
@@ -310,7 +310,7 @@ pause "Right account and repo? Press Enter"
 stage "Name the three pipelines"
 say "GitHub needs the exact names of your CodePipelines. Two exist already; destroy is new."
 open_url "${CONSOLE}/pipelines?region=${REGION}"
-step "Find the pipeline that runs infra/foundation/bootstrap.sh, and the one that runs ci/pipeline.sh."
+step "Find the pipeline that runs infra/foundation/bootstrap.sh, and the one that runs ci/apply-app.sh (ci/pipeline.sh before the rename)."
 note "Pipelines in $REGION right now:"
 awsq codepipeline list-pipelines --query 'pipelines[].name' --output text | tr '\t' '\n' | sed 's/^/      /'
 ask FOUNDATION_PIPELINE "Foundation pipeline name:"
@@ -488,10 +488,11 @@ pause
 stage "Merge the pull request and approve the first deploy"
 PR_URL="$(gh pr list --search 'GitHub Actions starts the CodePipelines in:title' --state all --json url --jq '.[0].url' 2>/dev/null || true)"
 [[ -n "$PR_URL" ]] || PR_URL="https://github.com/$REPO/pulls"
-say "Merging is a push to main: Deploy app runs the checks, then waits for you in 'app'."
+say "Merging deploys nothing by itself: after the merge this starts Deploy app (target application)."
 open_url "$PR_URL"
 step "Merge the pull request (skip this if it's already merged)."
 pause "Merged? Press Enter"
+gh workflow run deploy.yml --ref main -f target=application
 sleep 5
 RUN_ID="$(latest_run_id deploy.yml)"
 if [[ -n "$RUN_ID" ]]; then

@@ -1,6 +1,6 @@
 # Checks every pull request: lint, type-check, test and build each package, and check the
-# Terraform offline. deploy.yml calls it too (workflow_call), so every push to main is
-# checked before anything deploys. No AWS credentials here: deploy.yml starts the
+# Terraform offline. deploy.yml calls it too (workflow_call), so every commit is
+# checked before it deploys. No AWS credentials here: deploy.yml starts the
 # CodePipelines, which do the deploying (ADR 0016, ADR 0017).
 name: CI
 

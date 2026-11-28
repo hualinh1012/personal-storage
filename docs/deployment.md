@@ -18,11 +18,11 @@ There are two Terraform stacks and three pipelines.
 
 | Pipeline | Runs | Started by (GitHub Actions) |
 |---|---|---|
-| Foundation | `infra/foundation/bootstrap.sh` | `deploy.yml`, when a push to `main` changes `infra/foundation/**`, after approval in the `foundation` environment |
-| App deploy | `ci/pipeline.sh` | `deploy.yml`, on every push to `main` except docs-only ones, after approval in `app` (and after the foundation, if it ran) |
+| Foundation | `infra/foundation/bootstrap.sh` | `deploy.yml`, by hand only (target `foundation` or `foundation-then-application`), after approval in the `foundation` environment |
+| App deploy | `ci/apply-app.sh` | `deploy.yml`, by hand only (target `application` or `foundation-then-application`), after approval in `app` (and after the foundation, if it ran) |
 | App destroy | `ci/destroy-app.sh` | `destroy.yml`, by hand only: typed confirmation, then approval in `destroy` |
 
-No pipeline starts on a push by itself or has an approval stage: GitHub Actions starts them at the
+A push or merge to `main` deploys nothing. No pipeline starts on a push by itself or has an approval stage: GitHub Actions starts them at the
 commit its checks passed, signed in with OIDC ([ADR 0017](adr/0017-github-actions-starts-codepipeline-with-oidc.md)).
 Approve a waiting run under **Actions → the run → Review deployments**.
 
@@ -158,8 +158,7 @@ re-run `ci/iam/github-trigger-roles.sh` with the same name (see the script's hea
 | Deploy job fails at "Configure AWS credentials": role ARN `arn:aws:iam:::role/…` | The repository variable `AWS_ACCOUNT_ID` isn't set | Set it under **Settings → Secrets and variables → Actions → Variables**. |
 | `AccessDenied … codepipeline:StartPipelineExecution` | The pipeline's name differs from the one the role was made for | Set `FOUNDATION_PIPELINE` / `DEPLOY_PIPELINE` / `DESTROY_PIPELINE` to the console names and re-run `github-trigger-roles.sh` with the same names. |
 | `start-pipeline-execution`: `ValidationException` … `The action name provided in the source revision is not valid` | The pipeline's source action isn't named `CodeConnections` (the console's default) | Set the repository variable `SOURCE_ACTION` to the source action's name (the box in the pipeline's first stage), or rename the action to `CodeConnections`. All three pipelines must use the same name. |
-| Deploy app run waits forever at "Waiting for review" | Nobody approved the environment | **Actions → the run → Review deployments → Approve**. A newer push waits behind it (concurrency group `aws-app`): approve or reject the older run first. |
-| A push to `main` deployed nothing | It changed only `docs/**` or Markdown files (`paths-ignore`), or its checks failed | Run the app pipeline by hand if needed. |
+| Deploy app run waits forever at "Waiting for review" | Nobody approved the environment | **Actions → the run → Review deployments → Approve**. A newer run waits behind it (concurrency group `aws-app`): approve or reject the older run first. |
 | The pipeline started on a push by itself, as well as from GitHub | Its push trigger is still on | Remove the trigger in the pipeline's settings (setup guide step 4.1 / 7.1). |
 | `cognito-identity:SetPrincipalTagAttributeMap` / `GetPrincipalTagAttributeMap` AccessDenied | The app pipeline role has a policy from before personal folders | Re-attach the app policies (`bash ci/iam/attach-app-policies.sh <app-pipeline-role>`). |
 | AccessDenied opening your own personal folder | The Identity Pool's principal tag mapping is missing (stack not re-applied), or the account's email has capitals in its claim | Re-run the app pipeline; check the `email` claim in the ID token is lower case (ADR 0009). |

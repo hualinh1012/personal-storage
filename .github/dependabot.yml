@@ -1,5 +1,6 @@
 # Weekly dependency update PRs. Each one is checked by CI (.github/workflows/ci.yml runs on
-# every pull request); merging one to main deploys like any other merge (CodePipeline).
+# every pull request); merging one deploys nothing until
+# someone runs Deploy app by hand.
 version: 2
 
 updates:

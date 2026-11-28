@@ -39,7 +39,7 @@ flowchart LR
 
     subgraph CI["AWS CodePipeline"]
         FP["Foundation pipeline<br/>bootstrap.sh"]
-        AP["App pipeline<br/>ci/pipeline.sh"]
+        AP["App pipeline<br/>ci/apply-app.sh"]
         DP["Destroy pipeline<br/>ci/destroy-app.sh (manual)"]
     end
 
@@ -94,7 +94,7 @@ of truth.
 | SSM parameters | `infra/foundation/ssm.tf` | foundation | §4 below |
 | Config into the SPA | `scripts/write-config.sh` | scripts | §4 below |
 | Build and upload of the SPA | `scripts/deploy.sh` | scripts | §5 below |
-| Pipelines | `ci/pipeline.sh`, `ci/app-env.sh`, `ci/tf-init.sh`, `ci/destroy-app.sh`, `infra/foundation/bootstrap.sh` | CI | §5 below |
+| Pipelines | `ci/apply-app.sh`, `ci/app-env.sh`, `ci/tf-init.sh`, `ci/destroy-app.sh`, `infra/foundation/bootstrap.sh` | CI | §5 below |
 | Pipeline permissions | `ci/iam/app-pipeline-policy.json`, `ci/iam/app-pipeline-identity-policy.json` (managed, applied by `ci/iam/attach-app-policies.sh`), `ci/iam/foundation-pipeline-policy.json` (inline) | CI | §5 below |
 
 ## 2. Request path
@@ -168,7 +168,7 @@ flowchart TB
         IAM["family-drive-authenticated policy:<br/>prefix + aws:PrincipalTag conditions"]
     end
     Data[("Files bucket")]
-    Pipe["Pipelines: push to main → AWS (widest boundary)"]
+    Pipe["Pipelines: Deploy app run by hand → AWS (widest boundary)"]
 
     UI -->|"ID token"| IPool
     T --> IPool
@@ -259,7 +259,7 @@ must match the app client's callback URLs in `infra/auth.tf`. A rework of this p
 | Holds | files bucket, state bucket, SSM parameters, the app roles' permissions boundary | Cognito, Lambdas, Identity Pool, role, CloudFront, web bucket, files bucket CORS, the custom domain's Route 53 records (if set) |
 | Lifetime | retained: every resource `prevent_destroy` | disposable: destroy and rebuild freely |
 | State | `s3://family-drive-tfstate-<account>/foundation/terraform.tfstate` | `…/family-drive/terraform.tfstate` |
-| Applied by | `bootstrap.sh` (foundation pipeline, `AUTO_APPROVE=1`) | `ci/pipeline.sh` (app pipeline) |
+| Applied by | `bootstrap.sh` (foundation pipeline, `AUTO_APPROVE=1`) | `ci/apply-app.sh` (app pipeline) |
 | Finds the other | n/a | **by name**, through data sources (`aws_s3_bucket.files`, `aws_ssm_parameter.*`), never remote state |
 
 [ADR 0004](../adr/0004-retained-foundation-and-disposable-app-stack.md). Rebuilding the app stack
@@ -279,19 +279,19 @@ signed in with OIDC as a `family-drive-gh-*` role that may only start and watch 
 | Workflow (GitHub Actions) | Trigger | Does |
 |---|---|---|
 | `ci.yml` (no AWS access) | every pull request; called by `deploy.yml` | lint, type-check, test and build both packages; `terraform fmt -check` and offline `validate` of both stacks ([ADR 0016](../adr/0016-pull-request-checks-on-github-actions-with-oxlint.md)) |
-| `deploy.yml` | push to `main` (except docs-only), or by hand (target, optional older commit of `main`) | `ci.yml` on the commit → if `infra/foundation/**` changed: approve `foundation`, run the foundation pipeline → approve `app`, run the deploy pipeline |
+| `deploy.yml` | by hand only (target, optional older commit of `main`); a push to `main` deploys nothing | `ci.yml` on the commit → if the target includes it: approve `foundation`, run the foundation pipeline → if the target includes it: approve `app`, run the deploy pipeline |
 | `destroy.yml` | by hand, with the typed confirmation `destroy-family-drive` | approve `destroy`, run the destroy pipeline |
-| Dependency updates (Dependabot) | weekly, Monday 09:00 Singapore | `.github/dependabot.yml`: one PR for the pinned actions, and per package (`web`, `functions/allowlist`) one grouped minor/patch PR plus one per major (`@aws-amplify/ui-react-storage` always alone: it needs the manual re-check in `web/CLAUDE.md`). Each is checked by `ci.yml`; merging one deploys like any merge, after approval in `deploy.yml` |
+| Dependency updates (Dependabot) | weekly, Monday 09:00 Singapore | `.github/dependabot.yml`: one PR for the pinned actions, and per package (`web`, `functions/allowlist`) one grouped minor/patch PR plus one per major (`@aws-amplify/ui-react-storage` always alone: it needs the manual re-check in `web/CLAUDE.md`). Each is checked by `ci.yml`; merging one deploys nothing until `deploy.yml` is run by hand |
 
 `deploy.yml` and `destroy.yml` share the concurrency group `aws-app`: one AWS change at a time.
 
 | CodePipeline (V2, `QUEUED`) | Started by | Runs |
 |---|---|---|
 | Foundation | `deploy.yml`, job `foundation` | `terraform fmt -check`, `bootstrap.sh`: init (or first-run local state then migrate), import existing parameters, buckets and the boundary policy, apply |
-| Deploy | `deploy.yml`, job `app` | `ci/pipeline.sh` (below) |
+| Deploy | `deploy.yml`, job `app` | `ci/apply-app.sh` (below) |
 | Destroy | `destroy.yml` | `ci/destroy-app.sh`: build Lambdas, init, `terraform destroy` of `infra/` only |
 
-`ci/pipeline.sh`, in order:
+`ci/apply-app.sh`, in order:
 1. `ci/app-env.sh`: check Terraform and Node ≥ 22.12; `npm ci`, test and build the Lambdas (Terraform zips `dist/*.js`).
 2. `npm ci` and test the web app.
 3. `terraform fmt -check`, `ci/tf-init.sh` (backend bucket from the account ID), `plan`, `apply`.
